@@ -89,6 +89,9 @@ def test_serve_reports_bind_failure_with_alternate_port(monkeypatch, capsys):
 
 
 def test_mcp_command_dispatches_to_mcp_server_with_host_port(monkeypatch):
+    import pytest
+
+    pytest.importorskip("mcp")
     captured = {}
 
     def fake_main(host: str, port: int) -> None:

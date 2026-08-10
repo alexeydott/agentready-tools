@@ -29,7 +29,38 @@ py -3.12 -m venv .venv
 
 Optional extras:
 
-```bash
+```
+
+### Optional dependency FAQ
+
+`pip install -e .` installs only the core runtime. It does not install the
+MCP server or Playwright extras. Use `requirements-dev.txt` for the complete
+developer and portable-build environment, or install the needed extras
+explicitly:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+# alternatively:
+.\.venv\Scripts\python.exe -m pip install -e ".[mcp]"
+.\.venv\Scripts\python.exe -m pip install -e ".[server]"
+.\.venv\Scripts\python.exe -m pip install -e ".[ai]"
+```
+
+If tests report a missing `mcp` module, activate the same virtual environment
+used by pytest and install `.[mcp]`. MCP-specific tests intentionally skip
+when that optional dependency is absent; the core test suite remains runnable.
+
+Playwright's Python package and its Chromium executable are separate
+installations. For `--render` audits and browser-backed tests, run:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[portable]"
+.\.venv\Scripts\python.exe -m playwright install chromium
+```
+
+If Chromium is missing, `BrowserPool` reports the exact install command rather
+than exposing Playwright's low-level launch error. Browser binaries are not
+required to build the portable executable, only to run rendered audits/tests.bash
 pip install -e '.[server]'
 pip install -e '.[mcp]'
 pip install -e '.[ai]'

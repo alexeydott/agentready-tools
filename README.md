@@ -71,6 +71,14 @@ rendered mobile or SEO checks:
 python -m playwright install chromium
 ```
 
+`requirements-dev.txt` installs the complete developer/build dependency set,
+including the optional MCP facade and Playwright Python package. The MCP tests
+are skipped when the `mcp` extra is not installed; install the full developer
+requirements when validating MCP behavior. Installing the Playwright package
+does not install browser binaries. If rendered SEO/mobile tests fail with a
+missing Chromium executable, run `python -m playwright install chromium` in
+the same virtual environment.
+
 ### Windows portable executable
 
 The standalone Win64 build is distributed as `agentready.exe`. It includes the

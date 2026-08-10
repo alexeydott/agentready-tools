@@ -68,7 +68,16 @@ python -m compileall -q src
 
 For a clean Windows validation, create a new 64-bit Python 3.12 virtual
 environment and install `requirements-dev.txt`. This installs the package,
-test runner, and all portable-build dependencies through `pip`.
+test runner, MCP/Playwright optional dependencies, and all portable-build
+dependencies through `pip`. Playwright browser binaries are a separate step:
+
+```powershell
+.\.venv\Scripts\python.exe -m playwright install chromium
+```
+
+Without the `mcp` extra, MCP-specific tests are reported as skipped. Without
+the Chromium binary, browser-backed tests and `--render` audits cannot run;
+the portable build itself does not require that binary.
 
 ## Portable Windows Build
 

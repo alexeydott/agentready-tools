@@ -1,4 +1,5 @@
 import asyncio
+import pytest
 import sys
 from pathlib import Path
 
@@ -144,6 +145,7 @@ def test_remediation_plan_seo_mode():
 
 
 def test_mcp_server_registers_agent_tools_and_rejects_bad_mode(monkeypatch):
+    pytest.importorskip("mcp")
     import agentready.mcp_server as mcp_module
 
     async def _tools():
@@ -164,13 +166,12 @@ def test_mcp_server_registers_agent_tools_and_rejects_bad_mode(monkeypatch):
     plan = mcp_module.remediation_plan("https://example.com", language="en")
     assert plan["schema"] == "agentready.remediation-plan.v1"
 
-    import pytest
-
     with pytest.raises(ValueError, match="unsupported mode"):
         mcp_module.audit_findings("https://example.com", mode="bogus")
 
 
 def test_mcp_seo_audit_exposes_crawl_option(monkeypatch):
+    pytest.importorskip("mcp")
     import agentready.mcp_server as mcp_module
 
     captured: dict = {}

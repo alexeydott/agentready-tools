@@ -39,11 +39,20 @@ class BrowserPool:
         if self._started:
             return
         try:
+            from playwright.async_api import Error as PlaywrightError
             from playwright.async_api import async_playwright
         except ImportError as exc:
             raise RuntimeError("BrowserPool requires the optional browser extra (playwright)") from exc
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(headless=True)
+        try:
+            self._browser = await self._playwright.chromium.launch(headless=True)
+        except PlaywrightError as exc:
+            await self._playwright.stop()
+            self._playwright = None
+            raise RuntimeError(
+                "BrowserPool requires the Chromium browser binary; run "
+                "'python -m playwright install chromium'"
+            ) from exc
         self._started = True
         logger.info("[WP4.3] browser pool started max_contexts=%d", self.config.max_contexts)
 

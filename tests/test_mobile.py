@@ -166,6 +166,9 @@ def test_mobile_server_endpoints_exist():
 def test_mobile_mcp_tools_registered(monkeypatch):
     import asyncio
 
+    import pytest
+
+    pytest.importorskip("mcp")
     import agentready.mcp_server as mcp_module
 
     async def _tools():
