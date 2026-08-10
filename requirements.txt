@@ -1,0 +1,13 @@
+httpx>=0.27,<1
+dnspython>=2.6,<3
+PyYAML>=6,<7
+openai>=1.60,<2
+keyring>=25,<26
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+google-auth[requests]>=2.35,<3
+google-analytics-data>=0.18,<1
+google-api-python-client>=2,<3
+mcp[cli]>=2,<3
+playwright>=1.40,<2
+pyinstaller>=6.10,<7

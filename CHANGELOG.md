@@ -1,0 +1,152 @@
+# Changelog
+
+## 0.7.13
+
+- Embedded localized AI chat skills, including the SEO security interpreter
+  for explaining insecure links and possible SEO-spam signals.
+- Applied the built-in skill instructions consistently across dashboard, CLI,
+  and MCP AI assistant surfaces.
+
+## 0.7.12
+
+- Added a visible localized list of affected page URLs to SEO HTML reports
+  for crawl-aware insecure-link findings.
+
+## 0.7.11
+
+- Added crawl-aware SEO detection for insecure HTTP links on every crawled
+  HTTPS page, with affected page URLs and localized guidance in serve, CLI,
+  and MCP reports.
+
+## 0.7.10
+
+- Added the MCP CLI extra to the portable dependency set so clean PyInstaller
+  builds install all required transitive dependencies.
+- Added reproducible clean-environment setup and source-archive instructions.
+
+## 0.7.9
+
+- Changed Russian standard report status labels to normal lowercase wording,
+  matching the SEO report.
+
+## 0.7.8
+
+- Corrected SEO image evidence so `Additional details` lists only images
+  missing `alt` text and includes matching total/missing counters.
+- Applied the same affected-only evidence pattern to mixed-content resources
+  and insecure links.
+
+## 0.7.7
+
+- Normalized dashboard decimal values to display a leading zero, for example
+  `0.8` instead of `.8`.
+
+## 0.7.6
+
+- Updated dashboard decimal inputs to accept both `.` and `,` separators.
+
+## 0.7.5
+
+- Limited SEO report `Additional details` evidence to failed, warning, and
+  error checks so passed and not-applicable checks stay concise.
+
+## 0.7.4
+
+- Normalized the status column typography in the standard HTML report to match
+  the SEO and mobile report styling.
+
+## 0.7.3
+
+- Expanded the dashboard to use the available viewport width instead of a
+  centered fixed-width layout.
+
+## 0.7.2
+
+- Moved the dashboard help panel to the right side.
+- Moved the localized help toggle beside the language selector and removed the
+  language-selector tooltip icon.
+
+## 0.7.1
+
+- Made the dashboard help sidebar horizontally resizable on desktop while
+  preserving the stacked mobile layout.
+
+## 0.7.0
+
+- Added a collapsible localized help sidebar to the dashboard.
+- Added beginner guidance for audit setup, checks, reports, AI assistant usage, language selection, and troubleshooting.
+
+
+## 0.6.0
+
+- Added structured SEO evidence locations for affected pages and resources, including image `page`/`resource` fields and title length metrics.
+- Preserved bounded evidence metrics through AI context projection, typed AI responses, and the dashboard AI report.
+- Added evidence URLs, findings, and metrics to SEO console and Markdown exports for consistent report output.
+- Added regression coverage for structured evidence serialization, AI propagation, dashboard display data, and report renderers.
+
+## 0.5.2
+
+- Added simple and advanced usage examples with descriptions to nested CLI help modes.
+- Added regression coverage for rendered portable help output.
+
+## 0.5.1
+
+- Fixed report timestamps so they appear immediately below `h1` in every HTML report.
+- Unified subdued timestamp styling across standard, SEO, mobile, and AI report exports.
+- Fixed HTML report generation to use one timestamp for all localized report views.
+
+## 0.5.0
+
+- Added an OpenAI-compatible SEO/GEO AI assistant across CLI, FastAPI serve, dashboard, and MCP.
+- Added provider profiles, shared OS-vault credentials, model catalogs, capability markers, model selection, usage, and cost accounting.
+- Added localized structured AI reports, dashboard language support, loading/error states, audit gating, and persistent provider/model state.
+- Added localized prompt library, built-in SEO/GEO skills, AgentReady MCP context, bounded conversation history, attachments, clipboard paste, saved chats, and chat restoration.
+- Added chat retry, OpenAI/DeepSeek-compatible JSON export, new-chat autosave, resizable input, and AI report HTML download/print.
+- Changed portable runtime persistence to use `.cache` beside the executable and documented the runtime data layout.
+- Added generation timestamps to standard, SEO, mobile, and AI reports.
+
+## 0.4.0
+
+- Added a separate `ai-search` / GEO audit profile inspired by the Tochki practical guide without changing the protocol-readiness score.
+- Added `ai_search_score` and `ai_search_applicable` to reports plus `--min-ai-search-score` / `--min-geo-score` CI gates.
+- Added `search-indexability`, `ai-crawler-live-access`, `structured-data-graph`, `faq-structured-data`, `date-transparency`, and experimental `citation-readiness` checks.
+- Added live crawler diagnostics for OAI-SearchBot, Claude-SearchBot, PerplexityBot and Googlebot; user-directed/training agents are reported separately.
+- Added IndexNow key generation, deployed-key verification, batch submission, dry-run and Git-change URL mapping with explicit `--send`.
+- Added Git-backed publication/modification date review with normalized-content comparison.
+- Added AI crawler access-log summaries.
+- Added Russian/English `AI_SEARCH_RULES.md` generator for safe mass-edit and verification workflows.
+- Added GEO-aware recommendations and report/dashboard display.
+- Added baseline warning when AI Search/GEO score decreases.
+- Expanded regression suite to 21 tests before end-to-end packaging validation.
+
+## 0.3.0
+
+- Added a dedicated localization layer with built-in English (`en`) and Russian (`ru`) catalogs.
+- Added `--lang` / `--language` selection for scans and check listings.
+- Added `report.language` to YAML configuration and `agentready init --lang`.
+- Localized console, JSON, Markdown, and HTML report output.
+- Localized check/category/level labels, result descriptions, recommendations, remediation guidance, and coding-agent prompts.
+- Preserved stable machine identifiers (`id`, `status`, scores, protocol identifiers) across locales.
+- Added a client-side English/Russian selector to the self-contained HTML dashboard without requiring a rescan.
+- Added `language` support to FastAPI and MCP interfaces and a `/scan/dashboard` API endpoint.
+- Expanded the test suite from 11 to 16 tests with localization regression coverage.
+
+## 0.2.0 — 2026-08-07
+
+- Added YAML configuration and `agentready init`.
+- Added supplemental `llms-txt`, `markdown-index-fallback`, and `markdown-efficiency` checks.
+- Added generic `--include` / `--exclude` check selection.
+- Added `--with-llms`, `--with-markdown-fallback`, and `--with-markdown-efficiency` shortcuts.
+- Added `--min-score`, `--min-level`, `--ci`, and config-driven gates.
+- Added `transparent-tiered-v2` sequential maturity model with configurable threshold and next-tier progress.
+- Reclassified Web Bot Auth as informational by default because applicability is contextual.
+- Added impact/effort prioritized recommendations.
+- Added ready-to-paste coding-agent remediation prompts.
+- Added evidence metrics for content efficiency checks.
+- Improved HTML and Markdown reports.
+- Baseline comparison now detects maturity-level regressions and reports score decreases.
+- Expanded HTTP API and MCP arguments for supplemental checks.
+- Expanded test suite from 7 to 11 unit tests and repeated full end-to-end fixture validation.
+
+## 0.1.0
+- Initial revision
