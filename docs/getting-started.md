@@ -49,6 +49,8 @@ explicitly:
 If tests report a missing `mcp` module, activate the same virtual environment
 used by pytest and install `.[mcp]`. MCP-specific tests intentionally skip
 when that optional dependency is absent; the core test suite remains runnable.
+If `agentready mcp` is started without the extra, it prints the same repair
+command and an import verification command.
 
 Playwright's Python package and its Chromium executable are separate
 installations. For `--render` audits and browser-backed tests, run:

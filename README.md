@@ -79,6 +79,11 @@ does not install browser binaries. If rendered SEO/mobile tests fail with a
 missing Chromium executable, run `python -m playwright install chromium` in
 the same virtual environment.
 
+If `agentready mcp` reports a missing MCP dependency, activate the same
+environment used by `agentready` and run
+`python -m pip install -e ".[mcp]"`. Verify the installation with
+`python -c "import mcp; print(mcp.__file__)"`.
+
 ### Windows portable executable
 
 The standalone Win64 build is distributed as `agentready.exe`. It includes the

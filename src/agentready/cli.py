@@ -921,7 +921,12 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
     try:
         from .mcp_server import main as run_mcp
     except (ImportError, RuntimeError):
-        print("Install MCP extras: pip install 'agentready-tools[mcp]'", file=sys.stderr)
+        print(
+            "MCP dependency is missing. Activate the project virtual environment and run "
+            '`python -m pip install -e ".[mcp]"`; verify with '
+            '`python -c "import mcp; print(mcp.__file__)"`.',
+            file=sys.stderr,
+        )
         return 2
     logger.debug("Starting MCP server from CLI: host=%s port=%s", args.host, args.port)
     run_mcp(host=args.host, port=args.port)

@@ -107,11 +107,12 @@ def test_mcp_command_dispatches_to_mcp_server_with_host_port(monkeypatch):
     assert captured == {"host": "127.0.0.1", "port": 9999}
 
 
-def test_mcp_command_returns_2_when_mcp_extra_missing(monkeypatch):
+def test_mcp_command_returns_2_when_mcp_extra_missing(monkeypatch, capsys):
     monkeypatch.setitem(__import__("sys").modules, "agentready.mcp_server", None)
     args = type("Args", (), {"host": "127.0.0.1", "port": 8766})()
 
     assert cli._cmd_mcp(args) == 2
+    assert 'python -m pip install -e ".[mcp]"' in capsys.readouterr().err
 
 
 def test_mcp_parser_defaults_and_example():

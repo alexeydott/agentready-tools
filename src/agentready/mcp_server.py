@@ -9,7 +9,11 @@ from __future__ import annotations
 try:
     from mcp.server import MCPServer
 except ImportError as exc:  # pragma: no cover
-    raise RuntimeError("Install MCP extra: pip install 'agentready-tools[mcp]'") from exc
+    raise RuntimeError(
+        "MCP dependency is missing. Activate the project virtual environment and run "
+        "`python -m pip install -e \".[mcp]\"`; verify with "
+        "`python -c \"import mcp; print(mcp.__file__)\"`."
+    ) from exc
 
 from .agentfindings import build_findings, build_remediation_plan
 from .i18n import localized_report_dict
