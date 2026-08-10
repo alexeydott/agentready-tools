@@ -51,7 +51,12 @@ Useful presets:
 agentready scan https://docs.example.com --preset content
 agentready scan https://api.example.com --preset api
 agentready scan https://example.com/article/ --preset ai-search --lang ru
+agentready scan https://example.com --preset all --lang en
 ```
+
+The `all` preset runs the complete readiness set, including GEO-scored checks.
+The browser dashboard's **All checks** profile also runs the independent SEO
+audit and combines both report sections in one HTML result.
 
 Independent SEO audit:
 

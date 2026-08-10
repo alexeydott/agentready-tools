@@ -10,7 +10,9 @@ Run dedicated GEO checks:
 agentready scan https://example.com/article/ --preset ai-search --lang ru
 ```
 
-Or blend GEO checks into another preset:
+The `all` preset includes the core GEO checks. Use the explicit flag when
+making that intent visible in scripts or when preserving compatibility with
+older configuration:
 
 ```bash
 agentready scan https://example.com/article/ --preset all --with-ai-search --lang ru
@@ -20,6 +22,10 @@ Reports can expose:
 
 - `score` — protocol/core readiness
 - `ai_search_score` — separate GEO score (`geo_scored` checks only)
+
+The browser dashboard profile **All checks** additionally runs the independent
+SEO audit and presents the GEO/readiness and SEO reports as two sections of one
+HTML document. CLI/API/MCP report schemas remain independent.
 
 `citation-readiness` is experimental and intentionally excluded from numeric `ai_search_score`.
 

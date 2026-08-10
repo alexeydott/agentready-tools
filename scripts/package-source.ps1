@@ -25,6 +25,7 @@ try {
         "README.md", "pyproject.toml", "requirements.txt", "requirements-dev.txt"
     )
     $directories = @("docs", "packaging", "scripts", "src", "tests")
+    $excludedDocumentationDirectories = @("presentations", "vNext")
 
     foreach ($relative in $files) {
         $source = Join-Path $projectRoot $relative
@@ -38,6 +39,12 @@ try {
         $source = Join-Path $projectRoot $relative
         if (Test-Path -LiteralPath $source -PathType Container) {
             Copy-Item -LiteralPath $source -Destination $stageRoot -Recurse
+        }
+    }
+    foreach ($relative in $excludedDocumentationDirectories) {
+        $excludedPath = Join-Path $stageRoot "docs\$relative"
+        if (Test-Path -LiteralPath $excludedPath) {
+            Remove-Item -LiteralPath $excludedPath -Recurse -Force
         }
     }
 

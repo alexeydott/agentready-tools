@@ -32,6 +32,11 @@ agentready scan https://example.com --format html --lang ru -o dashboard.html
 
 The HTML dashboard embeds English and Russian views with an in-browser language switcher.
 
+The dashboard profile **All checks** runs the readiness/GEO scan and the
+independent SEO audit, then composes one HTML report with separate GEO and SEO
+sections. The combined report keeps the source report styles, including
+keyboard-focus and hover hints, and supports one download and print action.
+
 SEO output uses the independent `agentready.seo.v1` schema:
 
 ```bash
@@ -55,6 +60,21 @@ Evidence is preserved across JSON, HTML, Markdown, console, MCP, and AI report s
 When presenting findings, keep page and resource locations distinct and do not infer a location that is absent from the evidence.
 
 SEO baselines reject Agent Readiness JSON and only compare SEO score/check regressions.
+
+## v2 Reports, jobs, and inventory operations
+
+The additive `agentready.audit.v2` report includes:
+
+- normalized audit configuration and version metadata;
+- bounded evidence with source/page/resource locations and metrics;
+- coverage counters for discovered, attempted, completed, skipped, and failed work;
+- stable finding fingerprints for comparison across runs.
+
+The v2 API supports synchronous audit, rescan, baseline diff, and bounded
+inventory export. Inventory data can be paginated for UI/API consumers and
+exported as JSONL or CSV. Long-running operations use bounded in-memory jobs
+with explicit queued/running/completed/failed/cancelled states. These features
+do not replace v1 report schemas or legacy CLI output.
 
 Mobile-friendliness output uses the independent `agentready.mobile.v1` schema with per-page and aggregate scores:
 

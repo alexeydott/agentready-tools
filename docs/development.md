@@ -16,7 +16,13 @@ src/agentready/
   i18n.py             report/dashboard localization catalogs
   http.py             bounded HTTP client and evidence capture
   target.py           URL normalization and SSRF policy
+  fetcher.py          bounded fetch and evidence/storage boundary
+  egress.py           public-target egress and redirect policy
+  security.py         shared redaction and security helpers
   report.py           console/JSON/Markdown/HTML
+  report_v2.py        additive v2 report contract and evidence projection
+  jobs_v2.py          bounded asynchronous job lifecycle
+  compatibility.py    v1/v2 compatibility manifest and migration metadata
   gitutils.py         Git→URL mapping and publication-date audit
   indexnow.py         IndexNow key/verification/submission client
   accesslog.py        AI crawler access-log analysis
@@ -35,6 +41,19 @@ src/agentready/
   mobile_scoring.py   mobile score aggregation
   mobile_report.py    mobile console/JSON/Markdown/HTML rendering
   mobile_scanner.py   mobile audit orchestration
+  crawler.py          v2 deterministic bounded frontier crawler
+  page_parser.py      shared parsed-page evidence model
+  browser_pool.py     optional Playwright browser pool and egress interception
+  crawl_profiles.py   quick/standard/deep/custom crawl limits
+  robots.py           RFC 9309 and provider robots policies
+  sitemap.py          bounded sitemap/index parsing and scope reconciliation
+  crawler_identity.py crawler intent and identity confidence evidence
+  interaction.py      offline accessibility and semantic interaction findings
+  metrics.py           opt-in external enrichment provider adapters
+  protocols/          versioned passive protocol auditors and adapters
+  seo/                shared SEO evidence and atomic rule engine
+  dashboard.py        localized browser dashboard and combined audit presentation
+  report_styles.py    shared HTML report styles and tooltip presentation
   cli.py              CLI and CI gates
   server.py           optional FastAPI API
   mcp_server.py       optional MCP facade
@@ -76,6 +95,19 @@ The archive is written to
 package source, documentation, tests, examples when present, and build
 metadata.
 
+The browser regression runner is kept in `scripts\dashboard-interactive.py`.
+It can run a headed Edge smoke suite, including the combined `all` profile,
+report download/print actions, AI interactions, localization, and browser
+diagnostics:
+
+```powershell
+python scripts\dashboard-interactive.py `
+  --url http://127.0.0.1:8000 `
+  --target https://example.com `
+  --edge "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" `
+  --headed
+```
+
 ## Localization Notes
 
 - Built-in locales: `en`, `ru`
@@ -86,6 +118,11 @@ metadata.
 
 - 0.4.0 introduced separate GEO scoring and IndexNow/GEO utilities
 - Core and GEO scoring remain intentionally separated
+- 0.8.0 introduced the v2 contract, bounded crawler, protocol profiles,
+  independent SEO/mobile domains, jobs, diffs, exports, and compatibility
+  metadata.
+- 0.8.1 preserves that v1-compatible surface and fixes combined dashboard
+  report composition, including report-local tooltip styles.
 
 ## See Also
 

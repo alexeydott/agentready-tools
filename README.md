@@ -1,4 +1,4 @@
-# AgentReady Tools 0.8.0
+# AgentReady Tools 0.8.1
 
 > Audit public websites for AI-agent protocol readiness and AI Search/GEO readiness.
 
@@ -90,10 +90,13 @@ line application icon.
 - **Protocol readiness checks** across discoverability, content accessibility, bot controls, protocol discovery, and commerce signals.
 - **Separate AI Search/GEO score** (`ai_search_score`) so GEO quality does not overwrite core protocol readiness.
 - **CI gating support** via minimum score/level thresholds and optional strict fail-on-checks behavior.
+- **Additive v2 audit contract** with bounded evidence, coverage accounting, deterministic finding fingerprints, baseline diff, rescan, inventory pagination, JSONL/CSV export, and bounded asynchronous jobs.
+- **Bounded v2 crawler foundation** with deterministic frontier/scope accounting, shared fetch and egress policy, robots/sitemap reconciliation, protocol profiles, and optional browser rendering.
 - **Prioritized recommendations** ranked by impact and effort.
 - **Multiple output formats**: console, JSON, Markdown, HTML dashboard (with EN/RU localization).
 - **Integration surfaces**: CLI, optional FastAPI API, optional MCP endpoint (including `audit_findings`/`remediation_plan` tools that hand coding agents concrete optimization gaps with step-by-step fix instructions).
 - **Independent SEO mode** with Google/Yandex best-practice checks and SEO-only baselines/thresholds.
+- **Combined dashboard profile** where “All checks” runs GEO/readiness and SEO and presents both sections in one report.
 - **Mobile-friendliness audit** with static HTML/CSS checks plus optional Playwright-rendered viewport metrics, available in CLI, API, and MCP.
 - **Explicit indexing publishers**: global/Yandex IndexNow and eligible-content Google Indexing API workflows.
 - **Opt-in SEO/GEO AI assistant** using an OpenAI-compatible API, bounded audit context, OS-vault credentials, and EN/RU CLI/API/MCP flows.

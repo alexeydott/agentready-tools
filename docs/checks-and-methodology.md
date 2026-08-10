@@ -45,6 +45,25 @@ score = round(100 * passed_scored_checks / applicable_scored_checks)
 
 Supplemental, experimental, skipped, and error-only checks do not silently inflate the score.
 
+## vNext audit foundations
+
+The implemented vNext layer adds shared evidence and bounded execution without
+changing the legacy v1 score contract:
+
+| Capability | Implementation boundary |
+|---|---|
+| Typed v2 reports | `report_v2.py` emits `agentready.audit.v2` with config, evidence, coverage, findings, and fingerprints. |
+| Baselines and diffs | v2 adapters normalize legacy baselines and compare deterministic finding identities. |
+| Bounded crawl | `crawler.py` owns the async frontier, scope, item states, coverage classification, and page results. |
+| Fetch safety | `fetcher.py` and `egress.py` enforce response, redirect, timeout, and public-target limits. |
+| Protocol auditing | `protocols/` contains versioned passive profiles, evidence locators, and agent/MCP adapters. |
+| Shared SEO evidence | `seo/` atomic rules consume one parsed evidence snapshot and adapt to the independent SEO v1 report. |
+| Browser/interaction signals | `browser_pool.py`, `interaction.py`, and `crawler_identity.py` are opt-in diagnostic boundaries. |
+
+Robots and sitemap parsing remain passive policy modules. They do not perform
+network access outside the shared fetch boundary, and provider metrics remain
+opt-in enrichment rather than core score inputs.
+
 ## Maturity Levels
 
 - Level 0 — Not Agent-Ready

@@ -54,7 +54,18 @@ limits are enforced server-side; incompatible baselines are rejected rather
 than silently compared. The canonical CLI equivalent is
 `agentready audit https://example.com --fail-on-checks`.
 
-Release `0.8.0` freezes the compatibility manifest: v1 CLI/API facades stay
+`POST /v2/jobs` returns a job identifier for bounded asynchronous execution.
+Poll `GET /v2/jobs/{job_id}` for a typed snapshot and use
+`POST /v2/jobs/{job_id}/cancel` to request cancellation. Job state is
+explicit; a cancelled or failed operation is never returned as a successful
+audit report.
+
+The v2 crawler is deterministic within its configured limits: same-origin
+scope, normalized URL identity, bounded frontier, explicit item states, and
+coverage accounting. Protocol profiles audit passive documents and expose
+evidence through the same report and agent/MCP projection boundaries.
+
+Release `0.8.1` freezes the compatibility manifest: v1 CLI/API facades stay
 supported, while v2 schemas and protocol manifests are additive. Migration
 status is intentionally `v1-preserved-v2-additive`; no v1 endpoint is removed
 by this release candidate.
@@ -67,6 +78,11 @@ curl -X POST http://127.0.0.1:8765/scan/dashboard \
   -d '{"url":"https://example.com","language":"ru"}' \
   -o dashboard.html
 ```
+
+The dashboard's `all` profile calls both `/scan/dashboard` (including GEO
+checks) and `/seo/audit/dashboard`, then presents their results as one
+downloadable HTML report with GEO and SEO sections. The independent endpoints
+remain unchanged for API consumers that need one report source.
 
 Independent SEO endpoints (optional `crawl`, `max_pages`, `render` fields enable cross-page checks and headless-browser link extraction):
 
