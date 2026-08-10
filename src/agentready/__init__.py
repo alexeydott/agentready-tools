@@ -1,3 +1,3 @@
 """AgentReady Tools."""
 
-__version__ = "0.7.13"
+__version__ = "0.8.0"

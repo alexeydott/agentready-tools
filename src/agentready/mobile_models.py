@@ -78,7 +78,7 @@ class MobileReport:
     started_at: str
     finished_at: str
     language: str = "en"
-    tool_version: str = "0.7.13"
+    tool_version: str = "0.8.0"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

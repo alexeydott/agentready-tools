@@ -30,6 +30,7 @@ from .mobile_report import render_mobile_html
 from .mobile_scanner import audit_mobile
 from .target import TargetError
 from .ai_prompts import ai_skill_catalog
+from .compatibility import COMPATIBILITY
 from .jobs_v2 import AuditJobManager
 from .report_v2 import AuditConfig, diff_reports, export_inventory, report_from_checks, report_from_dict
 
@@ -169,7 +170,7 @@ def _chats_dir() -> Path:
 
 app = FastAPI(
     title="AgentReady Tools API",
-    version="0.7.13",
+    version=COMPATIBILITY.release,
     description="Read-only AI-agent readiness website scanner. Private targets are blocked by default to reduce SSRF risk.",
 )
 

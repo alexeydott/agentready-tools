@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0 — 2026-08-10
+
+- Added the vNext compatibility surface: bounded v2 reports, evidence and
+  coverage contracts, protocol and provider boundaries, storage/crawler
+  foundations, and additive API/CLI jobs, diff, rescan, and export workflows.
+- Migrated dashboard and AI projections to evidence-backed v2 context while
+  preserving v1 commands, localized reports, credential boundaries, and MCP
+  compatibility.
+- Release candidate validation covers 213 tests, source packaging policy,
+  compile checks, compatibility suites, and synchronized Windows/package
+  version metadata.
+
 ## 0.7.13
 
 - Embedded localized AI chat skills, including the SEO security interpreter

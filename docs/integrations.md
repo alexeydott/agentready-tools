@@ -54,6 +54,11 @@ limits are enforced server-side; incompatible baselines are rejected rather
 than silently compared. The canonical CLI equivalent is
 `agentready audit https://example.com --fail-on-checks`.
 
+Release `0.8.0` freezes the compatibility manifest: v1 CLI/API facades stay
+supported, while v2 schemas and protocol manifests are additive. Migration
+status is intentionally `v1-preserved-v2-additive`; no v1 endpoint is removed
+by this release candidate.
+
 Get localized HTML dashboard:
 
 ```bash
