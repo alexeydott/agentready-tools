@@ -24,7 +24,7 @@ try {
         ".agentready.yml", ".gitignore", "CHANGELOG.md", "LICENSE", "NOTICE.md",
         "README.md", "pyproject.toml", "requirements.txt", "requirements-dev.txt"
     )
-    $directories = @("docs", "packaging", "scripts", "src", "tests")
+    $directories = @("docs", "packaging", "schemas", "scripts", "src", "tests")
     $excludedDocumentationDirectories = @("presentations", "vNext")
 
     foreach ($relative in $files) {

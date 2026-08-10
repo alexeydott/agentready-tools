@@ -87,7 +87,8 @@ def test_browser_pool_requires_optional_dependency_or_starts() -> None:
         try:
             await pool.start()
         except RuntimeError as exc:
-            assert "optional browser extra" in str(exc)
+            message = str(exc)
+            assert "optional browser extra" in message or "Chromium browser binary" in message
         else:
             await pool.close()
 
