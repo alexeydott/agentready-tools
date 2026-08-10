@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentready.dev/schemas/agentready.audit.v2.schema.json",
+  "title": "AgentReady audit v2 contract",
+  "type": "object",
+  "required": ["schema", "target", "coverage", "findings"],
+  "properties": {
+    "schema": {
+      "const": "agentready.audit.v2"
+    },
+    "target": {
+      "type": "string",
+      "format": "uri"
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["total_rules", "evaluated_rules", "applicable_rules", "complete_rules"],
+      "additionalProperties": false,
+      "properties": {
+        "total_rules": {"type": "integer", "minimum": 0},
+        "evaluated_rules": {"type": "integer", "minimum": 0},
+        "applicable_rules": {"type": "integer", "minimum": 0},
+        "complete_rules": {"type": "integer", "minimum": 0}
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {"type": "object"}
+    }
+  },
+  "additionalProperties": true
+}
