@@ -56,7 +56,7 @@ def _add_command_parser(sub: argparse._SubParsersAction, name: str, **kwargs) ->
     kwargs.setdefault("formatter_class", _HELP_FORMATTER)
     parser = sub.add_parser(name, **kwargs)
     if kwargs.get("epilog"):
-        logger.debug("[FIX] CLI help examples registered: command=%s", name)
+        logger.debug("CLI help examples registered: command=%s", name)
     return parser
 
 
@@ -789,7 +789,7 @@ def _cmd_seo_credentials(args: argparse.Namespace) -> int:
         print("GA/GSC credentials removed." if removed else "No stored GA/GSC credentials found.")
         return 0
     except CredentialsError as exc:
-        logger.error("[FIX] GA/GSC credentials operation failed: action=%s error=%s", args.action, exc)
+        logger.error("GA/GSC credentials operation failed: action=%s error=%s", args.action, exc)
         print(f"credentials: {exc}", file=sys.stderr)
         return 2
 
@@ -900,8 +900,20 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     from .server import app, configure_data_dir
 
     data_dir = configure_data_dir(getattr(args, "data_dir", None))
-    logger.debug("[FIX] Starting FastAPI app directly: host=%s port=%s data_dir=%s", args.host, args.port, data_dir)
-    uvicorn.run(app, host=args.host, port=args.port, reload=False)
+    logger.debug("Starting FastAPI app directly: host=%s port=%s data_dir=%s", args.host, args.port, data_dir)
+    try:
+        uvicorn.run(app, host=args.host, port=args.port, reload=False)
+    except SystemExit as exc:
+        exit_code = exc.code if isinstance(exc.code, int) else 2
+        if exit_code:
+            logger.error("FastAPI bind failed: host=%s port=%s exit_code=%s", args.host, args.port, exit_code)
+            print(
+                f"agentready: unable to bind serve to {args.host}:{args.port}; "
+                f"the port may be reserved or blocked by Windows. Try --port {args.port + 1}.",
+                file=sys.stderr,
+            )
+            return 2
+        return 0
     return 0
 
 

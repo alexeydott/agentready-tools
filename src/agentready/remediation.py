@@ -45,7 +45,7 @@ def remediation_for(spec: CheckSpec, target: str) -> Remediation:
     removed_references = len(spec.references) - len(refs)
     if removed_references:
         logger.debug(
-            "[FIX] Removed development-only source references from report: check_id=%s count=%d",
+            "Removed development-only source references from report: check_id=%s count=%d",
             spec.id,
             removed_references,
         )

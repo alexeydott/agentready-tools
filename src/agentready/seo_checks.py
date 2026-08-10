@@ -162,7 +162,7 @@ def _add_evidence_metrics(evidence: list[Evidence], **metrics: object) -> list[E
     if evidence:
         attached = {key: value for key, value in metrics.items() if value is not None}
         evidence[0].metrics.update(attached)
-        logger.debug("[FIX] SEO evidence locations attached: fields=%s", sorted(attached))
+        logger.debug("SEO evidence locations attached: fields=%s", sorted(attached))
     return evidence
 
 
@@ -293,7 +293,7 @@ def check_favicon(url: str, client: HttpClient) -> SeoCheckResult:
         ok = icon.status_code == 200 and bool(icon.body)
         return _result("favicon", "Favicon reachability", "metadata", "pass" if ok else "warn", False, "favicon is reachable" if ok else "favicon was not found", started, evidence)
     except (FetchError, ValueError) as exc:
-        logger.warning("[FIX] Ignoring malformed favicon URL: url=%s error=%s", url, exc)
+        logger.warning("Ignoring malformed favicon URL: url=%s error=%s", url, exc)
         return _result("favicon", "Favicon reachability", "metadata", "warn", False, str(exc), started, [])
 
 

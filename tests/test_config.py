@@ -16,6 +16,7 @@ def test_config_roundtrip(tmp_path: Path):
 def test_supplemental_is_opt_in():
     default_ids = [x.id for x in selected_checks("all")]
     assert "llms-txt" not in default_ids
+    assert {"search-indexability", "structured-data-graph", "citation-readiness"} <= set(default_ids)
     ids = [x.id for x in selected_checks("all", include=["llms-txt"])]
     assert "llms-txt" in ids
 

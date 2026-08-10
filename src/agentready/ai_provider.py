@@ -189,7 +189,7 @@ class OpenAICompatibleProvider:
                     )
                     if fallback:
                         logger.warning(
-                            "[FIX] Requested AI model was not found; retrying with catalog chat model=%s",
+                            "Requested AI model was not found; retrying with catalog chat model=%s",
                             fallback,
                         )
                         model = fallback
@@ -225,7 +225,7 @@ class OpenAICompatibleProvider:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.warning("[FIX] AI model catalog request failed type=%s", type(exc).__name__)
+            logger.warning("AI model catalog request failed type=%s", type(exc).__name__)
             raise AIProviderError(str(exc), code=_error_code(exc), retryable=False) from exc
         finally:
             await client.close()
@@ -242,7 +242,7 @@ class OpenAICompatibleProvider:
             metadata = item if isinstance(item, dict) else getattr(item, "model_dump", lambda: {})()
             models.append(ProviderModel(model_id, model_capabilities(model_id, metadata), owned_by))
         models.sort(key=lambda item: item.id.lower())
-        logger.info("[FIX] Loaded AI model catalog count=%d source=%s", len(models), source)
+        logger.info("Loaded AI model catalog count=%d source=%s", len(models), source)
         return models
 
 

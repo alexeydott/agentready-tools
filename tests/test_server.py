@@ -67,6 +67,13 @@ def test_dashboard_is_localized_and_describes_each_operation():
     assert 'translations[language.value].ai_generated_with_model' in response.text
     assert "Сгенерировано: agent-ready-tools" in response.text
     assert "function updateAiModeHint()" in response.text
+    assert "function runAll()" in response.text
+    assert 'if (preset === "all") { await runAll(); return; }' in response.text
+    assert "combinedReportDocument" in response.text
+    assert "geo.querySelectorAll(\"style\")" in response.text
+    assert "seo.querySelectorAll(\"style\")" in response.text
+    assert "<meta charset='utf-8>" not in response.text
+    assert "checks:null" in response.text
     assert "AI-помощник обрабатывает запрос..." in response.text
     assert "function setAiBusy(busy)" in response.text
     assert 'id="threshold" type="text" inputmode="decimal" data-decimal' in response.text
@@ -178,6 +185,14 @@ def test_dashboard_refreshes_provider_models_and_clears_new_provider_catalog():
     assert 'id="ai-retry-button"' in response.text
     assert "function exportChat()" in response.text
     assert "function startNewChat()" in response.text
+
+
+def test_dashboard_inline_script_does_not_close_html_script_early():
+    """Regression: a literal closing script tag breaks the dashboard parser."""
+    response = TestClient(app).get("/dashboard", params={"language": "en"})
+    assert response.status_code == 200
+    assert 'reportText.indexOf("<" + "/script>", start)' in response.text
+    assert 'reportText.indexOf("</script>", start)' not in response.text
 
 
 def test_dashboard_hints_use_hover_tooltips_like_reports():

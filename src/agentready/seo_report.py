@@ -187,7 +187,7 @@ def _metric_html(value: object, depth: int = 0) -> str:
 def _additional_details_html(check: object, labels: dict[str, str]) -> str:
     status = getattr(check, "status", "")
     if status not in {"fail", "warn", "error"}:
-        logger.debug("[FIX] Suppressed additional SEO evidence for status=%s", status)
+        logger.debug("Suppressed additional SEO evidence for status=%s", status)
         return ""
     evidence = getattr(check, "evidence", [])
     if not evidence:

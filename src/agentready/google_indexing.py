@@ -158,7 +158,7 @@ def inspect_url_eligibility(url: str, *, timeout: float = 15.0, verify_tls: bool
             fetched = client.get(url, use_cache=False)
     except (FetchError, TargetError) as exc:
         logger.error(
-            "[FIX] Google eligibility preflight failed: host=%s error_type=%s",
+            "Google eligibility preflight failed: host=%s error_type=%s",
             urlsplit(url).netloc,
             type(exc).__name__,
         )
@@ -364,7 +364,7 @@ def publish_urls(
             detected = eligibility_inspector(url, timeout=timeout, verify_tls=verify_tls)
         except (GoogleIndexingError, TargetError) as exc:
             logger.error(
-                "[FIX] Google eligibility preflight failed for url: host=%s error=%s",
+                "Google eligibility preflight failed for url: host=%s error=%s",
                 urlsplit(url).netloc,
                 type(exc).__name__,
             )

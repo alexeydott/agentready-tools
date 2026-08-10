@@ -21,7 +21,7 @@ _TEXT = {
         "preset_seo": "SEO audit",
         "preset_mobile": "Mobile-friendliness",
         "preset_hint_label": "What the selected audit profile checks",
-        "profile_all": "Full AI-agent readiness audit: discoverability, content access, bot policies, protocol discovery, authentication and commerce signals.",
+        "profile_all": "Complete SEO/GEO and AI-agent readiness audit: indexability, structured data, discoverability, content access, bot policies, protocols and commerce signals.",
         "profile_content": "Readiness profile for content sites: llms.txt, Markdown negotiation, content signals and agent-friendly content access.",
         "profile_api": "Readiness profile for APIs and applications: API catalogs, OAuth discovery, MCP/A2A cards and agent integration protocols.",
         "profile_ai_search": "AI Search / GEO profile: indexability, AI crawler access, structured data, dates and citation readiness.",
@@ -211,7 +211,7 @@ _TEXT = {
         "preset_seo": "SEO-аудит",
         "preset_mobile": "Мобильная дружественность",
         "preset_hint_label": "Что проверяет выбранный профиль аудита",
-        "profile_all": "Полный аудит готовности к ИИ-агентам: обнаружимость, доступ к контенту, правила ботов, протокольные discovery, аутентификация и commerce-сигналы.",
+        "profile_all": "Полный аудит SEO/GEO и готовности к ИИ-агентам: индексируемость, структурированные данные, обнаружимость, доступ к контенту, правила ботов, протоколы и commerce-сигналы.",
         "profile_content": "Профиль для контентных сайтов: llms.txt, Markdown-negotiation, content-сигналы и удобный для агентов доступ к контенту.",
         "profile_api": "Профиль для API и приложений: каталоги API, OAuth discovery, карточки MCP/A2A и протоколы интеграции агентов.",
         "profile_ai_search": "Профиль AI-поиска / GEO: индексируемость, доступ ИИ-краулеров, структурированные данные, даты и цитируемость.",
@@ -583,7 +583,7 @@ helpToggle.onclick = () => {{
   helpSidebar.parentElement.classList.toggle("help-open", visible);
   helpToggle.textContent = visible ? translations[language.value].help_hide : translations[language.value].help;
   helpToggle.setAttribute("aria-expanded", String(visible));
-  console.info("[FIX] Dashboard help toggled", {{visible, language:language.value}});
+  console.info("Dashboard help toggled", {{visible, language:language.value}});
 }};
 const dashboardStateKey = "agentready.dashboard.state.v1";
 const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","verify","debug","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only"];
@@ -592,7 +592,7 @@ function readDashboardState() {{
     const raw = localStorage.getItem(dashboardStateKey);
     return raw ? JSON.parse(raw) : {{}};
   }} catch (error) {{
-    console.warn("[FIX] Unable to read dashboard state", {{error:String(error)}});
+    console.warn("Unable to read dashboard state", {{error:String(error)}});
     return {{}};
   }}
 }}
@@ -607,7 +607,7 @@ function saveDashboardState() {{
     state.language = language.value;
     localStorage.setItem(dashboardStateKey, JSON.stringify(state));
   }} catch (error) {{
-    console.warn("[FIX] Unable to save dashboard state", {{error:String(error)}});
+    console.warn("Unable to save dashboard state", {{error:String(error)}});
   }}
 }}
 function restoreDashboardState() {{
@@ -645,7 +645,7 @@ function updatePresetHint() {{
   const value = profileHints[document.getElementById("preset").value] || "";
   const icon = document.querySelector("label[for='preset'] .hint");
   if (icon) icon.dataset.tooltip = value;
-  console.info("[FIX] Audit profile selected", {{preset:document.getElementById("preset").value}});
+  console.info("Audit profile selected", {{preset:document.getElementById("preset").value}});
 }}
 function selectedChecks() {{ return [...document.querySelectorAll("#checks input:checked")].map(item => item.value); }}
 function decimalValue(id, fallback=0) {{
@@ -692,7 +692,7 @@ function setAiBusy(busy) {{
     const thinking = output.querySelector(".ai-thinking");
     if (thinking) {{
       thinking.remove();
-      console.warn("[FIX] AI thinking state cleared after request completion");
+      console.warn("AI thinking state cleared after request completion");
     }}
   }}
 }}
@@ -723,7 +723,7 @@ function reportFilename(site) {{
   try {{
     const parsed = new URL(site.includes("://") ? site : "https://" + site);
     slug = (parsed.hostname + parsed.pathname).replace(/[\/\\:*?"<>|#%&=+@!~'()\[\]{{}},;^`$\s]+/g, "-").replace(/^-+|-+$/g, "") || "site";
-  }} catch (error) {{ console.info("[FIX] Using fallback report filename", {{site}}); }}
+  }} catch (error) {{ console.info("Using fallback report filename", {{site}}); }}
   return "agentready-report-" + slug + ".html";
 }}
 async function request(path, method="GET", body=null, html=false, showOutput=true, statusMessage="") {{
@@ -739,13 +739,13 @@ async function request(path, method="GET", body=null, html=false, showOutput=tru
     try {{
       const v2Marker = '<script id="agentready-v2-report" type="application/json">';
       const start = reportText.indexOf(v2Marker);
-      const end = reportText.indexOf("</script>", start);
+      const end = reportText.indexOf("<" + "/script>", start);
       if (start >= 0 && end > start) window.agentreadyV2Report = JSON.parse(reportText.slice(start + v2Marker.length, end));
-    }} catch (error) {{ console.warn("[FIX] Ignoring unavailable embedded v2 report", {{error: String(error)}}); }}
+    }} catch (error) {{ console.warn("Ignoring unavailable embedded v2 report", {{error: String(error)}}); }}
     const frame = document.createElement("iframe"); frame.id = "report-frame"; frame.title = translations[language.value].result; frame.srcdoc = reportText;
     const actions = document.createElement("div"); actions.className = "report-actions";
-    const download = document.createElement("a"); download.href = URL.createObjectURL(new Blob([reportText], {{type:"text/html;charset=utf-8"}})); download.download = reportFilename(document.getElementById("url").value); download.textContent = translations[language.value].download_report; download.onclick = () => console.info("[FIX] Downloading audit report", {{language:language.value, filename:download.download}});
-    const print = document.createElement("a"); print.href = "#"; print.textContent = translations[language.value].print_report; print.onclick = (event) => {{ event.preventDefault(); console.info("[FIX] Printing audit report", {{language:language.value}}); frame.contentWindow.print(); }};
+    const download = document.createElement("a"); download.href = URL.createObjectURL(new Blob([reportText], {{type:"text/html;charset=utf-8"}})); download.download = reportFilename(document.getElementById("url").value); download.textContent = translations[language.value].download_report; download.onclick = () => console.info("Downloading audit report", {{language:language.value, filename:download.download}});
+    const print = document.createElement("a"); print.href = "#"; print.textContent = translations[language.value].print_report; print.onclick = (event) => {{ event.preventDefault(); console.info("Printing audit report", {{language:language.value}}); frame.contentWindow.print(); }};
     actions.append(download, hintIcon(translations[language.value].download_hint), print, hintIcon(translations[language.value].print_hint));
     result.replaceChildren(actions, frame); finishProgress(true); return frame;
   }}
@@ -757,9 +757,39 @@ async function runScan() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
   window.agentreadyV2Report = null;
   const preset = document.getElementById("preset").value;
+  if (preset === "all") {{ await runAll(); return; }}
   if (preset === "seo") {{ await runSeo(); return; }}
   if (preset === "mobile") {{ await runMobile(); return; }}
   try {{ await request("/scan/dashboard","POST",scanPayload(),true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
+}}
+function combinedReportDocument(geoText, seoText) {{
+  const geo = new DOMParser().parseFromString(geoText, "text/html");
+  const seo = new DOMParser().parseFromString(seoText, "text/html");
+  const styles = Array.from(document.querySelectorAll("style")).concat(
+    Array.from(geo.querySelectorAll("style")),
+    Array.from(seo.querySelectorAll("style"))
+  ).map(style => style.outerHTML).join("");
+  return "<!doctype html><html><head><meta charset='utf-8'>" + styles + "</head><body>" +
+    "<main><h1>AgentReady combined audit</h1>" +
+    "<section><h2>" + translations[language.value].preset_ai_search + "</h2>" + (geo.body ? geo.body.innerHTML : "") + "</section>" +
+    "<section><h2>" + translations[language.value].preset_seo + "</h2>" + (seo.body ? seo.body.innerHTML : "") + "</section>" +
+    "</main></body></html>";
+}}
+async function runAll() {{
+  if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
+  window.agentreadyV2Report = null;
+  try {{
+    const geoFrame = await request("/scan/dashboard","POST",scanPayload(),true);
+    const geoText = geoFrame.srcdoc;
+    const seoFrame = await request("/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,language:language.value,checks:null,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true);
+    const combined = combinedReportDocument(geoText, seoFrame.srcdoc);
+    const frame = document.createElement("iframe"); frame.id = "report-frame"; frame.title = translations[language.value].result; frame.srcdoc = combined;
+    const actions = document.createElement("div"); actions.className = "report-actions";
+    const download = document.createElement("a"); download.href = URL.createObjectURL(new Blob([combined], {{type:"text/html;charset=utf-8"}})); download.download = reportFilename(document.getElementById("url").value); download.textContent = translations[language.value].download_report;
+    const print = document.createElement("a"); print.href = "#"; print.textContent = translations[language.value].print_report; print.onclick = event => {{ event.preventDefault(); frame.contentWindow.print(); }};
+    actions.append(download, hintIcon(translations[language.value].download_hint), print, hintIcon(translations[language.value].print_hint));
+    result.replaceChildren(actions, frame); finishProgress(true); setAiAvailability(true);
+  }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
 async function runSeo() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
@@ -769,7 +799,7 @@ async function runSeo() {{
 async function runMobile() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
   window.agentreadyV2Report = null;
-  console.info("[FIX] Running mobile audit from dashboard", {{url:document.getElementById("url").value}});
+  console.info("Running mobile audit from dashboard", {{url:document.getElementById("url").value}});
   try {{ await request("/mobile/audit/dashboard","POST",{{urls:[document.getElementById("url").value],language:language.value,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
 async function runHealth() {{ try {{ await request("/healthz", "GET", null, false, true, translations[language.value].health_ok); }} catch (error) {{ showResult(); result.textContent = error.message; }} }}
@@ -888,7 +918,7 @@ async function loadAiTools() {{
       [...document.getElementById(id).options].forEach(option => option.selected = selected.includes(option.value));
     }});
   }} catch (error) {{
-    console.warn("[FIX] Unable to load AI tools settings", {{error:String(error)}});
+    console.warn("Unable to load AI tools settings", {{error:String(error)}});
   }}
 }}
 async function saveAiTools() {{
@@ -896,7 +926,7 @@ async function saveAiTools() {{
     const response = await fetch("/ai/tools", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{skills:selectedValues("ai-skill"),mcp_tools:selectedValues("ai-mcp-tool")}})}});
     if (!response.ok) throw new Error("HTTP " + response.status);
   }} catch (error) {{
-    console.warn("[FIX] Unable to save AI tools settings", {{error:String(error)}});
+    console.warn("Unable to save AI tools settings", {{error:String(error)}});
   }}
 }}
 let aiPromptLibrary = [];
@@ -914,7 +944,7 @@ async function loadPromptLibrary() {{
       select.append(option);
     }});
   }} catch (error) {{
-    console.warn("[FIX] Unable to load prompt library", {{error:String(error)}});
+    console.warn("Unable to load prompt library", {{error:String(error)}});
   }}
 }}
 function applyPrompt() {{
@@ -934,7 +964,7 @@ async function savePrompt() {{
     if (!response.ok) throw new Error("HTTP " + response.status);
     await loadPromptLibrary();
   }} catch (error) {{
-    console.warn("[FIX] Unable to save prompt", {{error:String(error)}});
+    console.warn("Unable to save prompt", {{error:String(error)}});
   }}
 }}
 async function loadSavedChats() {{
@@ -950,7 +980,7 @@ async function loadSavedChats() {{
       select.append(option);
     }});
   }} catch (error) {{
-    console.warn("[FIX] Unable to load saved chats", {{error:String(error)}});
+    console.warn("Unable to load saved chats", {{error:String(error)}});
   }}
 }}
 async function saveChat(nameOverride=null) {{
@@ -966,7 +996,7 @@ async function saveChat(nameOverride=null) {{
     await loadSavedChats();
     return true;
   }} catch (error) {{
-    console.warn("[FIX] Unable to save AI chat", {{error:String(error)}});
+    console.warn("Unable to save AI chat", {{error:String(error)}});
     return false;
   }}
 }}
@@ -1160,7 +1190,7 @@ function saveAiChatState() {{
   try {{
     localStorage.setItem(aiChatStateKey, JSON.stringify({{history:aiConversationHistory.slice(-40), usage:aiSessionUsage}}));
   }} catch (error) {{
-    console.warn("[FIX] Unable to persist AI chat", {{error:String(error)}});
+    console.warn("Unable to persist AI chat", {{error:String(error)}});
   }}
 }}
 function restoreAiChatState() {{
@@ -1174,7 +1204,7 @@ function restoreAiChatState() {{
     renderChatHistory();
     if (aiConversationHistory.length) prependChatResponseInfo({{}});
   }} catch (error) {{
-    console.warn("[FIX] Unable to restore AI chat", {{error:String(error)}});
+    console.warn("Unable to restore AI chat", {{error:String(error)}});
   }}
 }}
 function renderChatHistory() {{
@@ -1201,7 +1231,7 @@ async function restoreSavedChat() {{
     if (aiConversationHistory.length) prependChatResponseInfo({{}});
     saveAiChatState();
   }} catch (error) {{
-    console.warn("[FIX] Unable to restore saved AI chat", {{error:String(error)}});
+    console.warn("Unable to restore saved AI chat", {{error:String(error)}});
   }}
 }}
 function selectedValues(id) {{
@@ -1244,7 +1274,7 @@ async function readAiAttachment(file) {{
 }}
 async function readAiAttachments(files) {{
   aiAttachments = await Promise.all([...files].slice(0, 5).map(readAiAttachment));
-  console.info("[FIX] AI attachments loaded", {{count:aiAttachments.length, names:aiAttachments.map(item => item.name)}});
+  console.info("AI attachments loaded", {{count:aiAttachments.length, names:aiAttachments.map(item => item.name)}});
 }}
 function accumulateAiUsage(data) {{
   const usage = data && data.usage;
@@ -1432,7 +1462,7 @@ async function runAi(path="/ai/recommend", retry=false) {{
     renderAiReport(data);
   }} catch (error) {{
     const message = error.name === "AbortError" ? translations[language.value].ai_timeout : translations[language.value].failed + ": " + error.message;
-    console.warn("[FIX] AI request finished with error", {{path, name:error.name, message}});
+    console.warn("AI request finished with error", {{path, name:error.name, message}});
     renderAiReport({{error:{{message}}}});
   }} finally {{
     if (timeoutId !== null) window.clearTimeout(timeoutId);
@@ -1466,7 +1496,7 @@ document.getElementById("ai-skill").addEventListener("change", saveAiTools);
 document.getElementById("ai-mcp-tool").addEventListener("change", saveAiTools);
 document.getElementById("preset").onchange = () => {{ setAiAvailability(false); updatePresetHint(); loadChecks(); }};
 updatePresetHint(); updateAiModeHint(); setAiAvailability(false); loadChecks(false);
-refreshAiProviders().catch(error => console.warn("[FIX] Unable to initialize AI providers", {{error:String(error)}}));
+refreshAiProviders().catch(error => console.warn("Unable to initialize AI providers", {{error:String(error)}}));
 loadAiTools();
 loadPromptLibrary();
 loadSavedChats();

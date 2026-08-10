@@ -24,7 +24,7 @@ CONTENT = frozenset({"all", "content"})
 API = frozenset({"all", "api"})
 BOTH = frozenset({"all", "content", "api"})
 COMMERCE = frozenset({"all"})
-AI_SEARCH = frozenset({"ai-search"})
+AI_SEARCH = frozenset({"all", "ai-search"})
 OPTIONAL = frozenset()
 
 GUIDE = "https://tochkicamp.ru/guides/kak-optimizirovat-sayt-pod-ai-poisk/"

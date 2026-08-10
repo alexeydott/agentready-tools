@@ -368,7 +368,7 @@ def save_ai_provider_config(
     validate_config(merged)
     selected.parent.mkdir(parents=True, exist_ok=True)
     selected.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True), encoding="utf-8")
-    logger.info("[FIX] Saved AI provider profile id=%s active=%s path=%s", provider["id"], active, selected)
+    logger.info("Saved AI provider profile id=%s active=%s path=%s", provider["id"], active, selected)
     return merged, str(selected)
 
 
@@ -402,7 +402,7 @@ def save_ai_provider_profiles(
     validate_config(merged)
     selected.parent.mkdir(parents=True, exist_ok=True)
     selected.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True), encoding="utf-8")
-    logger.info("[FIX] Saved AI provider profiles count=%d active=%s path=%s", len(providers), active_provider, selected)
+    logger.info("Saved AI provider profiles count=%d active=%s path=%s", len(providers), active_provider, selected)
     return merged, str(selected)
 
 
@@ -432,7 +432,7 @@ def save_ai_enablement(
     selected.parent.mkdir(parents=True, exist_ok=True)
     selected.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True), encoding="utf-8")
     logger.info(
-        "[FIX] Saved AI enablement enabled=%s transport_enabled=%s path=%s",
+        "Saved AI enablement enabled=%s transport_enabled=%s path=%s",
         ai_raw["enabled"],
         ai_raw["transport_enabled"],
         selected,

@@ -229,7 +229,7 @@ def _render_html_body(report: ScanReport, lang: str, generated: str) -> str:
             f"{html.escape(reqs)}</p>"
         )
     logger.debug(
-        "[FIX] Rendering report sections collapsed by default: language=%s recommendations=%d remediation=%d",
+        "Rendering report sections collapsed by default: language=%s recommendations=%d remediation=%d",
         lang,
         len(recs),
         len(remediation),

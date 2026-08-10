@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1 — 2026-08-10
+
+- Fixed the combined “All checks” dashboard report so GEO and SEO sections
+  retain their built-in hover/focus hints, with Edge UI coverage against
+  `gossnab.ru`.
+- Synchronized package, API, report, and Windows portable version metadata.
+
 ## 0.8.0 — 2026-08-10
 
 - Added the vNext compatibility surface: bounded v2 reports, evidence and

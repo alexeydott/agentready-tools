@@ -75,6 +75,19 @@ def test_serve_passes_loaded_fastapi_app_to_uvicorn(monkeypatch):
     assert captured["kwargs"] == {"host": "127.0.0.1", "port": 8765, "reload": False}
 
 
+def test_serve_reports_bind_failure_with_alternate_port(monkeypatch, capsys):
+    class FailingUvicorn:
+        @staticmethod
+        def run(app, **kwargs):
+            raise SystemExit(3)
+
+    monkeypatch.setitem(__import__("sys").modules, "uvicorn", FailingUvicorn)
+    args = type("Args", (), {"host": "127.0.0.1", "port": 8765})()
+
+    assert cli._cmd_serve(args) == 2
+    assert "unable to bind serve to 127.0.0.1:8765" in capsys.readouterr().err
+
+
 def test_mcp_command_dispatches_to_mcp_server_with_host_port(monkeypatch):
     captured = {}
 

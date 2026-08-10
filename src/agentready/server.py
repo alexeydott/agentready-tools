@@ -53,7 +53,7 @@ def configure_data_dir(path: str | Path | None = None) -> Path:
     global _SERVER_DATA_DIR
     _SERVER_DATA_DIR = (Path(path).expanduser() if path is not None else default_data_dir()).resolve()
     _SERVER_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    logger.info("[FIX] Serve data directory ready: %s", _SERVER_DATA_DIR)
+    logger.info("Serve data directory ready: %s", _SERVER_DATA_DIR)
     return _SERVER_DATA_DIR
 
 
@@ -69,7 +69,7 @@ def _load_ai_tools() -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        logger.warning("[FIX] Unable to read AI tools settings path=%s error=%s", path, exc)
+        logger.warning("Unable to read AI tools settings path=%s error=%s", path, exc)
         return {"skills": ["seo-security-interpreter"], "mcp_tools": []}
     allowed_skills = {item["id"] for item in ai_skill_catalog("en")}
     return {
@@ -85,7 +85,7 @@ def _save_ai_tools(data: dict) -> dict:
         "mcp_tools": [item for item in data.get("mcp_tools", []) if item in {"agentready.seo_findings", "agentready.remediation_plan"}][:8],
     }
     _ai_tools_path().write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    logger.info("[FIX] Saved AI tools settings path=%s skills=%d mcp_tools=%d", _ai_tools_path(), len(payload["skills"]), len(payload["mcp_tools"]))
+    logger.info("Saved AI tools settings path=%s skills=%d mcp_tools=%d", _ai_tools_path(), len(payload["skills"]), len(payload["mcp_tools"]))
     return payload
 
 
@@ -119,7 +119,7 @@ def _load_prompts() -> list[dict]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        logger.warning("[FIX] Unable to read prompt library path=%s error=%s", path, exc)
+        logger.warning("Unable to read prompt library path=%s error=%s", path, exc)
         return list(DEFAULT_PROMPTS)
     defaults_by_id = {item["id"]: item for item in DEFAULT_PROMPTS}
     prompts = []
@@ -140,7 +140,7 @@ def _load_prompts() -> list[dict]:
         try:
             path.write_text(json.dumps(prompts, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         except OSError as exc:
-            logger.warning("[FIX] Unable to update prompt library path=%s error=%s", path, exc)
+            logger.warning("Unable to update prompt library path=%s error=%s", path, exc)
     return prompts[:100]
 
 
@@ -185,7 +185,7 @@ def dashboard(request: Request, language: Literal["en", "ru"] | None = None) -> 
     else:
         browser_language = request.headers.get("accept-language", "").split(",", 1)[0].split(";", 1)[0].strip()
         lang = "ru" if browser_language.lower().split("-", 1)[0] == "ru" else "en"
-    logger.debug("[FIX] Serving interactive dashboard: language=%s explicit=%s", lang, explicit_language)
+    logger.debug("Serving interactive dashboard: language=%s explicit=%s", lang, explicit_language)
     return HTMLResponse(render_dashboard(lang))
 
 
@@ -370,7 +370,7 @@ def ai_chats_get_endpoint(http_request: Request) -> dict:
             data = json.loads(path.read_text(encoding="utf-8"))
             rows.append({"file": path.name, "name": data.get("name", path.stem), "target": data.get("target"), "created_at": data.get("created_at")})
         except (OSError, json.JSONDecodeError):
-            logger.warning("[FIX] Ignoring invalid saved chat file path=%s", path)
+            logger.warning("Ignoring invalid saved chat file path=%s", path)
     return {"chats": rows}
 
 
@@ -398,7 +398,7 @@ def ai_chats_save_endpoint(request: AIChatSaveRequest, http_request: Request) ->
     payload = request.model_dump()
     payload["created_at"] = datetime.now(timezone.utc).isoformat()
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    logger.info("[FIX] Saved AI chat path=%s messages=%d", path, len(request.messages))
+    logger.info("Saved AI chat path=%s messages=%d", path, len(request.messages))
     return {"file": path.name, "name": request.name}
 
 
@@ -436,7 +436,7 @@ def ai_provider_save_endpoint(request: AIProviderRequest, http_request: Request)
             save_ai_enablement(request.enable_ai, config_path=config_path)
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail="Unable to save AI provider") from exc
-    logger.info("[FIX] Saved AI provider through loopback serve endpoint id=%s active=%s", provider_id, request.active)
+    logger.info("Saved AI provider through loopback serve endpoint id=%s active=%s", provider_id, request.active)
     return {"ok": True, "provider_id": provider_id, "active": request.active}
 
 
@@ -454,7 +454,7 @@ def ai_provider_activate_endpoint(request: AIProviderSelectionRequest, http_requ
         save_ai_provider_profiles([*ai_provider_profiles(cfg["ai"])], active_provider=request.provider_id, config_path=config_path)
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail="Unable to activate AI provider") from exc
-    logger.info("[FIX] Activated AI provider through loopback serve endpoint id=%s", request.provider_id)
+    logger.info("Activated AI provider through loopback serve endpoint id=%s", request.provider_id)
     return {"ok": True, "active_provider": request.provider_id}
 
 
@@ -479,7 +479,7 @@ def ai_provider_models_endpoint(provider_id: str, http_request: Request) -> dict
             max_retries=ai_cfg["max_retries"],
             allow_loopback_http=ai_cfg["allow_loopback_http"],
         ).list_models())
-        logger.info("[FIX] Served AI model catalog provider_id=%s count=%d", provider_id, len(models))
+        logger.info("Served AI model catalog provider_id=%s count=%d", provider_id, len(models))
         return {
             "provider_id": provider_id,
             "selected_model": provider.get("model") or ai_cfg["model"],
@@ -509,7 +509,7 @@ def ai_provider_delete_endpoint(provider_id: str, http_request: Request) -> dict
         save_ai_provider_profiles(remaining, active_provider=remaining[0]["id"], config_path=config_path)
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail="Unable to remove AI provider") from exc
-    logger.info("[FIX] Removed AI provider through loopback serve endpoint id=%s", provider_id)
+    logger.info("Removed AI provider through loopback serve endpoint id=%s", provider_id)
     return {"ok": True, "active_provider": remaining[0]["id"]}
 
 
@@ -554,7 +554,7 @@ def healthz() -> dict[str, bool]:
 def checks_endpoint(language: Literal["en", "ru"] = "en") -> list[dict[str, object]]:
     """List the checks available to every Agent Readiness scan preset."""
     lang = normalize_language(language)
-    logger.debug("[FIX] Serving localized check catalog: language=%s count=%d", lang, len(CHECKS))
+    logger.debug("Serving localized check catalog: language=%s count=%d", lang, len(CHECKS))
     return [
         {
             "id": spec.id,
@@ -583,7 +583,7 @@ def checks_endpoint(language: Literal["en", "ru"] = "en") -> list[dict[str, obje
 def seo_checks_endpoint(language: Literal["en", "ru"] = "en") -> list[dict[str, str]]:
     """List localized SEO checks available to the independent SEO profile."""
     lang = normalize_language(language)
-    logger.debug("[FIX] Serving localized SEO hint catalog: language=%s count=%d", lang, len(SEO_CHECK_METADATA) + len(CRAWL_CHECK_METADATA))
+    logger.debug("Serving localized SEO hint catalog: language=%s count=%d", lang, len(SEO_CHECK_METADATA) + len(CRAWL_CHECK_METADATA))
     return [
         {
             "id": item["id"],
@@ -727,7 +727,7 @@ def scan_dashboard(request: ScanRequest) -> HTMLResponse:
 def mobile_checks_endpoint(language: Literal["en", "ru"] = "en") -> list[dict[str, str]]:
     """List localized mobile-friendliness checks."""
     lang = normalize_language(language)
-    logger.debug("[FIX] Serving localized mobile check catalog: language=%s count=%d", lang, len(MOBILE_CHECK_METADATA))
+    logger.debug("Serving localized mobile check catalog: language=%s count=%d", lang, len(MOBILE_CHECK_METADATA))
     return [
         {
             "id": item["id"],
@@ -919,7 +919,7 @@ def _run_seo(request: SeoRequest):
         if unknown:
             raise ValueError(f"Unknown SEO check(s): {', '.join(unknown)}")
         checks = [SEO_CHECKS_BY_ID[check_id] for check_id in page_ids]
-        logger.debug("[FIX] SEO request split: page_checks=%d crawl_checks=%d", len(page_ids), len(crawl_ids))
+        logger.debug("SEO request split: page_checks=%d crawl_checks=%d", len(page_ids), len(crawl_ids))
     return audit_seo(
         request.url,
         checks=checks,
