@@ -13,6 +13,17 @@ from .models import (
     Status,
 )
 from .urls import Origin, UrlIdentity, fingerprint
+from .store import (
+    ContentRetention,
+    FetchFact,
+    MemorySiteStore,
+    PageRecord,
+    RedirectFact,
+    RunRecord,
+    SQLiteSiteStore,
+    SiteStore,
+    StoreError,
+)
 
 __all__ = [
     "Applicability",
@@ -29,4 +40,13 @@ __all__ = [
     "Status",
     "UrlIdentity",
     "fingerprint",
+    "ContentRetention",
+    "FetchFact",
+    "MemorySiteStore",
+    "PageRecord",
+    "RedirectFact",
+    "RunRecord",
+    "SQLiteSiteStore",
+    "SiteStore",
+    "StoreError",
 ]
