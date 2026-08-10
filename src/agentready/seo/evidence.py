@@ -1,0 +1,86 @@
+"""Shared bounded page evidence for SEO atomic rules."""
+from __future__ import annotations
+
+import hashlib
+import logging
+from dataclasses import dataclass
+from urllib.parse import urljoin
+
+from ..http import FetchError, HttpClient
+from ..seo_checks import SeoHtmlParser
+from ..structured_data import extract_jsonld_nodes
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class SeoPageEvidence:
+    url: str
+    final_url: str
+    status_code: int
+    content_type: str
+    title: str
+    titles: tuple[str, ...]
+    description: str
+    descriptions: tuple[str, ...]
+    h1: tuple[str, ...]
+    canonicals: tuple[str, ...]
+    hreflangs: tuple[tuple[str, str], ...]
+    meta_robots: tuple[str, ...]
+    x_robots: str
+    jsonld_nodes: tuple[dict[str, object], ...]
+    jsonld_errors: tuple[str, ...]
+    evidence_ids: tuple[str, ...]
+    fetch_error: str | None = None
+
+    @property
+    def html(self) -> bool:
+        return self.content_type in {"text/html", "application/xhtml+xml"}
+
+
+def collect_page_evidence(url: str, client: HttpClient) -> SeoPageEvidence:
+    """Fetch and parse one page once so all atomic rules share identical facts."""
+    evidence_id = _evidence_id(url, "page")
+    try:
+        response = client.get(url)
+    except FetchError as exc:
+        logger.debug("[WP6.2] SEO evidence fetch failed url=%s error=%s", url, exc)
+        return SeoPageEvidence(
+            url, url, 0, "", "", (), "", (), (), (), (), (), "", (), (), (evidence_id,), str(exc)
+        )
+    content_type = response.content_type
+    if response.status_code != 200 or content_type not in {"text/html", "application/xhtml+xml"}:
+        return SeoPageEvidence(
+            url, response.url, response.status_code, content_type, "", (), "", (), (), (), (), (), "",
+            (), (), (evidence_id,), f"HTTP {response.status_code} {content_type or 'no content-type'}"
+        )
+    parser = SeoHtmlParser()
+    parser.feed(response.text)
+    parser.close()
+    nodes, jsonld_errors, _ = extract_jsonld_nodes(response.text)
+    canonicals = tuple(urljoin(response.url, value) for value in parser.canonicals)
+    hreflangs = tuple((code, urljoin(response.url, href)) for code, href in parser.hreflangs)
+    logger.debug("[WP6.2] SEO evidence collected url=%s jsonld=%d", response.url, len(nodes))
+    return SeoPageEvidence(
+        url=url,
+        final_url=response.url,
+        status_code=response.status_code,
+        content_type=content_type,
+        title=parser.title,
+        titles=tuple(parser.titles),
+        description=parser.description,
+        descriptions=tuple(parser.descriptions),
+        h1=tuple(parser.h1),
+        canonicals=canonicals,
+        hreflangs=hreflangs,
+        meta_robots=tuple(parser.meta_robots),
+        x_robots=parser.x_robots,
+        jsonld_nodes=tuple(nodes),
+        jsonld_errors=tuple(jsonld_errors),
+        evidence_ids=(evidence_id,),
+    )
+
+
+def _evidence_id(url: str, kind: str) -> str:
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]
+    return f"seo:{kind}:{digest}"

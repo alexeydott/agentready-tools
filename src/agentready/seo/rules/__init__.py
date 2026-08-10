@@ -1,0 +1,6 @@
+"""Built-in atomic SEO rules and rule metadata."""
+
+from .builtin import SEO_ATOMIC_RULES
+from .models import AtomicFinding, RuleKind, SeoRuleSpec
+
+__all__ = ["AtomicFinding", "RuleKind", "SEO_ATOMIC_RULES", "SeoRuleSpec"]
