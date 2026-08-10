@@ -6,8 +6,10 @@ from urllib.parse import urljoin
 import httpx
 
 from . import __version__
+from .egress import EgressPolicy, EgressPolicyError
 from .models import Evidence
-from .target import TargetError, ensure_public_url
+from .security import SecretRedactor
+from .target import TargetError
 
 _REDIRECTS = {301, 302, 303, 307, 308}
 _SENSITIVE = {"authorization", "proxy-authorization", "cookie", "set-cookie"}
@@ -75,6 +77,11 @@ class HttpClient:
         self.max_bytes = max_bytes
         self.verify = verify
         self.allow_private = allow_private
+        self.egress_policy = EgressPolicy(
+            block_private=not allow_private,
+            max_redirects=max_redirects,
+            max_response_bytes=max_bytes,
+        )
         self._client = httpx.Client(
             timeout=httpx.Timeout(timeout),
             verify=verify,
@@ -85,6 +92,7 @@ class HttpClient:
             },
         )
         self._cache: dict[tuple[str, tuple[tuple[str, str], ...]], Fetched] = {}
+        self._redactor = SecretRedactor()
 
     def close(self) -> None:
         self._client.close()
@@ -97,6 +105,10 @@ class HttpClient:
 
     def get(self, url: str, headers: dict[str, str] | None = None, *, use_cache: bool = True) -> Fetched:
         headers = headers or {}
+        try:
+            headers = self.egress_policy.validate_headers(headers, purpose="legacy-http-client")
+        except EgressPolicyError as exc:
+            raise FetchError(str(exc)) from exc
         cache_key = (url, tuple(sorted((k.lower(), v) for k, v in headers.items())))
         if use_cache and cache_key in self._cache:
             return self._cache[cache_key]
@@ -105,30 +117,35 @@ class HttpClient:
         chain: list[str] = []
         for hop in range(self.max_redirects + 1):
             try:
-                if not self.allow_private:
-                    ensure_public_url(current)
+                self.egress_policy.validate_request(current, purpose="legacy-http-client")
                 with self._client.stream("GET", current, headers=headers) as resp:
                     if resp.status_code in _REDIRECTS and resp.headers.get("location"):
                         if hop >= self.max_redirects:
                             raise FetchError(f"Too many redirects (>{self.max_redirects})")
                         chain.append(current)
-                        current = urljoin(current, resp.headers["location"])
+                        next_url = urljoin(current, resp.headers["location"])
+                        self.egress_policy.validate_redirect(
+                            current,
+                            next_url,
+                            hop + 1,
+                            purpose="legacy-http-client",
+                        )
+                        current = next_url
                         continue
                     chunks: list[bytes] = []
                     size = 0
                     for chunk in resp.iter_bytes():
                         size += len(chunk)
-                        if size > self.max_bytes:
-                            raise FetchError(f"Response exceeds {self.max_bytes} byte limit")
+                        self.egress_policy.validate_response_size(size)
                         chunks.append(chunk)
                     result = Fetched(
                         url=str(resp.url),
                         status_code=resp.status_code,
-                        headers={k.lower(): v for k, v in resp.headers.items()},
+                        headers=self._redactor.mapping({k.lower(): v for k, v in resp.headers.items()}),
                         body=b"".join(chunks),
                         redirected_from=chain[:],
                     )
-            except (httpx.HTTPError, TargetError) as exc:
+            except (httpx.HTTPError, TargetError, EgressPolicyError) as exc:
                 raise FetchError(str(exc)) from exc
             if use_cache:
                 self._cache[cache_key] = result
