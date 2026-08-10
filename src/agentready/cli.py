@@ -22,6 +22,7 @@ from .indexnow import PROVIDER_ENDPOINTS, generate_key, submit_urls, verify_key_
 from .gitutils import audit_git_dates, changed_urls_from_git
 from .accesslog import analyze_ai_bot_log_file
 from .geo_rules import write_rules
+from .report_v2 import report_from_checks
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,13 @@ def _scan_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--min-level", type=int, default=None, help="Exit 1 if maturity level is below this value (0-5)")
     p.add_argument("--min-ai-search-score", "--min-geo-score", dest="min_ai_search_score", type=int, default=None, help="Exit 1 if the separate AI Search/GEO score is below this value (0-100)")
     p.add_argument("--fail-on-checks", action="store_true", help="Exit 1 when any scored check fails")
+
+
+def _audit_parser(sub: argparse._SubParsersAction) -> None:
+    p = _add_command_parser(sub, "audit", help="Run the canonical v2 audit report")
+    p.add_argument("url")
+    p.add_argument("--format", choices=["json"], default="json")
+    p.add_argument("--fail-on-checks", action="store_true", help="Exit 1 when a v2 finding fails")
 
 
 def _seo_parser(sub: argparse._SubParsersAction) -> None:
@@ -205,6 +213,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
+    _audit_parser(sub)
     _scan_parser(sub)
     _seo_parser(sub)
     _mobile_parser(sub)
@@ -924,6 +933,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         if args.command == "scan":
             return _cmd_scan(args)
+        if args.command == "audit":
+            return _cmd_audit(args)
         if args.command == "seo":
             return _cmd_seo(args)
         if args.command == "mobile":
@@ -953,6 +964,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"agentready: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     return 0
+
+
+def _cmd_audit(args: argparse.Namespace) -> int:
+    report = scan(args.url)
+    report_v2 = report_from_checks(args.url, report.checks)
+    print(json.dumps(report_v2.to_dict(), indent=2, sort_keys=True))
+    return 1 if args.fail_on_checks and any(item.status.value == "fail" for item in report_v2.findings) else 0
 
 
 def _configure_logging() -> None:

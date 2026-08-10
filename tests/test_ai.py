@@ -10,6 +10,7 @@ from agentready.ai_i18n import ai_catalog, ai_catalog_keys, ai_text
 from agentready.ai_models import AssistantRequest
 from agentready.ai_prompts import ai_skill_catalog, build_prompts
 from agentready.ai_provider import AIProviderConfigurationError, OpenAICompatibleProvider, ProviderModel, ProviderResult, model_capabilities, validate_base_url
+from agentready.agentfindings import build_findings
 from agentready.config import active_ai_provider, load_config, save_ai_provider_config
 
 
@@ -66,6 +67,40 @@ def test_ai_context_rejects_unsupported_schema():
 def test_ai_context_accepts_readiness_reports_without_schema():
     projected = project_report({"target": "https://example.com", "checks": []}, mode="both", language="en")
     assert projected["schema"] == "agentready.scan.v1"
+
+
+def test_ai_context_projects_v2_evidence_and_coverage():
+    projected = project_report(
+        {
+            "schema": "agentready.audit.v2",
+            "target": "https://example.com",
+            "version": "v2",
+            "coverage": {"total_rules": 1, "evaluated_rules": 1, "applicable_rules": 1, "complete_rules": 0},
+            "findings": [{
+                "id": "robots-txt",
+                "title": "Robots",
+                "status": "fail",
+                "reason": "Missing robots policy",
+                "evidence": [{"id": "robots-txt:0", "summary": "404", "url": "https://example.com/robots.txt"}],
+            }],
+        },
+        mode="both",
+        language="en",
+    )
+    assert projected["coverage"]["total_rules"] == 1
+    assert projected["checks"][0]["evidence"][0]["url"].endswith("/robots.txt")
+    assert projected["finding_groups"][0]["root"] == "robots"
+
+
+def test_agent_findings_projects_v2_without_legacy_fields():
+    result = build_findings({
+        "schema": "agentready.audit.v2",
+        "target": "https://example.com",
+        "coverage": {"total_rules": 1},
+        "findings": [{"id": "robots-txt", "title": "Robots", "status": "fail", "reason": "Missing"}],
+    })
+    assert result["source_schema"] == "agentready.audit.v2"
+    assert result["findings"][0]["check_id"] == "robots-txt"
 
 
 def test_provider_url_rejects_unsafe_overrides():

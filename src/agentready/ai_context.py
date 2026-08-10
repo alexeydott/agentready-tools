@@ -8,7 +8,7 @@ from typing import Any
 from .seo_i18n import seo_detail, seo_summary
 
 MAX_REPORT_BYTES = 2_000_000
-ALLOWED_SCHEMAS = {"agentready.seo.v1", "agentready.scan.v1"}
+ALLOWED_SCHEMAS = {"agentready.seo.v1", "agentready.scan.v1", "agentready.audit.v2"}
 
 
 class AIContextError(ValueError):
@@ -32,11 +32,13 @@ def load_report_file(path: str | Path) -> dict[str, Any]:
 
 
 def validate_report(report: dict[str, Any]) -> None:
-    if report.get("schema", "agentready.scan.v1") not in ALLOWED_SCHEMAS:
+    schema = report.get("schema", "agentready.scan.v1")
+    if schema not in ALLOWED_SCHEMAS:
         raise AIContextError("unsupported report schema")
-    if not isinstance(report.get("checks"), list):
-        raise AIContextError("report checks must be a list")
-    if len(report["checks"]) > 500:
+    collection_key = "findings" if schema == "agentready.audit.v2" else "checks"
+    if not isinstance(report.get(collection_key), list):
+        raise AIContextError(f"report {collection_key} must be a list")
+    if len(report[collection_key]) > 500:
         raise AIContextError("report contains too many checks")
 
 
@@ -46,23 +48,35 @@ def project_report(report: dict[str, Any], *, mode: str, language: str, limit: i
     if mode not in {"seo", "geo", "both"}:
         raise AIContextError("unsupported assistant mode")
     schema = report.get("schema", "agentready.scan.v1")
+    source_items = report["findings"] if schema == "agentready.audit.v2" else report["checks"]
     projected: dict[str, Any] = {
         "schema": schema,
         "mode": mode,
         "target": _short(report.get("target") or report.get("url"), 500),
         "score": report.get("score"),
+        "coverage": report.get("coverage") if schema == "agentready.audit.v2" else None,
         "checks": [],
         "recommendations": [],
+        "finding_groups": [],
     }
-    for check in report["checks"]:
+    group_ids: dict[str, list[str]] = {}
+    for check in source_items:
         if not isinstance(check, dict) or not isinstance(check.get("id"), str):
             continue
         status = check.get("status")
-        if status not in {"fail", "warn", "error", "pass", "skip"}:
+        if status not in {"fail", "warn", "error", "pass", "skip", "unavailable"}:
             continue
         check_id = check["id"]
-        details = _short(str(check.get("details") or ""), 600)
+        details = _short(str(check.get("details") or check.get("reason") or ""), 600)
         remediation = check.get("remediation") if isinstance(check.get("remediation"), dict) else {}
+        group = check_id.split("-", 1)[0]
+        group_ids.setdefault(group, []).append(check_id)
+        evidence = _project_evidence(check.get("evidence"))
+        if schema == "agentready.audit.v2":
+            evidence = [
+                {"finding": _short(item.get("summary") or "", 1000), **({"url": item["url"]} if item.get("url") else {})}
+                for item in evidence
+            ]
         projected["checks"].append({
             "id": check_id,
             "status": status,
@@ -70,7 +84,7 @@ def project_report(report: dict[str, Any], *, mode: str, language: str, limit: i
             "details": seo_detail(details, language) if schema == "agentready.seo.v1" else details,
             "remediation": seo_summary(check_id, _short(str(remediation.get("summary") or ""), 500), language)
             if schema == "agentready.seo.v1" else _short(str(remediation.get("summary") or ""), 500),
-            "evidence": _project_evidence(check.get("evidence")),
+            "evidence": evidence,
         })
         if len(projected["checks"]) >= 500:
             break
@@ -87,6 +101,9 @@ def project_report(report: dict[str, Any], *, mode: str, language: str, limit: i
                     language,
                 ) if schema == "agentready.seo.v1" else _short(str(recommendation.get("action") or ""), 500),
             })
+    projected["finding_groups"] = [
+        {"root": root, "check_ids": ids} for root, ids in sorted(group_ids.items())
+    ]
     encoded = json.dumps(projected, ensure_ascii=False, separators=(",", ":"))
     if len(encoded) > limit:
         projected["checks"] = projected["checks"][: max(1, len(projected["checks"]) // 2)]
@@ -109,7 +126,7 @@ def _project_evidence(value: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         evidence: dict[str, Any] = {}
-        for key in ("action", "url", "method", "status_code", "content_type", "finding"):
+        for key in ("action", "summary", "url", "method", "status_code", "content_type", "finding"):
             if item.get(key) not in (None, ""):
                 evidence[key] = _short(item[key], 1000)
         if isinstance(item.get("metrics"), dict):

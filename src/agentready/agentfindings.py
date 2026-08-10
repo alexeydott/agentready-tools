@@ -134,6 +134,8 @@ def build_findings(report: ScanReport | SeoReport | MobilePageReport, lang: str 
     Only failing/warning/error checks are included. Machine identifiers stay
     stable; human-facing fields follow ``lang``.
     """
+    if isinstance(report, dict) and report.get("schema") == "agentready.audit.v2":
+        return _build_v2_findings(report, lang)
     language = normalize_language(lang or getattr(report, "language", None))
     is_seo = isinstance(report, SeoReport)
     is_mobile = isinstance(report, MobilePageReport)
@@ -165,6 +167,51 @@ def build_findings(report: ScanReport | SeoReport | MobilePageReport, lang: str 
         "mode": mode,
         "target": target,
         "score": report.score,
+        "language": language,
+        "findings_count": len(findings),
+        "findings": findings,
+        "message": _msg("no_findings", language) if not findings else None,
+    }
+
+
+def _build_v2_findings(report: dict[str, Any], lang: str | None = None) -> dict[str, Any]:
+    """Project canonical v2 findings without reaching into legacy report fields."""
+    language = normalize_language(lang)
+    target = str(report.get("target") or "")
+    findings = []
+    for item in report.get("findings", [])[:500]:
+        if not isinstance(item, dict) or item.get("status") not in PROBLEM_STATUSES:
+            continue
+        evidence = [
+            f"{entry.get('url')}: {entry.get('summary')}" if entry.get("url") else str(entry.get("summary") or "")
+            for entry in item.get("evidence", [])[:3]
+            if isinstance(entry, dict)
+        ]
+        findings.append({
+            "check_id": item.get("id"),
+            "title": item.get("title") or item.get("id"),
+            "category": str(item.get("id", "")).split("-", 1)[0],
+            "status": item.get("status"),
+            "details": item.get("reason", ""),
+            "why": "Canonical v2 finding with evidence attached.",
+            "evidence": evidence,
+            "priority": None,
+            "impact": "low",
+            "effort": "medium",
+            "remediation": {
+                "summary": "Review the evidence and apply a safe, reversible fix.",
+                "instructions": "Review the evidence and apply a safe, reversible fix.",
+                "agent_prompt": f"Fix finding {item.get('id')} using only the supplied evidence.",
+                "rerun_command": f"agentready audit {target!r}",
+                "references": [],
+            },
+        })
+    return {
+        "schema": "agentready.findings.v1",
+        "source_schema": "agentready.audit.v2",
+        "mode": "readiness",
+        "target": target,
+        "coverage": report.get("coverage"),
         "language": language,
         "findings_count": len(findings),
         "findings": findings,

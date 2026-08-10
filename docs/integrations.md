@@ -31,6 +31,29 @@ without running a network scan:
 curl 'http://127.0.0.1:8765/checks?language=ru'
 ```
 
+### v2 application/report contract
+
+The additive v2 surface returns `agentready.audit.v2` reports with bounded
+evidence, coverage, version metadata, and deterministic finding fingerprints.
+Existing v1 endpoints remain supported:
+
+```bash
+curl -X POST http://127.0.0.1:8765/v2/audit \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://example.com","preset":"all","max_pages":25}'
+curl -X POST http://127.0.0.1:8765/v2/jobs \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://example.com"}'
+curl http://127.0.0.1:8765/v2/jobs/<job_id>
+curl -X POST http://127.0.0.1:8765/v2/jobs/<job_id>/cancel
+```
+
+Use `/v2/rescan`, `/v2/diff`, and `/v2/export` for explicit rescan,
+comparable-baseline, and bounded JSONL/CSV inventory operations. Request
+limits are enforced server-side; incompatible baselines are rejected rather
+than silently compared. The canonical CLI equivalent is
+`agentready audit https://example.com --fail-on-checks`.
+
 Get localized HTML dashboard:
 
 ```bash
@@ -71,6 +94,11 @@ The MCP facade additionally exposes `mobile_audit`, `mobile_findings`, and `mobi
 The HTTP `serve` surface is intentionally read-only: filesystem-only commands
 (`init`, `geo init-rules`, and `logs`) and credentialed/mutating publisher commands
 are not exposed as unauthenticated API endpoints.
+
+The dashboard and AI assistant preserve the v1 localized HTML experience while
+using the v2 evidence/coverage projection for AI context. AI output is
+advisory, bounded, and must not receive credential material; provider keys stay
+in the OS credential vault and saved chats remain local runtime data.
 
 The serve process creates its data directory automatically. It defaults to a
 `.cache` directory beside the running server (portable EXE) or project source

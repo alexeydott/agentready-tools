@@ -736,6 +736,12 @@ async function request(path, method="GET", body=null, html=false, showOutput=tru
   if (html) {{
     if (showOutput) setProgress(78, translations[language.value].progress_render);
     const reportText = await response.text();
+    try {{
+      const v2Marker = '<script id="agentready-v2-report" type="application/json">';
+      const start = reportText.indexOf(v2Marker);
+      const end = reportText.indexOf("</script>", start);
+      if (start >= 0 && end > start) window.agentreadyV2Report = JSON.parse(reportText.slice(start + v2Marker.length, end));
+    }} catch (error) {{ console.warn("[FIX] Ignoring unavailable embedded v2 report", {{error: String(error)}}); }}
     const frame = document.createElement("iframe"); frame.id = "report-frame"; frame.title = translations[language.value].result; frame.srcdoc = reportText;
     const actions = document.createElement("div"); actions.className = "report-actions";
     const download = document.createElement("a"); download.href = URL.createObjectURL(new Blob([reportText], {{type:"text/html;charset=utf-8"}})); download.download = reportFilename(document.getElementById("url").value); download.textContent = translations[language.value].download_report; download.onclick = () => console.info("[FIX] Downloading audit report", {{language:language.value, filename:download.download}});
@@ -749,6 +755,7 @@ async function request(path, method="GET", body=null, html=false, showOutput=tru
 }}
 async function runScan() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
+  window.agentreadyV2Report = null;
   const preset = document.getElementById("preset").value;
   if (preset === "seo") {{ await runSeo(); return; }}
   if (preset === "mobile") {{ await runMobile(); return; }}
@@ -756,10 +763,12 @@ async function runScan() {{
 }}
 async function runSeo() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
+  window.agentreadyV2Report = null;
   try {{ await request("/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,language:language.value,checks:selectedChecks(),timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
 async function runMobile() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
+  window.agentreadyV2Report = null;
   console.info("[FIX] Running mobile audit from dashboard", {{url:document.getElementById("url").value}});
   try {{ await request("/mobile/audit/dashboard","POST",{{urls:[document.getElementById("url").value],language:language.value,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
@@ -1413,7 +1422,7 @@ async function runAi(path="/ai/recommend", retry=false) {{
     const controller = new AbortController();
     timeoutId = window.setTimeout(() => controller.abort(), 45000);
     const history = path === "/ai/chat" ? aiConversationHistory.slice(0, retry ? aiConversationHistory.length : -1).slice(-12) : aiConversationHistory.slice(-12);
-    const response = await fetch(path, {{method:"POST", headers:{{"Content-Type":"application/json"}}, signal:controller.signal, body:JSON.stringify({{target,mode:document.getElementById("ai-mode").value,model:document.getElementById("ai-model").value || null,language:language.value,message,history,skills:selectedValues("ai-skill"),mcp_tools:selectedValues("ai-mcp-tool"),attachments:aiAttachments}})}});
+    const response = await fetch(path, {{method:"POST", headers:{{"Content-Type":"application/json"}}, signal:controller.signal, body:JSON.stringify({{target,report:window.agentreadyV2Report || null,mode:document.getElementById("ai-mode").value,model:document.getElementById("ai-model").value || null,language:language.value,message,history,skills:selectedValues("ai-skill"),mcp_tools:selectedValues("ai-mcp-tool"),attachments:aiAttachments}})}});
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || ("HTTP " + response.status));
     if (path === "/ai/chat") {{

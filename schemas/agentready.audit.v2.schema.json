@@ -3,7 +3,7 @@
   "$id": "https://agentready.dev/schemas/agentready.audit.v2.schema.json",
   "title": "AgentReady audit v2 contract",
   "type": "object",
-  "required": ["schema", "target", "coverage", "findings"],
+  "required": ["schema", "target", "version", "coverage", "evidence", "findings"],
   "properties": {
     "schema": {
       "const": "agentready.audit.v2"
@@ -11,6 +11,23 @@
     "target": {
       "type": "string",
       "format": "uri"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "summary"],
+        "properties": {
+          "id": {"type": "string"},
+          "summary": {"type": "string"},
+          "url": {"type": "string", "format": "uri"}
+        },
+        "additionalProperties": false
+      }
     },
     "coverage": {
       "type": "object",
@@ -25,7 +42,19 @@
     },
     "findings": {
       "type": "array",
-      "items": {"type": "object"}
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "status", "reason", "fingerprint", "evidence"],
+        "properties": {
+          "id": {"type": "string"},
+          "title": {"type": "string"},
+          "status": {"enum": ["pass", "fail", "warn", "skip", "unavailable"]},
+          "reason": {"type": "string"},
+          "fingerprint": {"type": "string"},
+          "evidence": {"type": "array"}
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": true

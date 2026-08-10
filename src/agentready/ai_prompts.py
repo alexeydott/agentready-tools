@@ -110,7 +110,9 @@ def build_prompts(
         "check_ids, verification. Keep recommendations concrete and tied to check IDs. "
         "Use structured evidence metrics when present. For every affected page or resource, preserve and "
         "clearly distinguish the page URL, resource URL, check finding, and relevant metric values in the "
-        "summary, action, or verification. Never invent a URL or metric that is absent from the audit context."
+        "summary, action, or verification. Use v2 coverage and evidence metadata to state audit limits. "
+        "Group related findings by root cause when evidence supports it. Never invent a URL, metric, check, "
+        "credential, or provider result that is absent from the audit context."
     )
     user = "AUDIT_CONTEXT_START\n" + json.dumps(context, ensure_ascii=False) + "\nAUDIT_CONTEXT_END"
     skill_instructions = resolve_skill_instructions(skills, language)

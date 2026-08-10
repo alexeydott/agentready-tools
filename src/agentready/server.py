@@ -30,6 +30,8 @@ from .mobile_report import render_mobile_html
 from .mobile_scanner import audit_mobile
 from .target import TargetError
 from .ai_prompts import ai_skill_catalog
+from .jobs_v2 import AuditJobManager
+from .report_v2 import AuditConfig, diff_reports, export_inventory, report_from_checks, report_from_dict
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,7 @@ def default_data_dir() -> Path:
 
 
 _SERVER_DATA_DIR = default_data_dir()
+_V2_JOBS = AuditJobManager(max_jobs=8)
 
 
 def configure_data_dir(path: str | Path | None = None) -> Path:
@@ -199,6 +202,15 @@ class ScanRequest(BaseModel):
     workers: int = Field(default=8, ge=1, le=24)
     level_threshold: float = Field(default=0.8, gt=0.0, le=1.0)
     recommendation_limit: int = Field(default=10, ge=0, le=50)
+
+
+class V2AuditRequest(BaseModel):
+    url: str
+    preset: Literal["all", "content", "api", "ai-search"] = "all"
+    timeout: float = Field(default=5.0, ge=1.0, le=30.0)
+    max_pages: int = Field(default=25, ge=1, le=100)
+    include: list[str] = Field(default_factory=list)
+    exclude: list[str] = Field(default_factory=list)
 
 
 class SeoRequest(BaseModel):
@@ -613,12 +625,99 @@ def scan_endpoint(request: ScanRequest) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def _run_v2_scan(request: V2AuditRequest) -> dict:
+    config = AuditConfig(
+        request.url,
+        preset=request.preset,
+        timeout=request.timeout,
+        max_pages=request.max_pages,
+        include=tuple(request.include),
+        exclude=tuple(request.exclude),
+    )
+    report = _run_scan(
+        ScanRequest(
+            url=config.target,
+            preset=config.preset,
+            timeout=config.timeout,
+            include=list(config.include),
+            exclude=list(config.exclude),
+        )
+    )
+    return report_from_checks(config.target, report.checks).to_dict()
+
+
+@app.post("/v2/audit")
+def audit_v2_endpoint(request: V2AuditRequest) -> dict:
+    """Run the additive canonical v2 report without changing the v1 endpoint."""
+    try:
+        return _run_v2_scan(request)
+    except (TargetError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/v2/rescan")
+def audit_v2_rescan_endpoint(request: V2AuditRequest) -> dict:
+    """Explicit additive rescan alias with the same bounded config as audit."""
+    return audit_v2_endpoint(request)
+
+
+@app.post("/v2/jobs")
+def audit_v2_job_endpoint(request: V2AuditRequest) -> dict:
+    try:
+        job_id = _V2_JOBS.submit(lambda: _run_v2_scan(request))
+    except (RuntimeError, TargetError, ValueError) as exc:
+        raise HTTPException(status_code=429 if isinstance(exc, RuntimeError) else 400, detail=str(exc)) from exc
+    return {"job_id": job_id, "status": "running"}
+
+
+@app.get("/v2/jobs/{job_id}")
+def audit_v2_job_status_endpoint(job_id: str) -> dict:
+    try:
+        return _V2_JOBS.get(job_id).to_dict()
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="job not found") from exc
+
+
+@app.post("/v2/jobs/{job_id}/cancel")
+def audit_v2_job_cancel_endpoint(job_id: str) -> dict:
+    try:
+        snapshot = _V2_JOBS.get(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="job not found") from exc
+    if snapshot.status.value in {"completed", "failed", "cancelled"}:
+        return snapshot.to_dict()
+    _V2_JOBS.cancel(job_id)
+    return _V2_JOBS.get(job_id).to_dict()
+
+
+@app.post("/v2/diff")
+def audit_v2_diff_endpoint(payload: dict) -> dict:
+    try:
+        request = V2AuditRequest.model_validate(payload["request"])
+        current = _run_v2_scan(request)
+        return diff_reports(report_from_dict(current), payload["baseline"]).to_dict()
+    except (KeyError, TargetError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/v2/export")
+def audit_v2_export_endpoint(payload: dict) -> dict:
+    format_name = payload.get("format", "jsonl")
+    try:
+        return {"format": format_name, "content": export_inventory(payload.get("items", []), format=format_name)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.post("/scan/dashboard", response_class=HTMLResponse)
 def scan_dashboard(request: ScanRequest) -> HTMLResponse:
     """Run a scan and return the self-contained bilingual HTML dashboard."""
     try:
         report = _run_scan(request)
-        return HTMLResponse(render_html(report, request.language))
+        html = render_html(report, request.language)
+        v2 = report_from_checks(request.url, report.checks).to_dict()
+        embedded = json.dumps(v2, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+        return HTMLResponse(f'{html}\n<script id="agentready-v2-report" type="application/json">{embedded}</script>')
     except (TargetError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -692,6 +791,8 @@ def _ai_assistant(request: AIRequest):
     from .ai_models import AssistantRequest, AssistantUsage, ConversationMessage
     from .ai_provider import AIProviderError, OpenAICompatibleProvider
     from .config import load_config
+    from .report_v2 import report_from_checks
+    from .scanner import scan
 
     cfg, _ = load_config()
     ai_cfg = cfg["ai"]
@@ -700,7 +801,8 @@ def _ai_assistant(request: AIRequest):
     if request.report is None:
         if not request.target:
             raise HTTPException(status_code=400, detail="target or report is required")
-        report_object = audit_seo(request.target, allow_private=False, language=request.language)
+        legacy_report = scan(request.target, allow_private=False, language=request.language)
+        report_object = report_from_checks(request.target, legacy_report.checks)
         report = report_object.to_dict()
     else:
         report_object = None
