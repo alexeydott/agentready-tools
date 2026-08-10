@@ -1,8 +1,8 @@
 """Optional async Playwright pool sharing one browser process per audit run."""
 from __future__ import annotations
 
-import asyncio
 import logging
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -72,19 +72,22 @@ class BrowserPool:
                 user_agent=user_agent,
                 service_workers="block" if self.config.block_service_workers else "allow",
             )
-            context.on("request", self._validate_request)
+            await context.route("**/*", self._route_request)
             try:
                 page = await context.new_page()
                 yield page
             finally:
                 await context.close()
 
-    def _validate_request(self, request: Any) -> None:
+    async def _route_request(self, route: Any) -> None:
+        request = route.request
         try:
             self.policy.validate_browser_request(request.url, resource_type=request.resource_type)
         except EgressPolicyError:
-            asyncio.create_task(request.abort("blockedbyclient"))
+            await route.abort("blockedbyclient")
             logger.warning("[WP4.3] blocked browser request url=%s type=%s", request.url, request.resource_type)
+        else:
+            await route.continue_()
 
     async def goto(self, page: Any, url: str, **kwargs: Any) -> Any:
         self.policy.validate_browser_request(url)
