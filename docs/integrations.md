@@ -58,11 +58,22 @@ than silently compared. The canonical CLI equivalent is
 `agentready audit https://example.com --fail-on-checks`.
 
 The `/dashboard` v2 preset uses `POST /v2/audit/dashboard` and renders the
-canonical `AuditService` result in an escaped HTML projection. Completed v2
-runs are retained in a bounded in-process registry for typed inventory reads:
-`/v2/runs/{run_id}/pages`, `run-urls`, `links`, `resources`, `redirects`,
-`findings`, and `metrics`. Each endpoint accepts bounded `limit`/`cursor`
-parameters and returns typed records; arbitrary queries are not accepted.
+canonical `AuditService` result in an escaped HTML projection. The dashboard's
+advanced panel exposes the vNext crawl profile (`quick`, `standard`, `deep`),
+the page limit, and optional browser rendering; server-side hard caps still
+apply to every submitted value. Completed v2 runs are retained in a bounded
+in-process registry for typed inventory reads:
+`/v2/runs/{run_id}/pages`, `run-urls` (alias `urls`), `links`, `resources`,
+`redirects`, `findings`, and `metrics`. The same records are reachable through
+the generic `/v2/runs/{run_id}/inventory/{kind}` route, where `kind` is one of
+those names; an unknown `kind` is rejected with `422`. Each endpoint accepts
+bounded `limit`/`cursor` parameters and returns typed records; arbitrary
+queries are not accepted.
+
+The registry is bounded by both the number of retained runs and the total
+number of retained inventory records, so deep crawls cannot pin unbounded
+memory. Once a run is evicted, its inventory endpoints return `404`; re-run the
+audit to repopulate it.
 
 For a selective child rescan, send `rescan_of` together with `selected_urls`.
 The crawler validates those URLs against the target origin and does not expand
@@ -80,7 +91,7 @@ scope, normalized URL identity, bounded frontier, explicit item states, and
 coverage accounting. Protocol profiles audit passive documents and expose
 evidence through the same report and agent/MCP projection boundaries.
 
-Release `0.8.2` freezes the compatibility manifest: v1 CLI/API facades stay
+Release `0.9.0` freezes the compatibility manifest: v1 CLI/API facades stay
 supported, while v2 schemas and protocol manifests are additive. Migration
 status is intentionally `v1-preserved-v2-additive`; no v1 endpoint is removed
 by this stable release.

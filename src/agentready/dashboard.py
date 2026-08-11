@@ -26,6 +26,16 @@ _TEXT = {
         "profile_content": "Readiness profile for content sites: llms.txt, Markdown negotiation, content signals and agent-friendly content access.",
         "profile_api": "Readiness profile for APIs and applications: API catalogs, OAuth discovery, MCP/A2A cards and agent integration protocols.",
         "profile_ai_search": "AI Search / GEO profile: indexability, AI crawler access, structured data, dates and citation readiness.",
+        "profile_v2": "vNext bounded crawl through the AuditService pipeline: same-origin discovery under hard caps, page/link/resource inventory, redirect chains and rule-based findings.",
+        "v2_profile": "vNext profile",
+        "v2_profile_hint": "Crawl budget for the vNext bounded audit. Quick is shallow and fast, deep discovers more pages. Server hard caps always apply.",
+        "v2_profile_quick": "Quick",
+        "v2_profile_standard": "Standard",
+        "v2_profile_deep": "Deep",
+        "v2_max_pages": "vNext page limit",
+        "v2_max_pages_hint": "Maximum number of pages the vNext crawl may fetch (1-100).",
+        "v2_render": "vNext browser rendering",
+        "v2_render_hint": "Render pages in a headless browser during the vNext crawl. Slower, but captures client-rendered content.",
         "profile_seo": "Independent SEO audit with optional same-origin crawl: metadata, indexability, links, canonical URL, robots/sitemap, favicon and JSON-LD.",
         "profile_mobile": "Mobile-friendliness audit based on Google Mobile-Friendly signals: viewport, responsive CSS, fixed widths, touch targets, font readability and indexability.",
         "language": "Language",
@@ -220,6 +230,16 @@ _TEXT = {
         "profile_content": "Профиль для контентных сайтов: llms.txt, Markdown-negotiation, content-сигналы и удобный для агентов доступ к контенту.",
         "profile_api": "Профиль для API и приложений: каталоги API, OAuth discovery, карточки MCP/A2A и протоколы интеграции агентов.",
         "profile_ai_search": "Профиль AI-поиска / GEO: индексируемость, доступ ИИ-краулеров, структурированные данные, даты и цитируемость.",
+        "profile_v2": "Ограниченный обход vNext через конвейер AuditService: обнаружение в пределах одного источника с жёсткими лимитами, инвентарь страниц/ссылок/ресурсов, цепочки редиректов и находки по правилам.",
+        "v2_profile": "Профиль vNext",
+        "v2_profile_hint": "Бюджет обхода для ограниченного аудита vNext. Quick — быстрый и поверхностный, deep обнаруживает больше страниц. Жёсткие лимиты сервера действуют всегда.",
+        "v2_profile_quick": "Быстрый",
+        "v2_profile_standard": "Стандартный",
+        "v2_profile_deep": "Глубокий",
+        "v2_max_pages": "Лимит страниц vNext",
+        "v2_max_pages_hint": "Максимальное число страниц, которые может загрузить обход vNext (1-100).",
+        "v2_render": "Браузерный рендеринг vNext",
+        "v2_render_hint": "Рендерить страницы в headless-браузере во время обхода vNext. Медленнее, но захватывает контент, отрисованный на клиенте.",
         "profile_seo": "Независимый SEO-аудит с дополнительным обходом сайта: метаданные, индексируемость, ссылки, canonical URL, robots/sitemap, favicon и JSON-LD.",
         "profile_mobile": "Аудит мобильной дружественности по сигналам Google Mobile-Friendly: viewport, адаптивный CSS, фиксированная ширина, мишени касания, читаемость шрифта и индексируемость.",
         "language": "Язык",
@@ -565,6 +585,10 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div><label for="threshold">{escape(text["threshold"])} {_hint(text, "threshold_hint")}</label><input id="threshold" type="text" inputmode="decimal" data-decimal min="0.01" max="1" step="0.01" value="0.8"></div>
 <div><label for="recommendations">{escape(text["recommendations"])} {_hint(text, "recommendations_hint")}</label><input id="recommendations" type="number" min="0" max="50" value="10"></div>
 <label><input id="verify" type="checkbox" style="width:auto;margin-right:8">{escape(text["verify"])} {_hint(text, "verify_hint")}</label>
+</div><div class="form-grid three" style="margin-top:14px">
+<div><label for="v2-profile">{escape(text["v2_profile"])} {_hint(text, "v2_profile_hint")}</label><select id="v2-profile"><option value="quick">{escape(text["v2_profile_quick"])}</option><option value="standard">{escape(text["v2_profile_standard"])}</option><option value="deep">{escape(text["v2_profile_deep"])}</option></select></div>
+<div><label for="v2-max-pages">{escape(text["v2_max_pages"])} {_hint(text, "v2_max_pages_hint")}</label><input id="v2-max-pages" type="number" min="1" max="100" value="3"></div>
+<label><input id="v2-render" type="checkbox" style="width:auto;margin-right:8">{escape(text["v2_render"])} {_hint(text, "v2_render_hint")}</label>
 </div></details>
 <div class="advanced-links"><div class="advanced-link-row"><a href="#" class="text-link" onclick="loadChecks(); return false;">{escape(text["checks"])}</a>{_hint(text, "refresh_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="runHealth(); return false;">{escape(text["health"])}</a>{_hint(text, "health_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="openAiCredentials(); return false;">{escape(text["ai_credentials"])}</a>{_hint(text, "ai_credentials_hint")}</div><div class="advanced-link-row"><label style="font-weight:700;margin:0"><input id="debug" type="checkbox" style="width:auto;margin-right:6px">{escape(text["debug"])}</label>{_hint(text, "debug_hint")}</div></div>
 </section>
@@ -647,7 +671,7 @@ const resultPanel = document.getElementById("result-panel");
 const aiPanel = document.getElementById("ai-assistant-panel");
 let auditCompleted = false;
 const presetLabels = {{all:translations[language.value].preset_all, content:translations[language.value].preset_content, api:translations[language.value].preset_api, "ai-search":translations[language.value].preset_ai_search, v2:translations[language.value].preset_v2, seo:translations[language.value].preset_seo, mobile:translations[language.value].preset_mobile}};
-const profileHints = {{all:translations[language.value].profile_all, content:translations[language.value].profile_content, api:translations[language.value].profile_api, "ai-search":translations[language.value].profile_ai_search, seo:translations[language.value].profile_seo, mobile:translations[language.value].profile_mobile}};
+const profileHints = {{all:translations[language.value].profile_all, content:translations[language.value].profile_content, api:translations[language.value].profile_api, "ai-search":translations[language.value].profile_ai_search, v2:translations[language.value].profile_v2, seo:translations[language.value].profile_seo, mobile:translations[language.value].profile_mobile}};
 const progress = document.getElementById("progress"); const progressBar = document.getElementById("progress-bar");
 function debugMode() {{ return document.getElementById("debug").checked; }}
 function updateAiModeHint() {{
@@ -785,7 +809,7 @@ async function runV2() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
   window.agentreadyV2Report = null;
   try {{
-    await request("/v2/audit/dashboard","POST",{{url:document.getElementById("url").value,preset:"all",profile:"quick",max_pages:3,timeout:Number(document.getElementById("timeout").value),language:language.value}},true);
+    await request("/v2/audit/dashboard","POST",{{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:Number(document.getElementById("v2-max-pages").value)||3,render:document.getElementById("v2-render").checked,timeout:Number(document.getElementById("timeout").value),language:language.value}},true);
     setAiAvailability(true);
   }} catch (error) {{
     setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message;

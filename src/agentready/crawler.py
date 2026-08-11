@@ -503,6 +503,13 @@ class AsyncCrawler:
                             queued_item = queue.get_nowait()
                             if queued_item is not None:
                                 frontier.set_state(queued_item.url, CrawlItemState.SKIPPED_POLICY)
+                                skipped_policy += 1
+                                record_url(
+                                    queued_item.url,
+                                    RunUrlState.SKIPPED,
+                                    queued_item.depth,
+                                    error_kind="max-pages",
+                                )
                             queue.task_done()
                     for _ in workers:
                         await queue.put(None)

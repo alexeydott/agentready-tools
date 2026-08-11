@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 from types import SimpleNamespace
 
+import pytest
+
 import agentready.server as server_module
 from agentready.ai_provider import ProviderModel
 from agentready.audit_core.store import (
@@ -123,6 +125,43 @@ def test_v2_inventory_endpoints_paginate_typed_store_records():
     assert client.get(f"/v2/runs/{run_id}/findings").json()["total"] == 1
     assert client.get(f"/v2/runs/{run_id}/metrics").json()["total"] == 1
     assert client.get(f"/v2/runs/{run_id}/inventory/pages", params={"limit": 1}).json()["next_cursor"]
+
+
+def test_v2_run_registry_evicts_by_run_count_and_record_budget():
+    registry = server_module._V2RunRegistry(max_runs=3, max_records=5)
+
+    def make_store(run_id: str, pages: int) -> MemorySiteStore:
+        store = MemorySiteStore()
+        for index in range(pages):
+            store.put_page(PageRecord(run_id, f"https://example.com/{run_id}/{index}", f"https://example.com/{run_id}/{index}"))
+        return store
+
+    for run_id in ("r1", "r2", "r3", "r4"):
+        registry.put(run_id, make_store(run_id, 1))
+    with pytest.raises(KeyError):
+        registry.get("r1")
+    assert registry.get("r4") is not None
+
+    registry.put("big", make_store("big", 20))
+    for run_id in ("r2", "r3", "r4"):
+        with pytest.raises(KeyError):
+            registry.get(run_id)
+    assert registry.get("big") is not None
+
+
+def test_v2_inventory_returns_404_for_evicted_runs(monkeypatch):
+    registry = server_module._V2RunRegistry(max_runs=1, max_records=1_000)
+    monkeypatch.setattr(server_module, "_V2_RUNS", registry)
+    first = MemorySiteStore()
+    first.put_page(PageRecord("evicted", "https://example.com/", "https://example.com/"))
+    registry.put("evicted", first)
+    second = MemorySiteStore()
+    second.put_page(PageRecord("kept", "https://example.com/", "https://example.com/"))
+    registry.put("kept", second)
+
+    client = TestClient(app)
+    assert client.get("/v2/runs/evicted/pages").status_code == 404
+    assert client.get("/v2/runs/kept/pages").status_code == 200
 
 
 def test_v2_inventory_rejects_invalid_kind_limits_and_unknown_runs():

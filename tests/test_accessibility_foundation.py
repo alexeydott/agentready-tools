@@ -43,6 +43,24 @@ def test_dashboard_accessibility_foundation_is_localized_and_live():
     assert "min-height:44px" in html
 
 
+def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
+    for language, profile_hint, budget_label in (
+        ("en", "vNext bounded crawl", "vNext page limit"),
+        ("ru", "Ограниченный обход vNext", "Лимит страниц vNext"),
+    ):
+        html = render_dashboard(language)
+
+        assert profile_hint in html
+        assert "v2:translations[language.value].profile_v2" in html
+        assert budget_label in html
+        assert 'id="v2-profile"' in html
+        assert 'id="v2-max-pages"' in html
+        assert 'id="v2-render"' in html
+        assert 'profile:document.getElementById("v2-profile").value' in html
+        assert 'max_pages:Number(document.getElementById("v2-max-pages").value)' in html
+        assert 'render:document.getElementById("v2-render").checked' in html
+
+
 def test_dashboard_noscript_guidance_is_localized():
     html = render_dashboard("ru")
 

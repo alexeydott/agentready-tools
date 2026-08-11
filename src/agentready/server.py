@@ -67,21 +67,56 @@ _AUDIT_SERVICE = AuditService()
 
 
 class _V2RunRegistry:
-    """Bounded in-process access to completed v2 audit stores."""
+    """Bounded in-process access to completed v2 audit stores.
 
-    def __init__(self, *, max_runs: int = 32) -> None:
+    Bounded by both the number of retained runs and the total number of retained
+    inventory records, so a small number of deep runs cannot pin unbounded memory.
+    """
+
+    def __init__(self, *, max_runs: int = 32, max_records: int = 250_000) -> None:
         self._max_runs = max_runs
+        self._max_records = max_records
         self._runs: OrderedDict[str, MemorySiteStore] = OrderedDict()
+        self._sizes: dict[str, int] = {}
         self._lock = threading.RLock()
+
+    @staticmethod
+    def _record_count(run_id: str, store: MemorySiteStore) -> int:
+        return sum(
+            sum(1 for _ in iterator(run_id))
+            for iterator in (
+                store.iter_pages,
+                store.iter_run_urls,
+                store.iter_link_occurrences,
+                store.iter_resource_occurrences,
+                store.iter_metrics,
+                store.iter_redirects,
+                store.iter_findings,
+            )
+        )
+
+    def _evict_oldest(self, reason: str) -> None:
+        run_id, evicted = self._runs.popitem(last=False)
+        self._sizes.pop(run_id, None)
+        evicted.close()
+        logger.info("v2 run inventory evicted run_id=%s reason=%s", run_id, reason)
 
     def put(self, run_id: str, store: MemorySiteStore) -> None:
         with self._lock:
             self._runs.pop(run_id, None)
+            self._sizes.pop(run_id, None)
             self._runs[run_id] = store
+            self._sizes[run_id] = self._record_count(run_id, store)
             while len(self._runs) > self._max_runs:
-                _, evicted = self._runs.popitem(last=False)
-                evicted.close()
-        logger.debug("v2 run inventory stored run_id=%s size=%d", run_id, len(self._runs))
+                self._evict_oldest("max-runs")
+            while len(self._runs) > 1 and sum(self._sizes.values()) > self._max_records:
+                self._evict_oldest("max-records")
+            logger.debug(
+                "v2 run inventory stored run_id=%s runs=%d records=%d",
+                run_id,
+                len(self._runs),
+                sum(self._sizes.values()),
+            )
 
     def get(self, run_id: str) -> MemorySiteStore:
         with self._lock:

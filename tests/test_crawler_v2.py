@@ -16,7 +16,7 @@ from agentready.crawler import (
     Frontier,
     ScopePolicy,
 )
-from agentready.audit_core import AuditRunContext, MemorySiteStore
+from agentready.audit_core import AuditRunContext, MemorySiteStore, RunUrlState
 from agentready.egress import EgressPolicy
 from agentready.page_parser import Representation, RepresentationSource, parse_page
 
@@ -243,6 +243,60 @@ def test_crawler_deadline_is_classified_as_partial() -> None:
         ).crawl()
         assert result.coverage.deadline_hit is True
         assert result.coverage.classification.value == "partial_limit"
+
+    asyncio.run(run())
+
+
+def test_crawler_leaves_no_queued_urls_when_max_pages_stops_scheduling() -> None:
+    """Stopping at max_pages must leave every discovered URL in a terminal state.
+
+    Both the worker-side limit check and the scheduler-side queue drain mark
+    remaining work as SKIPPED_POLICY; neither may leave stale ``queued`` rows in
+    run inventory nor under-report ``skipped_policy`` coverage.
+    """
+
+    async def run() -> None:
+        store = MemorySiteStore()
+        context = AuditRunContext.create(
+            "https://example.test",
+            {"max_pages": 5},
+            tool_version="test",
+            rule_catalog_version="rules-1",
+            run_id="run-drained",
+        )
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            if str(request.url).rstrip("/") == "https://example.test":
+                links = b"".join(
+                    f'<a href="/p{index}">p{index}</a>'.encode() for index in range(12)
+                )
+                return httpx.Response(200, headers={"content-type": "text/html"}, content=links)
+            await asyncio.sleep(0.02)
+            return httpx.Response(200, headers={"content-type": "text/html"}, content=b"<title>child</title>")
+
+        result = await AsyncCrawler(
+            CrawlScope(("https://example.test/",), allowed_origins=("https://example.test",)),
+            config=CrawlConfig(
+                max_pages=5,
+                concurrency=4,
+                per_origin_concurrency=4,
+                min_request_interval_ms=0,
+                max_duration=10,
+            ),
+            policy=EgressPolicy(allowed_origins=frozenset({"https://example.test"})),
+            transport=httpx.MockTransport(handler),
+            store=store,
+            run_context=context,
+        ).crawl()
+
+        assert result.coverage.max_pages_hit is True
+        assert len(result.pages) == 5
+        records = list(store.iter_run_urls("run-drained"))
+        assert records
+        assert all(record.state is not RunUrlState.QUEUED for record in records)
+        skipped = [record for record in records if record.state is RunUrlState.SKIPPED]
+        assert skipped, "expected URLs beyond max_pages to be recorded as skipped"
+        assert result.coverage.skipped_policy == len(skipped)
 
     asyncio.run(run())
 

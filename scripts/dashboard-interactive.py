@@ -147,18 +147,11 @@ def run(
                 if profile == "all":
                     report_frame = page.locator("#report-frame").content_frame
                     hint = report_frame.locator(".check-help").first
-                    if hint.count() > 0:
-                        hint.wait_for(state="attached")
-                        page.wait_for_timeout(500)
-                        assert hint.evaluate(
-                            "element => { element.focus(); return getComputedStyle(element, '::after').content != 'none'; }"
-                        )
-                    else:
-                        print(json.dumps({
-                            "check": "report hover/focus hint",
-                            "status": "skip",
-                            "reason": "live report contained no check-help element",
-                        }))
+                    hint.wait_for(state="attached", timeout=30_000)
+                    _check(page, "report hover/focus hint", lambda: None)
+                    assert hint.evaluate(
+                        "element => { element.focus(); return getComputedStyle(element, '::after').content != 'none'; }"
+                    )
                 assert page.locator("#ai-assistant-panel").is_visible()
             with page.expect_download(timeout=30_000):
                 page.locator("#result a").first.click()
