@@ -1,5 +1,6 @@
 from agentready.seo_checks import SEO_CHECKS_BY_ID, SeoHtmlParser
 from agentready.agentfindings import build_findings
+from agentready.browser_pool import CapabilityUnavailableError
 from agentready.seo_crawler import (
     CRAWL_CHECK_METADATA,
     CrawledPage,
@@ -275,3 +276,110 @@ def test_crawl_site_stays_same_origin(monkeypatch):
     pages = crawl_site("https://example.com/", max_pages=5)
     assert all(page.url.startswith("https://example.com") for page in pages)
     assert len(pages) == 2  # start + /internal, external link not followed
+
+
+def test_rendered_crawl_reuses_one_browser_pool(monkeypatch):
+    from contextlib import asynccontextmanager
+
+    class CrawlResponse:
+        def __init__(self, url):
+            self.url = url
+            self.status_code = 200
+            self.content_type = "text/html"
+            self.text = "<html><body>JS links</body></html>"
+            self.body = self.text.encode()
+            self.redirected_from = []
+
+    class FakeHttpClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def get(self, url):
+            return CrawlResponse(url)
+
+    class FakePage:
+        async def eval_on_selector_all(self, selector, script):
+            assert selector == "a[href]"
+            assert "nofollow" in script
+            return [{"href": "https://example.com/rendered", "nofollow": True}]
+
+    class FakeBrowserPool:
+        instances = []
+
+        def __init__(self, policy):
+            self.started = 0
+            self.closed = 0
+            self.pages = 0
+            FakeBrowserPool.instances.append(self)
+
+        async def start(self):
+            self.started += 1
+
+        async def close(self):
+            self.closed += 1
+
+        @asynccontextmanager
+        async def page(self, **kwargs):
+            self.pages += 1
+            yield FakePage()
+
+        async def goto(self, page, url, **kwargs):
+            assert url == "https://example.com"
+
+    monkeypatch.setattr("agentready.seo_crawler.HttpClient", FakeHttpClient)
+    monkeypatch.setattr("agentready.seo_crawler.BrowserPool", FakeBrowserPool)
+    pages = crawl_site("https://example.com/", max_pages=1, render=True)
+
+    assert len(pages) == 1
+    pool = FakeBrowserPool.instances[0]
+    assert pool.started == 1
+    assert pool.closed == 1
+    assert pool.pages == 1
+    assert pages[0].links == ["https://example.com/rendered"]
+    assert pages[0].nofollow_links == ["https://example.com/rendered"]
+
+
+def test_rendered_crawl_preserves_static_results_when_browser_optional_dependency_is_missing(monkeypatch, caplog):
+    class FakeHttpClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def get(self, url):
+            return FakeResponse("<html><body>No static links</body></html>", url=url)
+
+    class MissingBrowserPool:
+        closed = 0
+
+        def __init__(self, policy):
+            pass
+
+        async def start(self):
+            raise CapabilityUnavailableError(
+                "Playwright browser support",
+                "Install the optional browser extra.",
+            )
+
+        async def close(self):
+            MissingBrowserPool.closed += 1
+
+    monkeypatch.setattr("agentready.seo_crawler.HttpClient", FakeHttpClient)
+    monkeypatch.setattr("agentready.seo_crawler.BrowserPool", MissingBrowserPool)
+    with caplog.at_level("DEBUG", logger="agentready.seo_crawler"):
+        pages = crawl_site("https://example.com/", max_pages=1, render=True)
+
+    assert len(pages) == 1
+    assert pages[0].links == []
+    assert MissingBrowserPool.closed == 1
+    assert "optional browser extra" in caplog.text

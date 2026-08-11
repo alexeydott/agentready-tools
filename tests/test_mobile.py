@@ -199,3 +199,93 @@ def test_mobile_check_metadata_is_localized():
         assert item["title"]["en"] and item["title"]["ru"]
         assert item["category"]["en"] and item["category"]["ru"]
         assert item["description"]["en"] and item["description"]["ru"]
+
+
+def test_mobile_render_preserves_exact_optional_dependency_skip(monkeypatch):
+    from agentready.browser_pool import CapabilityUnavailableError
+
+    class FakeResponse:
+        status_code = 200
+        content_type = "text/html"
+        text = "<html><head><meta name='viewport' content='width=device-width'></head></html>"
+        headers = {}
+
+        def evidence(self, action, **kwargs):
+            return Evidence(action=action, url="https://example.com")
+
+    class FakeHttpClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def get(self, url, **kwargs):
+            return FakeResponse()
+
+    class MissingBrowserPool:
+        def __init__(self, policy):
+            pass
+
+        async def start(self):
+            raise CapabilityUnavailableError(
+                "Playwright browser support",
+                "Install the optional browser extra.",
+            )
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr("agentready.mobile_scanner.HttpClient", FakeHttpClient)
+    monkeypatch.setattr("agentready.mobile_scanner.BrowserPool", MissingBrowserPool)
+    report = audit_mobile(["https://example.com"], render=True)
+
+    rendered = [check for check in report.pages[0].checks if check.id.startswith("rendered-")]
+    assert len(rendered) == 3
+    assert {(check.status, check.scored, check.details) for check in rendered} == {
+        ("skip", False, "playwright not installed")
+    }
+
+
+def test_rendered_checks_use_one_shared_async_pool():
+    import asyncio
+    from contextlib import asynccontextmanager
+
+    from agentready.mobile_render import MOBILE_RENDER_CHECKS
+
+    class FakePage:
+        async def evaluate(self, script):
+            if "scrollWidth" in script:
+                return {"scrollWidth": 360, "clientWidth": 360, "innerWidth": 360}
+            if "tooSmall" in script:
+                return {"total": 0, "tooSmall": 0}
+            return {"fontSizePx": 16, "zoomBlocked": False}
+
+    class FakePool:
+        def __init__(self):
+            self.pages = 0
+            self.navigations = 0
+
+        @asynccontextmanager
+        async def page(self, **kwargs):
+            assert kwargs["viewport"] == {"width": 360, "height": 640}
+            self.pages += 1
+            yield FakePage()
+
+        async def goto(self, page, url, **kwargs):
+            assert url == "https://example.com"
+            assert kwargs["wait_until"] == "networkidle"
+            self.navigations += 1
+
+    async def run():
+        pool = FakePool()
+        results = [await check("https://example.com", pool) for check in MOBILE_RENDER_CHECKS]
+        return pool, results
+
+    pool, results = asyncio.run(run())
+    assert pool.pages == len(MOBILE_RENDER_CHECKS)
+    assert pool.navigations == len(MOBILE_RENDER_CHECKS)
+    assert [result.status for result in results] == ["pass", "skip", "pass"]

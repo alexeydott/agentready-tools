@@ -9,6 +9,7 @@ from urllib.parse import urljoin
 from ..http import FetchError, HttpClient
 from ..seo_checks import SeoHtmlParser
 from ..structured_data import extract_jsonld_nodes
+from ..page_parser import ParsedPage
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,44 @@ class SeoPageEvidence:
     @property
     def html(self) -> bool:
         return self.content_type in {"text/html", "application/xhtml+xml"}
+
+
+def evidence_from_parsed_page(
+    page: ParsedPage,
+    *,
+    url: str,
+    final_url: str,
+    status_code: int,
+    content_type: str,
+    evidence_id: str | None = None,
+) -> SeoPageEvidence:
+    """Project shared parsed facts into the legacy SEO evidence DTO."""
+    facts = page.facts
+    if facts is None:
+        raise ValueError("parsed page does not contain shared facts")
+    titles = facts.titles
+    descriptions = facts.descriptions
+    h1 = tuple(item.text for item in facts.headings if item.level == 1)
+    canonicals = tuple(urljoin(final_url, item) for item in facts.canonicals)
+    hreflangs = tuple((item.lang, urljoin(final_url, item.href)) for item in facts.hreflang)
+    return SeoPageEvidence(
+        url=url,
+        final_url=final_url,
+        status_code=status_code,
+        content_type=content_type,
+        title=titles[0] if titles else page.title,
+        titles=titles,
+        description=descriptions[0] if descriptions else "",
+        descriptions=descriptions,
+        h1=h1,
+        canonicals=canonicals,
+        hreflangs=hreflangs,
+        meta_robots=facts.meta_robots,
+        x_robots="",
+        jsonld_nodes=(),
+        jsonld_errors=(),
+        evidence_ids=(evidence_id or _evidence_id(url, "page"),),
+    )
 
 
 def collect_page_evidence(url: str, client: HttpClient) -> SeoPageEvidence:

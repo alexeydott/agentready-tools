@@ -19,6 +19,64 @@ SEO_ATOMIC_RULES: tuple[SeoRuleSpec, ...] = (
     SeoRuleSpec("title-length", "Title length heuristic", "metadata", RuleKind.HEURISTIC, False),
 )
 
+SEO_RULE_GROUPS: tuple[str, ...] = (
+    "visibility",
+    "hreflang",
+    "http",
+    "crawl-index",
+    "canonical-duplicates",
+    "security",
+    "links",
+    "metadata",
+    "images",
+    "content",
+    "performance",
+)
+
+
+def rule_manifest() -> tuple[dict[str, object], ...]:
+    """Return the stable machine-readable built-in rule catalog."""
+    ids = [rule.id for rule in SEO_ATOMIC_RULES]
+    if len(ids) != len(set(ids)):
+        raise ValueError("duplicate SEO rule IDs")
+    return tuple(
+        {
+            "id": rule.id,
+            "title": rule.title,
+            "category": rule.category,
+            "kind": rule.kind.value,
+            "scored_by_default": rule.scored_by_default,
+            "applies_to": rule.applies_to,
+            "status": "implemented",
+        }
+        for rule in SEO_ATOMIC_RULES
+    )
+
+
+def rule_groups() -> tuple[dict[str, object], ...]:
+    """Return the stable rule taxonomy, including groups awaiting implementation."""
+    by_category: dict[str, list[str]] = {category: [] for category in SEO_RULE_GROUPS}
+    for rule in SEO_ATOMIC_RULES:
+        category = {
+            "hreflang": "hreflang",
+            "technical": "http",
+            "indexability": "crawl-index",
+            "structured-data": "visibility",
+        }.get(rule.id, {
+            "technical": "http",
+            "indexability": "crawl-index",
+            "structured-data": "visibility",
+        }.get(rule.category, rule.category))
+        by_category.setdefault(category, []).append(rule.id)
+    return tuple(
+        {
+            "id": category,
+            "rule_ids": tuple(sorted(by_category[category])),
+            "status": "implemented" if by_category[category] else "planned",
+        }
+        for category in SEO_RULE_GROUPS
+    )
+
 
 def run_rules(evidence: SeoPageEvidence) -> tuple[AtomicFinding, ...]:
     findings = [

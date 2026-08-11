@@ -10,10 +10,13 @@ pages with excessive link counts.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from urllib.parse import urldefrag, urljoin, urlsplit
 
+from .browser_pool import BrowserPool, BrowserPoolBoundary
+from .egress import EgressPolicy
 from .http import FetchError, HttpClient
 from .models import Evidence, Remediation
 from .seo_checks import SeoHtmlParser
@@ -51,22 +54,18 @@ def _same_origin(url: str, origin: str) -> bool:
     return urlsplit(url).netloc == urlsplit(origin).netloc
 
 
-def _rendered_links(url: str) -> list[str]:
+async def _rendered_links(url: str, browser_pool: BrowserPoolBoundary) -> list[tuple[str, bool]]:
     """Extract anchor hrefs from the rendered DOM using headless Chromium."""
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
-        try:
-            page = browser.new_page()
-            page.goto(url, wait_until="networkidle", timeout=30000)
-            hrefs: list[str] = page.eval_on_selector_all("a[href]", "els => els.map(e => e.href)")
-            return hrefs
-        finally:
-            browser.close()
+    async with browser_pool.page() as page:
+        await browser_pool.goto(page, url, wait_until="networkidle", timeout=30000)
+        facts = await page.eval_on_selector_all(
+            "a[href]",
+            "els => els.map(e => ({href: e.href, nofollow: (e.rel || '').toLowerCase().includes('nofollow')}))",
+        )
+        return [(item["href"], bool(item["nofollow"])) for item in facts]
 
 
-def crawl_site(
+async def _crawl_site_async(
     start_url: str,
     *,
     max_pages: int = 25,
@@ -81,38 +80,74 @@ def crawl_site(
     seen: set[str] = set(queue)
     pages: list[CrawledPage] = []
     logger.info("SEO crawl started: origin=%s max_pages=%d render=%s", origin, max_pages, render)
-    with HttpClient(timeout=timeout, verify=verify, allow_private=allow_private) as client:
-        while queue and len(pages) < max_pages:
-            current = queue.pop(0)
-            started = time.perf_counter()
-            try:
-                response = client.get(current)
-            except FetchError as exc:
-                logger.debug("Crawl fetch failed: url=%s error=%s", current, exc)
-                pages.append(CrawledPage(current, 0, None, [], round((time.perf_counter() - started) * 1000)))
-                continue
-            fetch_ms = round((time.perf_counter() - started) * 1000)
-            parser = None
-            if response.status_code == 200 and response.content_type in {"text/html", "application/xhtml+xml"}:
-                parser = SeoHtmlParser()
-                parser.feed(response.text)
-                parser.close()
-            page = CrawledPage(response.url, response.status_code, parser, response.redirected_from, fetch_ms)
-            pages.append(page)
-            hrefs = page.links
-            if render and not hrefs:
+    browser_pool: BrowserPoolBoundary | None = None
+    if render:
+        browser_pool = BrowserPool(EgressPolicy(block_private=not allow_private, max_response_bytes=MAX_HTML_BYTES))
+        try:
+            await browser_pool.start()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Rendered link extraction unavailable: %s", exc)
+            await browser_pool.close()
+            browser_pool = None
+    try:
+        with HttpClient(timeout=timeout, verify=verify, allow_private=allow_private) as client:
+            while queue and len(pages) < max_pages:
+                current = queue.pop(0)
+                started = time.perf_counter()
                 try:
-                    hrefs = _rendered_links(current)
-                    logger.debug("Rendered link extraction: url=%s links=%d", current, len(hrefs))
-                except Exception as exc:  # noqa: BLE001
-                    logger.debug("Rendered link extraction failed: url=%s error=%s", current, exc)
-            for href in hrefs:
-                absolute = _normalize(urljoin(current, href))
-                if absolute.startswith(origin) and _same_origin(absolute, origin) and absolute not in seen:
-                    seen.add(absolute)
-                    queue.append(absolute)
+                    response = client.get(current)
+                except FetchError as exc:
+                    logger.debug("Crawl fetch failed: url=%s error=%s", current, exc)
+                    pages.append(CrawledPage(current, 0, None, [], round((time.perf_counter() - started) * 1000)))
+                    continue
+                fetch_ms = round((time.perf_counter() - started) * 1000)
+                parser = None
+                if response.status_code == 200 and response.content_type in {"text/html", "application/xhtml+xml"}:
+                    parser = SeoHtmlParser()
+                    parser.feed(response.text)
+                    parser.close()
+                page = CrawledPage(response.url, response.status_code, parser, response.redirected_from, fetch_ms)
+                pages.append(page)
+                hrefs = page.links
+                if render and not hrefs and browser_pool is not None:
+                    try:
+                        rendered_links = await _rendered_links(current, browser_pool)
+                        hrefs = [href for href, _ in rendered_links]
+                        page.links = hrefs
+                        page.nofollow_links = [href for href, nofollow in rendered_links if nofollow]
+                        logger.debug("Rendered link extraction: url=%s links=%d", current, len(hrefs))
+                    except Exception as exc:  # noqa: BLE001
+                        logger.debug("Rendered link extraction failed: url=%s error=%s", current, exc)
+                for href in hrefs:
+                    absolute = _normalize(urljoin(current, href))
+                    if absolute.startswith(origin) and _same_origin(absolute, origin) and absolute not in seen:
+                        seen.add(absolute)
+                        queue.append(absolute)
+    finally:
+        if browser_pool is not None:
+            await browser_pool.close()
     logger.info("SEO crawl finished: pages=%d queue_left=%d", len(pages), len(queue))
     return pages
+
+
+def crawl_site(
+    start_url: str,
+    *,
+    max_pages: int = 25,
+    timeout: float = 5.0,
+    verify: bool = True,
+    allow_private: bool = True,
+    render: bool = False,
+) -> list[CrawledPage]:
+    """Breadth-first crawl of same-origin pages starting at ``start_url``."""
+    return asyncio.run(_crawl_site_async(
+        start_url,
+        max_pages=max_pages,
+        timeout=timeout,
+        verify=verify,
+        allow_private=allow_private,
+        render=render,
+    ))
 
 
 def _result(

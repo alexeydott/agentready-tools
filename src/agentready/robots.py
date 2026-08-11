@@ -8,6 +8,8 @@ from datetime import datetime
 from enum import StrEnum
 from urllib.parse import urlsplit
 
+from .query_service import QueryService, RunUrlQuery
+
 logger = logging.getLogger(__name__)
 MAX_ROBOTS_BYTES = 500 * 1024
 
@@ -69,6 +71,39 @@ class RobotsPolicyDiff:
     sitemap_urls_affected: tuple[str, ...]
     observed_search_pages_affected: tuple[str, ...]
     label: str = "SIMULATION - site not changed"
+    user_agent: str = "*"
+
+
+class RobotsSimulationService:
+    """Run a no-write robots policy simulation over stored run URLs."""
+
+    def __init__(self, query_service: QueryService) -> None:
+        self.query_service = query_service
+
+    def simulate(
+        self,
+        run_id: str,
+        live: RobotsPolicy,
+        simulated: RobotsPolicy,
+        *,
+        user_agent: str = "*",
+        observed_search_pages: list[str] | tuple[str, ...] = (),
+    ) -> RobotsPolicyDiff:
+        cursor: str | None = None
+        urls: list[str] = []
+        while True:
+            page = self.query_service.run_urls(RunUrlQuery(run_id, cursor=cursor, limit=1000))
+            urls.extend(item.url_key for item in page.items)
+            if page.next_cursor is None:
+                break
+            cursor = page.next_cursor
+        return simulate_robots(
+            live,
+            simulated,
+            urls,
+            user_agent=user_agent,
+            observed_search_pages=observed_search_pages,
+        )
 
 
 def parse_robots(text: str, origin: str, *, fetch: RobotsFetchState | None = None) -> RobotsPolicy:
@@ -165,20 +200,37 @@ def simulate_robots(
     *,
     user_agent: str = "*",
     observed_search_pages: list[str] | tuple[str, ...] = (),
+    interpretation: RobotsInterpretation = RobotsInterpretation.RFC9309,
 ) -> RobotsPolicyDiff:
     newly_allowed: list[str] = []
     newly_blocked: list[str] = []
     for url in dict.fromkeys(urls):
-        before = evaluate_robots(live, user_agent, url).allowed
-        after = evaluate_robots(simulated, user_agent, url).allowed
+        before = evaluate_robots(live, user_agent, url, interpretation=interpretation).allowed
+        after = evaluate_robots(simulated, user_agent, url, interpretation=interpretation).allowed
         if after and not before:
             newly_allowed.append(url)
         elif before and not after:
             newly_blocked.append(url)
     affected_sitemaps = sorted(set(live.sitemaps) ^ set(simulated.sitemaps))
     observed = tuple(url for url in observed_search_pages if url in newly_allowed or url in newly_blocked)
-    logger.info("[WP5.2] robots simulation urls=%d allowed_delta=%d blocked_delta=%d", len(urls), len(newly_allowed), len(newly_blocked))
-    return RobotsPolicyDiff(tuple(newly_allowed), tuple(newly_blocked), tuple(affected_sitemaps), observed)
+    logger.info(
+        "[WP5.2] robots simulation interpretation=%s bot=%s urls=%d allowed_delta=%d "
+        "blocked_delta=%d sitemap_delta=%d observed_delta=%d",
+        interpretation.value,
+        user_agent,
+        len(urls),
+        len(newly_allowed),
+        len(newly_blocked),
+        len(affected_sitemaps),
+        len(observed),
+    )
+    return RobotsPolicyDiff(
+        tuple(newly_allowed),
+        tuple(newly_blocked),
+        tuple(affected_sitemaps),
+        observed,
+        user_agent=user_agent,
+    )
 
 
 def sensitive_path_diagnostic(policy: RobotsPolicy) -> tuple[str, ...]:

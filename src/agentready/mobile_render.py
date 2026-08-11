@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import time
 
+from .browser_pool import BrowserPoolBoundary
 from .mobile_models import MobileCheckResult
 from .models import Evidence, Remediation
 
@@ -50,21 +51,14 @@ def _remediation(summary: str, command: str, references: list[str]) -> Remediati
     return Remediation(summary=summary, rerun_command=command, references=references)
 
 
-def check_rendered_layout_overflow(url: str, client: object) -> MobileCheckResult:
+async def check_rendered_layout_overflow_async(url: str, pool: BrowserPoolBoundary) -> MobileCheckResult:
     """Measure horizontal overflow in a mobile viewport."""
     started = time.perf_counter()
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        return _result("rendered-layout-overflow", "Rendered layout overflow", "layout", "skip", False, "playwright not installed", started, [])
     evidence: list[Evidence] = []
     try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
-            try:
-                page = browser.new_page(viewport={"width": _VIEWPORT_WIDTH, "height": _VIEWPORT_HEIGHT})
-                page.goto(url, wait_until="networkidle", timeout=30000)
-                metrics = page.evaluate(
+        async with pool.page(viewport={"width": _VIEWPORT_WIDTH, "height": _VIEWPORT_HEIGHT}) as page:
+            await pool.goto(page, url, wait_until="networkidle", timeout=30000)
+            metrics = await page.evaluate(
                     """() => {
                         const doc = document.documentElement;
                         return {
@@ -73,9 +67,7 @@ def check_rendered_layout_overflow(url: str, client: object) -> MobileCheckResul
                             innerWidth: window.innerWidth,
                         };
                     }"""
-                )
-            finally:
-                browser.close()
+            )
     except Exception as exc:  # noqa: BLE001
         logger.error("Rendered overflow check failed for %s: %s", url, exc)
         return _result("rendered-layout-overflow", "Rendered layout overflow", "layout", "error", True, str(exc), started, evidence)
@@ -93,21 +85,14 @@ def check_rendered_layout_overflow(url: str, client: object) -> MobileCheckResul
     return _result("rendered-layout-overflow", "Rendered layout overflow", "layout", "fail" if overflow else "pass", True, detail, started, evidence, remediation)
 
 
-def check_rendered_tap_targets(url: str, client: object) -> MobileCheckResult:
+async def check_rendered_tap_targets_async(url: str, pool: BrowserPoolBoundary) -> MobileCheckResult:
     """Measure tap target size and spacing in a mobile viewport."""
     started = time.perf_counter()
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        return _result("rendered-tap-targets", "Rendered tap targets", "usability", "skip", False, "playwright not installed", started, [])
     evidence: list[Evidence] = []
     try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
-            try:
-                page = browser.new_page(viewport={"width": _VIEWPORT_WIDTH, "height": _VIEWPORT_HEIGHT})
-                page.goto(url, wait_until="networkidle", timeout=30000)
-                metrics = page.evaluate(
+        async with pool.page(viewport={"width": _VIEWPORT_WIDTH, "height": _VIEWPORT_HEIGHT}) as page:
+            await pool.goto(page, url, wait_until="networkidle", timeout=30000)
+            metrics = await page.evaluate(
                     """() => {
                         const targets = Array.from(document.querySelectorAll('a, button, input, select, textarea, [role="button"]'))
                             .filter(el => {
@@ -122,9 +107,7 @@ def check_rendered_tap_targets(url: str, client: object) -> MobileCheckResult:
                         }
                         return { total: targets.length, tooSmall };
                     }"""
-                )
-            finally:
-                browser.close()
+            )
     except Exception as exc:  # noqa: BLE001
         logger.error("Rendered tap target check failed for %s: %s", url, exc)
         return _result("rendered-tap-targets", "Rendered tap targets", "usability", "error", True, str(exc), started, evidence)
@@ -144,21 +127,14 @@ def check_rendered_tap_targets(url: str, client: object) -> MobileCheckResult:
     return _result("rendered-tap-targets", "Rendered tap targets", "usability", "fail" if too_many_small else "pass", True, detail, started, evidence, remediation)
 
 
-def check_rendered_font_readability(url: str, client: object) -> MobileCheckResult:
+async def check_rendered_font_readability_async(url: str, pool: BrowserPoolBoundary) -> MobileCheckResult:
     """Measure base font size in a mobile viewport."""
     started = time.perf_counter()
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        return _result("rendered-font-readability", "Rendered font readability", "content", "skip", False, "playwright not installed", started, [])
     evidence: list[Evidence] = []
     try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
-            try:
-                page = browser.new_page(viewport={"width": _VIEWPORT_WIDTH, "height": _VIEWPORT_HEIGHT})
-                page.goto(url, wait_until="networkidle", timeout=30000)
-                metrics = page.evaluate(
+        async with pool.page(viewport={"width": _VIEWPORT_WIDTH, "height": _VIEWPORT_HEIGHT}) as page:
+            await pool.goto(page, url, wait_until="networkidle", timeout=30000)
+            metrics = await page.evaluate(
                     """() => {
                         const body = document.body;
                         const p = document.querySelector('p') || body;
@@ -168,9 +144,7 @@ def check_rendered_font_readability(url: str, client: object) -> MobileCheckResu
                         );
                         return { fontSizePx: size, zoomBlocked };
                     }"""
-                )
-            finally:
-                browser.close()
+            )
     except Exception as exc:  # noqa: BLE001
         logger.error("Rendered font check failed for %s: %s", url, exc)
         return _result("rendered-font-readability", "Rendered font readability", "content", "error", True, str(exc), started, evidence)
@@ -190,14 +164,19 @@ def check_rendered_font_readability(url: str, client: object) -> MobileCheckResu
     return _result("rendered-font-readability", "Rendered font readability", "content", "pass" if ok else "fail", True, detail, started, evidence, remediation)
 
 
+check_rendered_layout_overflow = check_rendered_layout_overflow_async
+check_rendered_tap_targets = check_rendered_tap_targets_async
+check_rendered_font_readability = check_rendered_font_readability_async
+
+
 MOBILE_RENDER_CHECKS = (
-    check_rendered_layout_overflow,
-    check_rendered_tap_targets,
-    check_rendered_font_readability,
+    check_rendered_layout_overflow_async,
+    check_rendered_tap_targets_async,
+    check_rendered_font_readability_async,
 )
 
 MOBILE_RENDER_CHECKS_BY_ID = {
-    "rendered-layout-overflow": check_rendered_layout_overflow,
-    "rendered-tap-targets": check_rendered_tap_targets,
-    "rendered-font-readability": check_rendered_font_readability,
+    "rendered-layout-overflow": check_rendered_layout_overflow_async,
+    "rendered-tap-targets": check_rendered_tap_targets_async,
+    "rendered-font-readability": check_rendered_font_readability_async,
 }

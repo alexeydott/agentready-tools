@@ -8,12 +8,15 @@ from agentready.robots import (
     RobotsFetchState,
     RobotsFetchStatus,
     RobotsInterpretation,
+    RobotsSimulationService,
     evaluate_robots,
     parse_robots,
     robots_fetch_state,
     sensitive_path_diagnostic,
     simulate_robots,
 )
+from agentready.audit_core.store import MemorySiteStore, RunUrlRecord, RunUrlState
+from agentready.query_service import QueryService
 from agentready.sitemap import (
     SitemapEvaluation,
     SitemapLimits,
@@ -53,6 +56,60 @@ def test_virtual_robots_diff_is_explicit_and_non_mutating() -> None:
     assert diff.newly_allowed_urls == ("https://example.test/private",)
     assert diff.label.startswith("SIMULATION")
     assert sensitive_path_diagnostic(live)
+
+
+def test_virtual_robots_simulates_bot_specific_diffs_and_sitemap_conflicts_from_stored_urls() -> None:
+    store = MemorySiteStore()
+    stored_urls = (
+        "https://example.test/private",
+        "https://example.test/important",
+        "https://example.test/public",
+    )
+    for url in stored_urls:
+        store.put_run_url(RunUrlRecord("run", url, RunUrlState.PARSED))
+
+    live = parse_robots(
+        "User-agent: GPTBot\nDisallow: /private\n"
+        "User-agent: *\nDisallow: /important\n"
+        "Sitemap: https://example.test/sitemap-old.xml",
+        "https://example.test",
+    )
+    simulated = parse_robots(
+        "User-agent: GPTBot\nAllow: /private\nDisallow: /public\n"
+        "User-agent: *\nDisallow: /public\n"
+        "Sitemap: https://example.test/sitemap-new.xml",
+        "https://example.test",
+    )
+
+    service = RobotsSimulationService(QueryService(store))
+    gpt_diff = service.simulate(
+        "run",
+        live,
+        simulated,
+        user_agent="GPTBot",
+        observed_search_pages=("https://example.test/private", "https://example.test/public"),
+    )
+    generic_diff = service.simulate(
+        "run",
+        live,
+        simulated,
+        user_agent="ExampleBot",
+        observed_search_pages=("https://example.test/private", "https://example.test/public"),
+    )
+
+    assert gpt_diff.newly_allowed_urls == ("https://example.test/private",)
+    assert gpt_diff.newly_blocked_urls == ("https://example.test/public",)
+    assert gpt_diff.sitemap_urls_affected == (
+        "https://example.test/sitemap-new.xml",
+        "https://example.test/sitemap-old.xml",
+    )
+    assert gpt_diff.observed_search_pages_affected == (
+        "https://example.test/private",
+        "https://example.test/public",
+    )
+    assert generic_diff.newly_allowed_urls == ("https://example.test/important",)
+    assert generic_diff.newly_blocked_urls == ("https://example.test/public",)
+    assert generic_diff.user_agent == "ExampleBot"
 
 
 def test_robots_size_limit_is_bounded() -> None:

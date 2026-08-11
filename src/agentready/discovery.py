@@ -1,0 +1,347 @@
+"""Bounded, deterministic discovery sources for audit planning."""
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, is_dataclass
+import hashlib
+import json
+import asyncio
+import gzip
+import logging
+from typing import Protocol
+from urllib.parse import urljoin, urlsplit
+from xml.etree import ElementTree
+from typing import TYPE_CHECKING
+
+from .fetcher import FetchRequest
+
+if TYPE_CHECKING:
+    from .crawler import CrawlConfig, CrawlScope
+    from .egress import EgressPolicy
+    from .fetcher import FetchTransport
+    from .fetcher import FetcherBoundary
+
+logger = logging.getLogger(__name__)
+
+
+class DiscoverySource(Protocol):
+    def discover(self, *, limit: int = 1000) -> tuple[str, ...]: ...
+
+
+def discovery_plan_hash(source: DiscoverySource, *, limit: int = 1000) -> str:
+    """Return a stable non-secret identity for a bounded discovery configuration."""
+    _validate_limit(limit)
+    if isinstance(source, SingleUrlSource):
+        payload = {"type": "single", "url": source.url, "limit": limit}
+    elif isinstance(source, UrlListSource):
+        payload = {"type": "list", "urls": list(source.urls), "limit": limit}
+    elif isinstance(source, SitemapSource):
+        payload = {
+            "type": "sitemap",
+            "base_url": source.base_url,
+            "same_origin_only": source.same_origin_only,
+            "xml_hash": hashlib.sha256(source.xml.encode("utf-8")).hexdigest(),
+            "limit": limit,
+        }
+    elif isinstance(source, RobotsSitemapSource):
+        payload = {
+            "type": "robots-sitemap",
+            "base_url": source.base_url,
+            "sitemap_urls": list(source.sitemap_urls),
+            "same_origin_only": source.same_origin_only,
+            "max_bytes": source.max_bytes,
+            "max_depth": source.max_depth,
+            "max_files": source.max_files,
+            "limit": limit,
+        }
+    elif isinstance(source, CrawlSource):
+        payload = {
+            "type": "crawl",
+            "scope": asdict(source.scope) if is_dataclass(source.scope) else repr(source.scope),
+            "config": asdict(source.config) if is_dataclass(source.config) else repr(source.config),
+            "policy": repr(source.policy),
+            "limit": limit,
+        }
+    else:
+        raise TypeError(f"unsupported discovery source: {type(source).__name__}")
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _validate_limit(limit: int) -> None:
+    if limit <= 0 or limit > 100_000:
+        raise ValueError("discovery limit must be between 1 and 100000")
+
+
+def _same_origin(url: str, origin: str) -> bool:
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}" == origin
+
+
+@dataclass(frozen=True, slots=True)
+class SingleUrlSource:
+    url: str
+
+    def discover(self, *, limit: int = 1000) -> tuple[str, ...]:
+        _validate_limit(limit)
+        if not self.url.strip():
+            raise ValueError("discovery URL must not be empty")
+        result = (self.url.strip(),)
+        logger.info("discovery complete source=single limit=%d count=%d", limit, len(result))
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class UrlListSource:
+    urls: tuple[str, ...]
+
+    def discover(self, *, limit: int = 1000) -> tuple[str, ...]:
+        _validate_limit(limit)
+        result: list[str] = []
+        seen: set[str] = set()
+        for url in self.urls:
+            value = url.strip()
+            if value and value not in seen:
+                seen.add(value)
+                result.append(value)
+            if len(result) >= limit:
+                break
+        discovered = tuple(result)
+        logger.info("discovery complete source=list limit=%d count=%d", limit, len(discovered))
+        return discovered
+
+
+@dataclass(frozen=True, slots=True)
+class SitemapSource:
+    xml: str
+    base_url: str
+    same_origin_only: bool = True
+    max_bytes: int = 5 * 1024 * 1024
+
+    def discover(self, *, limit: int = 1000) -> tuple[str, ...]:
+        _validate_limit(limit)
+        if not self.base_url.strip():
+            raise ValueError("sitemap base URL must not be empty")
+        if len(self.xml.encode("utf-8")) > self.max_bytes:
+            raise ValueError("sitemap exceeds configured size limit")
+        if "<!doctype" in self.xml.lower() or "<!entity" in self.xml.lower():
+            raise ValueError("DOCTYPE and ENTITY declarations are not allowed")
+        root = ElementTree.fromstring(self.xml)
+        origin = f"{urlsplit(self.base_url).scheme}://{urlsplit(self.base_url).netloc}"
+        result: list[str] = []
+        seen: set[str] = set()
+        for node in root.iter():
+            if node.tag.rsplit("}", 1)[-1] != "loc" or not node.text:
+                continue
+            value = urljoin(self.base_url, node.text.strip())
+            if self.same_origin_only and not _same_origin(value, origin):
+                continue
+            if value not in seen:
+                seen.add(value)
+                result.append(value)
+            if len(result) >= limit:
+                break
+        discovered = tuple(result)
+        logger.info("discovery complete source=sitemap limit=%d count=%d", limit, len(discovered))
+        return discovered
+
+    @classmethod
+    def from_bytes(
+        cls,
+        payload: bytes,
+        base_url: str,
+        *,
+        compressed: bool = False,
+        same_origin_only: bool = True,
+        max_bytes: int = 5 * 1024 * 1024,
+    ) -> "SitemapSource":
+        raw = gzip.decompress(payload) if compressed else payload
+        if len(raw) > max_bytes:
+            raise ValueError("sitemap exceeds configured size limit")
+        return cls(raw.decode("utf-8"), base_url, same_origin_only, max_bytes)
+
+    def discover_nested(
+        self,
+        documents: dict[str, str],
+        *,
+        limit: int = 1000,
+        max_depth: int = 3,
+        max_files: int = 100,
+    ) -> tuple[str, ...]:
+        """Resolve bounded sitemap indexes from caller-provided fetched documents."""
+        _validate_limit(limit)
+        if max_depth <= 0 or max_depth > 10 or max_files <= 0 or max_files > 1000:
+            raise ValueError("sitemap recursion limits are outside the allowed range")
+        result: list[str] = []
+        visited: set[str] = set()
+        pending: list[tuple[str, int]] = [(self.base_url, 0)]
+        while pending and len(visited) < max_files and len(result) < limit:
+            url, depth = pending.pop(0)
+            if url in visited or depth > max_depth:
+                continue
+            visited.add(url)
+            xml = documents.get(url)
+            if xml is None:
+                continue
+            source = SitemapSource(xml, url, self.same_origin_only, self.max_bytes)
+            locations = source.discover(limit=limit - len(result))
+            root = ElementTree.fromstring(xml)
+            is_index = root.tag.rsplit("}", 1)[-1] == "sitemapindex"
+            if is_index and depth < max_depth:
+                pending.extend((location, depth + 1) for location in locations)
+            else:
+                for location in locations:
+                    if location not in result:
+                        result.append(location)
+        return tuple(result[:limit])
+
+    async def discover_from_fetcher(
+        self,
+        fetcher: "FetcherBoundary",
+        *,
+        limit: int = 1000,
+        max_depth: int = 3,
+        max_files: int = 100,
+    ) -> tuple[str, ...]:
+        """Fetch and resolve a bounded sitemap tree through the shared Fetcher."""
+        _validate_limit(limit)
+        if max_depth <= 0 or max_depth > 10 or max_files <= 0 or max_files > 1000:
+            raise ValueError("sitemap recursion limits are outside the allowed range")
+        pending: list[tuple[str, int]] = [(self.base_url, 0)]
+        visited: set[str] = set()
+        result: list[str] = []
+        while pending and len(visited) < max_files and len(result) < limit:
+            url, depth = pending.pop(0)
+            if url in visited or depth > max_depth:
+                continue
+            if self.same_origin_only and not _same_origin(url, _origin(self.base_url)):
+                continue
+            response = await fetcher.get(
+                FetchRequest(
+                    url,
+                    purpose="discovery-sitemap",
+                    cache_mode="run-deduplicate",
+                )
+            )
+            visited.add(url)
+            if response.status_code < 200 or response.status_code >= 300:
+                raise ValueError(f"sitemap fetch failed with HTTP {response.status_code}")
+            compressed = "gzip" in response.headers.get("content-encoding", "").lower() or url.lower().endswith(".gz")
+            source = SitemapSource.from_bytes(
+                response.body,
+                url,
+                compressed=compressed,
+                same_origin_only=self.same_origin_only,
+                max_bytes=self.max_bytes,
+            )
+            root = ElementTree.fromstring(source.xml)
+            locations = source.discover(limit=limit - len(result))
+            if root.tag.rsplit("}", 1)[-1] == "sitemapindex" and depth < max_depth:
+                pending.extend((location, depth + 1) for location in locations)
+            else:
+                for location in locations:
+                    if location not in result:
+                        result.append(location)
+        logger.info(
+            "discovery complete source=sitemap-fetch limit=%d count=%d files=%d",
+            limit,
+            len(result),
+            len(visited),
+        )
+        return tuple(result[:limit])
+
+
+@dataclass(frozen=True, slots=True)
+class RobotsSitemapSource:
+    """Discover bounded sitemap trees named by robots.txt and explicit URLs."""
+
+    base_url: str
+    sitemap_urls: tuple[str, ...] = ()
+    same_origin_only: bool = True
+    max_bytes: int = 5 * 1024 * 1024
+    max_depth: int = 3
+    max_files: int = 100
+
+    async def discover_from_fetcher(
+        self,
+        fetcher: "FetcherBoundary",
+        *,
+        limit: int = 1000,
+    ) -> tuple[str, ...]:
+        _validate_limit(limit)
+        if not self.base_url.strip():
+            raise ValueError("robots base URL must not be empty")
+        if self.max_depth <= 0 or self.max_depth > 10 or self.max_files <= 0 or self.max_files > 1000:
+            raise ValueError("robots sitemap recursion limits are outside the allowed range")
+        origin = _origin(self.base_url)
+        robots_url = urljoin(self.base_url, "/robots.txt")
+        response = await fetcher.get(
+            FetchRequest(
+                robots_url,
+                purpose="discovery-robots",
+                cache_mode="run-deduplicate",
+            )
+        )
+        if response.status_code >= 400 and response.status_code != 404:
+            raise ValueError(f"robots fetch failed with HTTP {response.status_code}")
+        discovered_roots = [
+            urljoin(robots_url, line.split(":", 1)[1].strip())
+            for line in response.body.decode("utf-8", errors="replace").splitlines()
+            if line.split(":", 1)[0].strip().lower() == "sitemap" and ":" in line
+        ]
+        discovered_roots.extend(urljoin(self.base_url, value) for value in self.sitemap_urls)
+        roots = tuple(
+            url for url in dict.fromkeys(discovered_roots)
+            if not self.same_origin_only or _same_origin(url, origin)
+        )[: self.max_files]
+        result: list[str] = []
+        for root in roots:
+            if len(result) >= limit:
+                break
+            source = SitemapSource("", root, self.same_origin_only, self.max_bytes)
+            for url in await source.discover_from_fetcher(
+                fetcher,
+                limit=limit - len(result),
+                max_depth=self.max_depth,
+                max_files=self.max_files,
+            ):
+                if url not in result:
+                    result.append(url)
+        logger.info(
+            "discovery complete source=robots-sitemap limit=%d count=%d roots=%d",
+            limit,
+            len(result),
+            len(roots),
+        )
+        return tuple(result[:limit])
+
+
+@dataclass(frozen=True, slots=True)
+class CrawlSource:
+    """Discover URLs through the canonical bounded crawler."""
+
+    scope: "CrawlScope"
+    config: "CrawlConfig"
+    policy: "EgressPolicy"
+    transport: "FetchTransport | None" = None
+
+    def discover(self, *, limit: int = 1000) -> tuple[str, ...]:
+        _validate_limit(limit)
+        from .crawler import AsyncCrawler
+
+        result = asyncio.run(
+            AsyncCrawler(
+                self.scope,
+                config=self.config,
+                policy=self.policy,
+                transport=self.transport,
+            ).crawl()
+        )
+        discovered = tuple(page.url for page in result.pages[:limit])
+        logger.info("discovery complete source=crawl limit=%d count=%d", limit, len(discovered))
+        return discovered
+
+
+def _origin(url: str) -> str:
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}"

@@ -341,16 +341,16 @@ def render_seo_html(report: SeoReport, lang: str | None = None) -> str:
 <html lang="{html.escape(report.language)}"><head><meta charset="utf-8">
 <title>{html.escape(labels['title'])}</title>
 <style>{BASE_REPORT_CSS}.affected-pages{{margin:.5rem 0;font-size:.92rem}}.affected-pages ul{{margin:.4rem 0;padding-left:1.2rem}}.additional-details{{margin:.5rem 0;font-size:.92rem}}.additional-details ul{{margin:.4rem 0;padding-left:1.2rem}}.additional-details p{{margin:.25rem 0}}</style>
-</head><body><h1>{html.escape(labels['title'])}</h1>
+</head><body><a class="skip-link" href="#seo-report-content">Skip to report content</a><main id="seo-report-content"><h1>{html.escape(labels['title'])}</h1>
 <p class="report-generated"><small>{html.escape(labels['generated_by'])}: {html.escape(generated)}</small></p>
 <p>{html.escape(labels['target'])}: <code>{html.escape(report.target)}</code></p>
 <p><strong>{html.escape(labels['score'])}: {report.score}/100</strong></p>
 <h2>{html.escape(labels['categories'])}</h2><div class="grid">{''.join(category_cards) or f"<p>{html.escape(labels['no_items'])}</p>"}</div>
-<h2>{html.escape(labels['checks'])}</h2><table><thead><tr><th>{html.escape(labels['status'])}</th><th>{html.escape(labels['category'])}</th><th>{html.escape(labels['check'])}</th><th>{html.escape(labels['result'])}</th></tr></thead><tbody>{rows}</tbody></table>
-<details><summary>{html.escape(labels['recommendations'])}</summary><ol>{recommendations}</ol></details>
-<details><summary>{html.escape(labels['remediation'])}</summary>{remediation}</details>
+<h2>{html.escape(labels['checks'])}</h2><div class="table-wrap"><table><caption>{html.escape(labels['checks'])}</caption><thead><tr><th scope="col">{html.escape(labels['status'])}</th><th scope="col">{html.escape(labels['category'])}</th><th scope="col">{html.escape(labels['check'])}</th><th scope="col">{html.escape(labels['result'])}</th></tr></thead><tbody>{rows}</tbody></table></div>
+<details><summary><h3>{html.escape(labels['recommendations'])}</h3></summary><ol>{recommendations}</ol></details>
+<details><summary><h3>{html.escape(labels['remediation'])}</h3></summary>{remediation}</details>
 <script>window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));</script>
-</body></html>
+</main></body></html>
 """
 
 

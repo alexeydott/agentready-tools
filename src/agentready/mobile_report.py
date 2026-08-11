@@ -156,7 +156,7 @@ def render_mobile_html(report: MobileReport, lang: str | None = None) -> str:
                 f"<small><code>{html.escape(check.id)}</code></small></td>"
                 f"<td>{html.escape(mobile_detail(check.details, active))}</td></tr>"
             )
-        pages_html += f"<h2>{html.escape(page.url)} <small>({mode})</small></h2><p><strong>{labels['score']}: {page.score}/100</strong></p><table><thead><tr><th>{labels['status']}</th><th>{labels['category']}</th><th>{labels['check']}</th><th>{labels['result']}</th></tr></thead><tbody>{rows}</tbody></table>"
+        pages_html += f"<h2>{html.escape(page.url)} <small>({mode})</small></h2><p><strong>{labels['score']}: {page.score}/100</strong></p><div class='table-wrap'><table><caption>{html.escape(labels['checks'])}: {html.escape(page.url)}</caption><thead><tr><th scope='col'>{labels['status']}</th><th scope='col'>{labels['category']}</th><th scope='col'>{labels['check']}</th><th scope='col'>{labels['result']}</th></tr></thead><tbody>{rows}</tbody></table></div>"
     recommendations = "".join(
         f"<li><strong>{html.escape(_localized_check(item.check_id, item.title, '', active)[0])}</strong>: {html.escape(mobile_summary(item.check_id, item.action, active))}</li>"
         for item in report.recommendations
@@ -184,16 +184,16 @@ def render_mobile_html(report: MobileReport, lang: str | None = None) -> str:
 <html lang="{html.escape(report.language)}"><head><meta charset="utf-8">
 <title>{html.escape(labels['title'])}</title>
 <style>{BASE_REPORT_CSS}</style>
-</head><body><h1>{html.escape(labels['title'])}</h1>
+</head><body><a class="skip-link" href="#mobile-report-content">Skip to report content</a><main id="mobile-report-content"><h1>{html.escape(labels['title'])}</h1>
 <p class="report-generated"><small>{html.escape(labels['generated_by'])}: {html.escape(generated)}</small></p>
 <p>{html.escape(labels['targets'])}: <code>{html.escape(', '.join(report.targets))}</code></p>
 <p><strong>{html.escape(labels['score'])}: {report.score}/100</strong></p>
 <h2>{html.escape(labels['categories'])}</h2><div class="grid">{''.join(category_cards) or f"<p>{html.escape(labels['no_items'])}</p>"}</div>
 {pages_html}
-<details><summary>{html.escape(labels['recommendations'])}</summary><ol>{recommendations}</ol></details>
-<details><summary>{html.escape(labels['remediation'])}</summary>{remediation}</details>
+<details><summary><h3>{html.escape(labels['recommendations'])}</h3></summary><ol>{recommendations}</ol></details>
+<details><summary><h3>{html.escape(labels['remediation'])}</h3></summary>{remediation}</details>
 <script>window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));</script>
-</body></html>
+</main></body></html>
 """
 
 
