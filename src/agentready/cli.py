@@ -22,7 +22,7 @@ from .indexnow import PROVIDER_ENDPOINTS, generate_key, submit_urls, verify_key_
 from .gitutils import audit_git_dates, changed_urls_from_git
 from .accesslog import analyze_ai_bot_log_file
 from .geo_rules import write_rules
-from .report_v2 import report_from_checks
+from .audit_service import AuditRequest, AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +110,20 @@ def _audit_parser(sub: argparse._SubParsersAction) -> None:
     p = _add_command_parser(sub, "audit", help="Run the canonical v2 audit report")
     p.add_argument("url")
     p.add_argument("--format", choices=["json"], default="json")
+    p.add_argument("--preset", choices=["all", "content", "api", "ai-search"], default="all")
+    p.add_argument("--profile", choices=["quick", "standard", "deep", "custom"], default="standard")
+    p.add_argument("--max-pages", type=int, default=25)
+    p.add_argument("--timeout", type=float, default=5.0)
+    p.add_argument("--max-depth", type=int)
+    p.add_argument("--max-duration", type=float)
+    p.add_argument("--concurrency", type=int)
+    p.add_argument("--per-origin-concurrency", type=int)
+    p.add_argument("--include", action="append", default=[])
+    p.add_argument("--exclude", action="append", default=[])
+    p.add_argument("--select-url", action="append", default=[], help="Restrict a child rescan to explicit same-origin URLs")
+    p.add_argument("--render", action="store_true")
+    p.add_argument("--provider")
+    p.add_argument("--lang", "--language", dest="language", choices=["en", "ru"], default="en")
     p.add_argument("--fail-on-checks", action="store_true", help="Exit 1 when a v2 finding fails")
 
 
@@ -935,6 +949,9 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     try:
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                stream.reconfigure(encoding="utf-8")
         _configure_logging()
         parser = build_parser()
         try:
@@ -984,10 +1001,34 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _cmd_audit(args: argparse.Namespace) -> int:
-    report = scan(args.url)
-    report_v2 = report_from_checks(args.url, report.checks)
-    print(json.dumps(report_v2.to_dict(), indent=2, sort_keys=True))
-    return 1 if args.fail_on_checks and any(item.status.value == "fail" for item in report_v2.findings) else 0
+    limits = {
+        key: value
+        for key, value in {
+            "max_depth": args.max_depth,
+            "max_duration": args.max_duration,
+            "concurrency": args.concurrency,
+            "per_origin_concurrency": args.per_origin_concurrency,
+        }.items()
+        if value is not None
+    }
+    result = AuditService().run(
+        AuditRequest(
+            target=args.url,
+            preset=args.preset,
+            profile=args.profile,
+            max_pages=args.max_pages,
+            timeout=args.timeout,
+            limits=limits,
+            include=tuple(args.include),
+            exclude=tuple(args.exclude),
+            selected_urls=tuple(args.select_url),
+            render=args.render,
+            provider=args.provider,
+            language=args.language,
+        )
+    )
+    print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    return 1 if args.fail_on_checks and any(item.status.value == "fail" for item in result.report.findings) else 0
 
 
 def _configure_logging() -> None:

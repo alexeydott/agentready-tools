@@ -19,6 +19,12 @@ For untrusted targets:
 agentready scan https://example.com --block-private
 ```
 
+The v2 crawler uses one bounded Fetcher/EgressPolicy boundary for HTTP and
+one BrowserPool boundary for rendered requests. Trusted-local credentials are
+CLI-only, require loopback targets and an explicit header allowlist, and are
+blocked on cross-origin redirects unless an explicit policy opt-in is used.
+Remote API/MCP requests remain passive and cannot supply credential contexts.
+
 FastAPI and MCP facades always operate in public-target mode.
 
 ## Commerce Safety

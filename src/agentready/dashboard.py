@@ -196,6 +196,9 @@ _TEXT = {
         "help": "Help",
         "help_hide": "Hide help",
         "help_title": "Dashboard help",
+        "skip_to_content": "Skip to main content",
+        "noscript_title": "JavaScript is disabled",
+        "noscript_text": "Use the CLI or local API instead: agentready scan https://example.com --format html, or POST an audit request to /scan/dashboard.",
     },
     "ru": {
         "title": "AgentReady Tools",
@@ -386,6 +389,9 @@ _TEXT = {
         "help": "Справка",
         "help_hide": "Скрыть справку",
         "help_title": "Справка по dashboard",
+        "skip_to_content": "Перейти к основному содержимому",
+        "noscript_title": "JavaScript отключён",
+        "noscript_text": "Используйте CLI или локальный API: agentready scan https://example.com --format html или отправьте POST-запрос аудита на /scan/dashboard.",
     },
 }
 
@@ -473,23 +479,26 @@ def render_dashboard(language: str = "en") -> str:
 <style>
 :root {{ color-scheme:light; font-family:Inter,Segoe UI,Arial,sans-serif; color:#441d0c; background:#fffaf6; }}
 * {{ box-sizing:border-box; }} html,body {{ min-height:100%; }} body {{ width:100%; min-height:100vh; margin:0; padding:30px clamp(20px,3vw,48px); }}
+.skip-link {{ position:absolute; left:-9999px; top:8px; z-index:30; padding:10px 14px; background:#24130d; color:#fff; border-radius:8px; }}
+.skip-link:focus {{ left:8px; }}
+.sr-only {{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }}
 header {{ display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-bottom:24px; }}
 h1 {{ margin:0 0 8px; font-size:clamp(28px,4vw,46px); }} h2 {{ margin:0 0 12px; }}
 p {{ line-height:1.5; }} label {{ display:block; font-weight:600; margin-bottom:6px; }}
-input,select,button {{ width:100%; border:1px solid #efcdb8; border-radius:10px; padding:12px 14px; font:inherit; }}
+input,select,button {{ width:100%; min-height:44px; border:1px solid #efcdb8; border-radius:10px; padding:12px 14px; font:inherit; }}
 button {{ background:#ed4308; color:white; border:0; cursor:pointer; font-weight:700; }}
 button.secondary {{ background:#fff; color:#9e2f0b; border:1px solid #ed4308; }}
 .panel {{ background:#fff; border:1px solid #efcdb8; border-radius:16px; padding:22px; margin-bottom:20px; box-shadow:0 4px 14px #8e3b1612; }}
 .form-grid {{ display:grid; grid-template-columns:minmax(0,2fr) minmax(150px,1fr) minmax(210px,auto); gap:14px; align-items:end; }}
 .model-control {{ display:flex; gap:6px; align-items:center; }} .model-control select {{ min-width:0; flex:1 1 auto; }} .model-control button {{ width:auto; flex:0 0 46px; min-width:46px; padding-left:8px; padding-right:8px; }}
 .form-grid.three {{ grid-template-columns:repeat(3,minmax(0,1fr)); }} .form-grid.four {{ grid-template-columns:repeat(4,minmax(0,1fr)); }}
-details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} .actions {{ display:flex; gap:10px; margin-top:16px; }}
+details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} details summary h2,details summary h3 {{ display:inline; font:inherit; margin:0; }} .actions {{ display:flex; gap:10px; margin-top:16px; }}
 .advanced-links {{ display:flex; flex-wrap:wrap; gap:18px; margin-top:18px; padding-top:14px; border-top:1px solid #efcdb8; }} .advanced-link-row {{ display:flex; align-items:center; gap:6px; position:relative; }}
 .text-link {{ color:#9e2f0b; font-weight:700; text-decoration:underline; cursor:pointer; }} .checks-toolbar {{ display:flex; justify-content:space-between; gap:12px; align-items:center; }}
 #checks {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:14px; }}
 .check {{ border:1px solid #efcdb8; border-radius:10px; padding:12px; display:grid; grid-template-columns:auto 1fr; gap:10px; }}
 .check input {{ width:auto; margin-top:4px; }} .check strong {{ display:inline; }} .check small {{ display:block; line-height:1.4; margin-top:4px; color:#6c554b; }}
-.hint {{ position:relative; display:inline-flex; align-items:center; justify-content:center; width:21px; height:21px; margin-left:6px; border:1px solid #ed4308; border-radius:50%; background:#fff8f2; color:#9e2f0b; font-size:.82rem; font-weight:700; line-height:1; cursor:help; vertical-align:middle; }}
+.hint {{ position:relative; display:inline-flex; align-items:center; justify-content:center; width:21px; height:21px; min-width:21px; min-height:21px; margin-left:6px; border:1px solid #ed4308; border-radius:50%; background:#fff8f2; color:#9e2f0b; font-size:.82rem; font-weight:700; line-height:1; cursor:help; vertical-align:middle; }}
 .hint:hover::after,.hint:focus::after {{ content:attr(data-tooltip); position:absolute; z-index:20; left:0; top:26px; width:min(340px,80vw); padding:10px 12px; border-radius:10px; background:#24130d; color:#ffe8d8; font-size:.85rem; font-weight:400; line-height:1.45; white-space:pre-line; text-align:left; box-shadow:0 6px 18px #0005; }}
 #result {{ min-height:80px; background:#fff8f2; color:#441d0c; border:1px solid #efcdb8; border-radius:12px; padding:18px; }}
 #progress {{ border:1px solid #efcdb8; border-radius:12px; padding:14px; margin-bottom:14px; background:#fff8f2; }}
@@ -533,9 +542,10 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main-content">{escape(text["skip_to_content"])}</a>
 <header><div><h1>{escape(text["title"])}</h1><p>{escape(text["subtitle"])}</p></div>
-<div class="header-actions"><select id="language" aria-label="{escape(text["language"])}" style="width:auto"><option value="en">English</option><option value="ru">Русский</option></select><button id="help-toggle" type="button" class="secondary help-header-button" aria-expanded="false">{escape(text["help"])}</button></div></header>
-<div class="dashboard-layout">
+<div class="header-actions"><select id="language" aria-label="{escape(text["language"])}" style="width:auto"><option value="en">English</option><option value="ru">Русский</option></select><button id="help-toggle" type="button" class="secondary help-header-button" aria-expanded="false" aria-controls="help-content">{escape(text["help"])}</button></div></header>
+<div class="dashboard-layout" id="main-content">
 <main class="dashboard-main">
 <section class="panel">
 <div class="form-grid">
@@ -543,7 +553,7 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div><label for="preset">{escape(text["preset"])} {_hint(text, "preset_hint_label")}</label><select id="preset"><option value="all">{escape(text["preset_all"])}</option><option value="content">{escape(text["preset_content"])}</option><option value="api">{escape(text["preset_api"])}</option><option value="ai-search">{escape(text["preset_ai_search"])}</option><option value="seo">{escape(text["preset_seo"])}</option><option value="mobile">{escape(text["preset_mobile"])}</option></select></div>
 <div style="display:flex;align-items:flex-end;gap:8px"><button onclick="runScan()">{escape(text["scan"])}</button>{_hint(text, "run_hint")}</div>
 </div>
-<details><summary>{escape(text["advanced"])} {_hint(text, "advanced_hint")}</summary>
+<details><summary>{escape(text["advanced"])} <h2 class="sr-only">{escape(text["advanced"])}</h2> {_hint(text, "advanced_hint")}</summary>
 <div class="form-grid three">
 <div><label for="content-url">{escape(text["content_url"])} {_hint(text, "content_url_hint")}</label><input id="content-url" type="url"></div>
 <div><label for="commerce-url">{escape(text["commerce_url"])} {_hint(text, "commerce_url_hint")}</label><input id="commerce-url" type="url"></div>
@@ -556,19 +566,20 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 </div></details>
 <div class="advanced-links"><div class="advanced-link-row"><a href="#" class="text-link" onclick="loadChecks(); return false;">{escape(text["checks"])}</a>{_hint(text, "refresh_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="runHealth(); return false;">{escape(text["health"])}</a>{_hint(text, "health_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="openAiCredentials(); return false;">{escape(text["ai_credentials"])}</a>{_hint(text, "ai_credentials_hint")}</div><div class="advanced-link-row"><label style="font-weight:700;margin:0"><input id="debug" type="checkbox" style="width:auto;margin-right:6px">{escape(text["debug"])}</label>{_hint(text, "debug_hint")}</div></div>
 </section>
-<dialog id="ai-credentials-dialog"><form method="dialog" onsubmit="return false;"><h2>{escape(text["ai_credentials"])}</h2><p>{escape(text["ai_credentials_hint"])}</p><label for="ai-provider">{escape(text["ai_provider"])}</label><select id="ai-provider" onchange="selectAiProvider()"></select><div class="actions"><button type="button" class="secondary" onclick="newAiProvider()">{escape(text["ai_new"])}</button></div><div class="form-grid four" style="margin-top:14px"><div><label for="ai-provider-name">{escape(text["ai_provider_name"])}</label><input id="ai-provider-name" maxlength="100"></div><div><label for="ai-provider-url">{escape(text["ai_provider_url"])} {_hint(text, "ai_provider_url_hint")}</label><input id="ai-provider-url" type="url" maxlength="500"></div><div><label for="ai-provider-model">{escape(text["ai_model"])} {_hint(text, "ai_model_hint")}</label><div class="model-control"><select id="ai-provider-model"></select><button id="ai-provider-model-refresh" type="button" class="secondary" title="{escape(text["model_refresh"])}" aria-label="{escape(text["model_refresh"])}" onclick="refreshAiModels()">↻</button></div></div><div><label for="ai-key">{escape(text["ai_key"])}</label><input id="ai-key" type="password" autocomplete="off" maxlength="1000"></div></div><label style="margin-top:14px"><input id="ai-provider-chat-only" type="checkbox" onchange="toggleChatOnly()" style="width:auto;margin-right:8px">{escape(text["model_chat_only"])} {_hint(text, "model_chat_only_hint")}</label><label style="margin-top:14px"><input id="ai-enable" type="checkbox" style="width:auto;margin-right:8px">{escape(text["ai_enable"])} {_hint(text, "ai_enable_hint")}</label><div class="actions"><button type="button" onclick="saveAiProvider()">{escape(text["ai_save"])}</button><button type="button" class="secondary" onclick="activateAiProvider()">{escape(text["ai_activate"])}</button><button type="button" class="secondary" onclick="clearAiProvider()">{escape(text["ai_clear"])}</button><button type="button" class="secondary" onclick="document.getElementById('ai-credentials-dialog').close()">{escape(text["ai_close"])}</button></div><p id="ai-credentials-result"></p></form></dialog>
-<section class="panel"><details><summary>{escape(text["select_checks"])} {_hint(text, "checks_hint")}</summary><div class="checks-toolbar"><div></div><div class="actions"><span><button class="secondary" onclick="selectApplicable(true)">{escape(text["all_checks"])}</button>{_hint(text, "select_all_hint")}</span><span><button class="secondary" onclick="selectApplicable(false)">{escape(text["clear_checks"])}</button>{_hint(text, "clear_checks_hint")}</span></div></div><div id="checks"></div></details></section>
+<dialog id="ai-credentials-dialog"><form method="dialog" onsubmit="return false;"><h2>{escape(text["ai_credentials"])}</h2><p>{escape(text["ai_credentials_hint"])}</p><label for="ai-provider">{escape(text["ai_provider"])}</label><select id="ai-provider" onchange="selectAiProvider()"></select><div class="actions"><button type="button" class="secondary" onclick="newAiProvider()">{escape(text["ai_new"])}</button></div><div class="form-grid four" style="margin-top:14px"><div><label for="ai-provider-name">{escape(text["ai_provider_name"])}</label><input id="ai-provider-name" maxlength="100"></div><div><label for="ai-provider-url">{escape(text["ai_provider_url"])} {_hint(text, "ai_provider_url_hint")}</label><input id="ai-provider-url" type="url" maxlength="500"></div><div><label for="ai-provider-model">{escape(text["ai_model"])} {_hint(text, "ai_model_hint")}</label><div class="model-control"><select id="ai-provider-model"></select><button id="ai-provider-model-refresh" type="button" class="secondary" title="{escape(text["model_refresh"])}" aria-label="{escape(text["model_refresh"])}" onclick="refreshAiModels()">↻</button></div></div><div><label for="ai-key">{escape(text["ai_key"])}</label><input id="ai-key" type="password" autocomplete="off" maxlength="1000"></div></div><label style="margin-top:14px"><input id="ai-provider-chat-only" type="checkbox" onchange="toggleChatOnly()" style="width:auto;margin-right:8px">{escape(text["model_chat_only"])} {_hint(text, "model_chat_only_hint")}</label><label style="margin-top:14px"><input id="ai-enable" type="checkbox" style="width:auto;margin-right:8px">{escape(text["ai_enable"])} {_hint(text, "ai_enable_hint")}</label><div class="actions"><button type="button" onclick="saveAiProvider()">{escape(text["ai_save"])}</button><button type="button" class="secondary" onclick="activateAiProvider()">{escape(text["ai_activate"])}</button><button type="button" class="secondary" onclick="clearAiProvider()">{escape(text["ai_clear"])}</button><button type="button" class="secondary" onclick="document.getElementById('ai-credentials-dialog').close()">{escape(text["ai_close"])}</button></div><p id="ai-credentials-result" role="status" aria-live="polite"></p></form></dialog>
+<section class="panel"><details><summary>{escape(text["select_checks"])} <h2 class="sr-only">{escape(text["select_checks"])}</h2> {_hint(text, "checks_hint")}</summary><div class="checks-toolbar"><div></div><div class="actions"><span><button class="secondary" onclick="selectApplicable(true)">{escape(text["all_checks"])}</button>{_hint(text, "select_all_hint")}</span><span><button class="secondary" onclick="selectApplicable(false)">{escape(text["clear_checks"] )}</button>{_hint(text, "clear_checks_hint")}</span></div></div><div id="checks"></div></details></section>
 <section id="result-panel" class="panel" hidden><h2>{escape(text["result"])}</h2>
-<div id="progress" hidden><strong>{escape(text["progress_title"])}</strong><div class="progress-track"><span id="progress-bar"></span></div><div id="progress-steps"><span>{escape(text["progress_start"])}</span><span>{escape(text["progress_fetch"])}</span><span>{escape(text["progress_render"])}</span></div></div>
-<div id="result" hidden>{escape(text["ready"])}</div></section>
-<details id="ai-assistant-panel" class="panel" hidden><summary>{escape(text["ai_title"])} {_hint(text, "ai_hint")}</summary>
+<div id="progress" hidden role="status" aria-live="polite"><strong>{escape(text["progress_title"])}</strong><div class="progress-track"><span id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="{escape(text["progress_start"])}"></span></div><div id="progress-steps"><span>{escape(text["progress_start"])}</span><span>{escape(text["progress_fetch"])}</span><span>{escape(text["progress_render"])}</span></div></div>
+<div id="result" hidden role="status" aria-live="polite">{escape(text["ready"])}</div></section>
+<details id="ai-assistant-panel" class="panel" hidden><summary>{escape(text["ai_title"])} <h2 class="sr-only">{escape(text["ai_title"])}</h2> {_hint(text, "ai_hint")}</summary>
 <div class="form-grid three"><div><label for="ai-mode">{escape(text["ai_mode"])} {_hint(text, "ai_request_hint")}</label><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div><div><label for="ai-chat-provider">{escape(text["ai_provider"])}</label><select id="ai-chat-provider" onchange="selectChatProvider()"></select></div><div><label for="ai-model">{escape(text["ai_model"])}</label><select id="ai-model"></select></div></div><h3>{escape(text["ai_chat_history"])} {_hint(text, "ai_chat_history_hint")}</h3><div id="ai-chat-history" class="ai-chat-history" aria-live="polite"></div><label for="ai-message">{escape(text["ai_message"])}</label><textarea id="ai-message"></textarea>
 <div class="form-grid three"><div><label for="ai-skill">{escape(text["ai_skills"])} {_hint(text, "ai_skills_hint")}</label><select id="ai-skill" multiple size="4">{skill_options}</select></div><div><label for="ai-mcp-tool">{escape(text["ai_mcp"])} {_hint(text, "ai_mcp_hint")}</label><select id="ai-mcp-tool" multiple size="3"><option value="agentready.seo_findings">AgentReady MCP: SEO findings</option><option value="agentready.remediation_plan">AgentReady MCP: remediation plan</option></select></div><div><label for="ai-attachments">{escape(text["ai_attachments"])} {_hint(text, "ai_attach_hint")}</label><input id="ai-attachments" type="file" multiple accept=".jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.pdf,.txt,.md,.markdown,.json,.csv,.yaml,.yml,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png"></div></div>
 <div class="form-grid three"><div><label for="ai-prompt-library">{escape(text["ai_prompt_library"])}</label><select id="ai-prompt-library"></select></div><div><label for="ai-saved-chats">{escape(text["ai_saved_chats"])}</label><select id="ai-saved-chats"></select></div><div><label for="ai-prompt-title">{escape(text["ai_prompt_title"])}</label><input id="ai-prompt-title" type="text"></div></div>
-<div class="actions"><button id="ai-run-button" class="secondary" title="{escape(text["ai_run_hint"])}" aria-label="{escape(text["ai_run_hint"])}" onclick="runAi('/ai/recommend')">{escape(text["ai_run"])}</button><button id="ai-chat-button" class="secondary" title="{escape(text["ai_chat_hint"])}" aria-label="{escape(text["ai_chat_hint"])}" onclick="runAi('/ai/chat')">{escape(text["ai_chat"])}</button><button id="ai-retry-button" type="button" class="secondary" onclick="runAi('/ai/chat', true)">{escape(text["ai_retry"])}</button><button type="button" class="secondary" onclick="applyPrompt()">{escape(text["ai_prompt_apply"])}</button><button type="button" class="secondary" onclick="savePrompt()">{escape(text["ai_prompt_save"])}</button><button type="button" class="secondary" onclick="saveChat()">{escape(text["ai_chat_save"])}</button><button type="button" class="secondary" onclick="exportChat()">{escape(text["ai_chat_export"])}</button><button type="button" class="secondary" onclick="startNewChat()">{escape(text["ai_new_chat"])}</button></div><div id="ai-result" class="ai-report" hidden></div></details>
+<div class="actions"><button id="ai-run-button" class="secondary" title="{escape(text["ai_run_hint"])}" aria-label="{escape(text["ai_run_hint"])}" onclick="runAi('/ai/recommend')">{escape(text["ai_run"])}</button><button id="ai-chat-button" class="secondary" title="{escape(text["ai_chat_hint"])}" aria-label="{escape(text["ai_chat_hint"])}" onclick="runAi('/ai/chat')">{escape(text["ai_chat"])}</button><button id="ai-retry-button" type="button" class="secondary" onclick="runAi('/ai/chat', true)">{escape(text["ai_retry"])}</button><button type="button" class="secondary" onclick="applyPrompt()">{escape(text["ai_prompt_apply"])}</button><button type="button" class="secondary" onclick="savePrompt()">{escape(text["ai_prompt_save"])}</button><button type="button" class="secondary" onclick="saveChat()">{escape(text["ai_chat_save"])}</button><button type="button" class="secondary" onclick="exportChat()">{escape(text["ai_chat_export"])}</button><button type="button" class="secondary" onclick="startNewChat()">{escape(text["ai_new_chat"])}</button></div><div id="ai-result" class="ai-report" hidden role="status" aria-live="polite"></div></details>
 </main>
-<aside class="help-sidebar" aria-label="{escape(text["help_title"])}"><section id="help-content" class="panel help-content" hidden>{faq}</section></aside>
+<aside class="help-sidebar" aria-label="{escape(text["help_title"])}"><section id="help-content" class="panel help-content" hidden tabindex="-1">{faq}</section></aside>
 </div>
+<noscript><section class="noscript-notice" aria-labelledby="noscript-title"><h2 id="noscript-title">{escape(text["noscript_title"])}</h2><p>{escape(text["noscript_text"])}</p></section></noscript>
 <script>
 const translations = {translations};
 const language = document.getElementById("language");
@@ -583,6 +594,7 @@ helpToggle.onclick = () => {{
   helpSidebar.parentElement.classList.toggle("help-open", visible);
   helpToggle.textContent = visible ? translations[language.value].help_hide : translations[language.value].help;
   helpToggle.setAttribute("aria-expanded", String(visible));
+  (visible ? helpContent : helpToggle).focus();
   console.info("Dashboard help toggled", {{visible, language:language.value}});
 }};
 const dashboardStateKey = "agentready.dashboard.state.v1";
@@ -715,8 +727,8 @@ function scanPayload() {{
     verify_skill_digests:document.getElementById("verify").checked}};
   return payload;
 }}
-function setProgress(percent, message) {{ showResult(); progress.hidden = false; progressBar.style.width = percent + "%"; result.textContent = message; }}
-function finishProgress(success) {{ progressBar.style.width = success ? "100%" : "0%"; }}
+function setProgress(percent, message) {{ showResult(); progress.hidden = false; progressBar.style.width = percent + "%"; progressBar.setAttribute("aria-valuenow", String(percent)); progressBar.setAttribute("aria-valuetext", message); result.textContent = message; }}
+function finishProgress(success) {{ const percent = success ? 100 : 0; progressBar.style.width = percent + "%"; progressBar.setAttribute("aria-valuenow", String(percent)); }}
 function hintIcon(text) {{ const span = document.createElement("span"); span.className = "hint"; span.tabIndex = 0; span.setAttribute("role", "img"); span.setAttribute("aria-label", text); span.dataset.tooltip = text; span.textContent = "?"; return span; }}
 function reportFilename(site) {{
   let slug = "site";
@@ -765,15 +777,37 @@ async function runScan() {{
 function combinedReportDocument(geoText, seoText) {{
   const geo = new DOMParser().parseFromString(geoText, "text/html");
   const seo = new DOMParser().parseFromString(seoText, "text/html");
+  function namespaceReport(root, prefix) {{
+    const ids = new Map();
+    root.querySelectorAll("[id]").forEach(element => {{
+      const nextId = prefix + "-" + element.id;
+      ids.set(element.id, nextId);
+      element.id = nextId;
+    }});
+    ["for", "aria-controls", "aria-labelledby", "aria-describedby"].forEach(attribute => {{
+      root.querySelectorAll("[" + attribute + "]").forEach(element => {{
+        const value = element.getAttribute(attribute);
+        element.setAttribute(attribute, value.split(/\s+/).map(item => ids.get(item) || item).join(" "));
+      }});
+    }});
+    root.querySelectorAll("a[href^='#']").forEach(link => {{
+      const target = link.getAttribute("href").slice(1);
+      if (ids.has(target)) link.setAttribute("href", "#" + ids.get(target));
+    }});
+  }}
+  if (geo.body) namespaceReport(geo.body, "geo");
+  if (seo.body) namespaceReport(seo.body, "seo");
+  [geo.body, seo.body].forEach(body => body && body.querySelectorAll("script").forEach(script => script.remove()));
   const styles = Array.from(document.querySelectorAll("style")).concat(
     Array.from(geo.querySelectorAll("style")),
     Array.from(seo.querySelectorAll("style"))
   ).map(style => style.outerHTML).join("");
-  return "<!doctype html><html><head><meta charset='utf-8'>" + styles + "</head><body>" +
+  const controller = "<script>(function(){{const reports=[...document.querySelectorAll('[data-report-instance]')];reports.forEach(report=>{{const selector=report.querySelector(\"select[id$='-lang']\"),mains=[...report.querySelectorAll('main[data-lang]')],skip=report.querySelector('.skip-link');if(!selector||!mains.length)return;function setLang(value){{document.documentElement.lang=value;mains.forEach(main=>main.hidden=main.dataset.lang!==value);const active=mains.find(main=>main.dataset.lang===value);if(active&&skip)skip.href='#'+active.id;}}selector.addEventListener('change',()=>setLang(selector.value));setLang(selector.value);}});window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(detail=>detail.open=true));}})();</script>";
+  return "<!doctype html><html lang='" + language.value + "'><head><meta charset='utf-8'>" + styles + "</head><body>" +
     "<main><h1>AgentReady combined audit</h1>" +
-    "<section><h2>" + translations[language.value].preset_ai_search + "</h2>" + (geo.body ? geo.body.innerHTML : "") + "</section>" +
-    "<section><h2>" + translations[language.value].preset_seo + "</h2>" + (seo.body ? seo.body.innerHTML : "") + "</section>" +
-    "</main></body></html>";
+    "<section data-report-instance='geo'><h2>" + translations[language.value].preset_ai_search + "</h2>" + (geo.body ? geo.body.innerHTML : "") + "</section>" +
+    "<section data-report-instance='seo'><h2>" + translations[language.value].preset_seo + "</h2>" + (seo.body ? seo.body.innerHTML : "") + "</section>" +
+    "</main>" + controller + "</body></html>";
 }}
 async function runAll() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}

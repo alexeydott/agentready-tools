@@ -93,6 +93,12 @@ CLI `--credentials` overrides `GOOGLE_APPLICATION_CREDENTIALS` for one command. 
 
 ## CI Gates
 
+The additive v2 audit surface uses the same bounded controls from CLI, API,
+and MCP projections. `profile`, `max_pages`, `limits`, `include`, `exclude`,
+`render`, `provider`, and `language` are included in the deterministic
+execution plan; provider names describe optional enrichment capabilities and
+do not cause remote provider calls during the core crawl.
+
 Command-line gates without `--ci`:
 
 ```bash

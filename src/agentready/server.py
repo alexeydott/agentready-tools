@@ -32,7 +32,8 @@ from .target import TargetError
 from .ai_prompts import ai_skill_catalog
 from .compatibility import COMPATIBILITY
 from .jobs_v2 import AuditJobManager
-from .report_v2 import AuditConfig, diff_reports, export_inventory, report_from_checks, report_from_dict
+from .report_v2 import diff_reports, export_inventory, report_from_checks, report_from_dict
+from .audit_service import AuditRequest, AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ def default_data_dir() -> Path:
 
 _SERVER_DATA_DIR = default_data_dir()
 _V2_JOBS = AuditJobManager(max_jobs=8)
+_AUDIT_SERVICE = AuditService()
 
 
 def configure_data_dir(path: str | Path | None = None) -> Path:
@@ -208,10 +210,17 @@ class ScanRequest(BaseModel):
 class V2AuditRequest(BaseModel):
     url: str
     preset: Literal["all", "content", "api", "ai-search"] = "all"
+    profile: Literal["quick", "standard", "deep", "custom"] = "standard"
+    language: Literal["en", "ru"] = "en"
     timeout: float = Field(default=5.0, ge=1.0, le=30.0)
     max_pages: int = Field(default=25, ge=1, le=100)
+    limits: dict[str, int | float] = Field(default_factory=dict)
     include: list[str] = Field(default_factory=list)
     exclude: list[str] = Field(default_factory=list)
+    render: bool = False
+    provider: str | None = None
+    rescan_of: str | None = None
+    selected_urls: list[str] = Field(default_factory=list)
 
 
 class SeoRequest(BaseModel):
@@ -626,25 +635,33 @@ def scan_endpoint(request: ScanRequest) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-def _run_v2_scan(request: V2AuditRequest) -> dict:
-    config = AuditConfig(
-        request.url,
-        preset=request.preset,
-        timeout=request.timeout,
-        max_pages=request.max_pages,
-        include=tuple(request.include),
-        exclude=tuple(request.exclude),
-    )
-    report = _run_scan(
-        ScanRequest(
-            url=config.target,
-            preset=config.preset,
-            timeout=config.timeout,
-            include=list(config.include),
-            exclude=list(config.exclude),
+def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None) -> dict:
+    fields_set = getattr(request, "model_fields_set", None)
+    if fields_set is None:
+        fields_set = getattr(request, "__fields_set__", set())
+    max_pages = request.max_pages
+    if "max_pages" not in fields_set and "max_pages" in request.limits:
+        max_pages = int(request.limits["max_pages"])
+    if not 1 <= max_pages <= 100:
+        raise ValueError("max_pages must be between 1 and 100")
+    result = _AUDIT_SERVICE.run(
+        AuditRequest(
+            target=request.url,
+            preset=request.preset,
+            profile=request.profile,
+            max_pages=max_pages,
+            timeout=request.timeout,
+            limits=request.limits,
+            include=tuple(request.include),
+            exclude=tuple(request.exclude),
+            render=request.render,
+            provider=request.provider,
+            language=request.language,
+            parent_run_id=parent_run_id if parent_run_id is not None else request.rescan_of,
+            selected_urls=tuple(request.selected_urls),
         )
     )
-    return report_from_checks(config.target, report.checks).to_dict()
+    return result.to_dict()
 
 
 @app.post("/v2/audit")
@@ -658,8 +675,11 @@ def audit_v2_endpoint(request: V2AuditRequest) -> dict:
 
 @app.post("/v2/rescan")
 def audit_v2_rescan_endpoint(request: V2AuditRequest) -> dict:
-    """Explicit additive rescan alias with the same bounded config as audit."""
-    return audit_v2_endpoint(request)
+    """Run a new child audit linked to the requested parent run."""
+    try:
+        return _run_v2_scan(request, parent_run_id=request.rescan_of)
+    except (TargetError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/v2/jobs")

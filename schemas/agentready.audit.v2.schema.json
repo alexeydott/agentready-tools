@@ -37,7 +37,18 @@
         "total_rules": {"type": "integer", "minimum": 0},
         "evaluated_rules": {"type": "integer", "minimum": 0},
         "applicable_rules": {"type": "integer", "minimum": 0},
-        "complete_rules": {"type": "integer", "minimum": 0}
+        "complete_rules": {"type": "integer", "minimum": 0},
+        "urls_discovered": {"type": "integer", "minimum": 0},
+        "urls_fetched": {"type": "integer", "minimum": 0},
+        "classification": {"type": "string"},
+        "limit": {
+          "type": "object",
+          "required": ["max_pages_hit"],
+          "additionalProperties": false,
+          "properties": {
+            "max_pages_hit": {"type": "boolean"}
+          }
+        }
       }
     },
     "findings": {

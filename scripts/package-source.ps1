@@ -41,6 +41,10 @@ try {
             Copy-Item -LiteralPath $source -Destination $stageRoot -Recurse
         }
     }
+    Get-ChildItem -LiteralPath $stageRoot -Recurse -Directory |
+        Where-Object { $_.Name.StartsWith(".") } |
+        Sort-Object FullName -Descending |
+        Remove-Item -Recurse -Force
     foreach ($relative in $excludedDocumentationDirectories) {
         $excludedPath = Join-Path $stageRoot "docs\$relative"
         if (Test-Path -LiteralPath $excludedPath) {

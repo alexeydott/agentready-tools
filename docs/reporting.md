@@ -69,6 +69,8 @@ The additive `agentready.audit.v2` report includes:
 - bounded evidence with source/page/resource locations and metrics;
 - coverage counters for discovered, attempted, completed, skipped, and failed work;
 - stable finding fingerprints for comparison across runs.
+- run metadata including the deterministic configuration hash, lifecycle state,
+  parent-run lineage, and child-rescan identity.
 
 The v2 API supports synchronous audit, rescan, baseline diff, and bounded
 inventory export. Inventory data can be paginated for UI/API consumers and

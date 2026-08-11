@@ -23,10 +23,19 @@ from .i18n import (
     tr,
 )
 from .models import ScanReport
+from .report_components import (
+    render_disclosure,
+    render_category_card,
+    render_progress_bar,
+    render_recommendation_list,
+    render_report_table,
+    render_score_meter,
+    render_status_badge,
+    render_section,
+)
 from .report_styles import BASE_REPORT_CSS
 
 logger = logging.getLogger(__name__)
-
 
 def render_json(report: ScanReport, lang: str | None = None) -> str:
     lang = normalize_language(lang or report.language)
@@ -169,7 +178,19 @@ def render_markdown(report: ScanReport, lang: str | None = None) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _render_html_body(report: ScanReport, lang: str, generated: str) -> str:
+def _render_html_body(report: ScanReport, lang: str, generated: str, *, instance_suffix: str = "") -> str:
+    def dom_id(name: str) -> str:
+        return f"{name}-{instance_suffix}" if instance_suffix else name
+
+    summary_id = dom_id("report-summary")
+    checks_id = dom_id("report-checks")
+    recommendations_id = dom_id("report-recommendations")
+    remediation_id = dom_id("report-remediation")
+    score_title_id = dom_id("report-score-title")
+    status_filter_id = dom_id("report-status-filter")
+    search_id = dom_id("report-search")
+    filter_count_id = dom_id("report-filter-count")
+    checks_table_id = dom_id("report-checks-table")
     localized = localized_report_dict(report, lang)
     rows: list[str] = []
     localized_checks = {x["id"]: x for x in localized["checks"]}
@@ -177,9 +198,12 @@ def _render_html_body(report: ScanReport, lang: str, generated: str) -> str:
         loc = localized_checks[r.id]
         title = check_title(r.id, r.title, lang)
         hint = check_hint(r.id, r.title, r.category, lang)
+        search_text = " ".join(
+            (r.id, title, category_name(r.category, lang), status_label(r.status, lang), str(loc["details"]))
+        )
         rows.append(
-            "<tr>"
-            f"<td class='{html.escape(r.status)}'>{html.escape(status_label(r.status, lang))}</td>"
+            f"<tr data-status='{html.escape(r.status)}' data-search='{html.escape(search_text, quote=True)}'>"
+            f"<td class='status-cell {html.escape(r.status)}'>{render_status_badge(r.status, status_label(r.status, lang))}</td>"
             f"<td>{html.escape(category_name(r.category, lang))}</td>"
             f"<td class='check-cell'><span class='check-name'>{html.escape(title)}</span>"
             f" <span class='check-help' tabindex='0' role='img' aria-label='{html.escape(hint)}' data-tooltip='{html.escape(hint)}'>?</span>"
@@ -195,10 +219,7 @@ def _render_html_body(report: ScanReport, lang: str, generated: str) -> str:
         label = tr(lang, "n_a") if cat.score is None else f"{cat.score}%"
         name = category_name(cat.category, lang)
         hint = category_hint(cat.category, lang)
-        category_cards.append(
-            f"<div class='card'><b>{html.escape(name)} <span class='category-help check-help' tabindex='0' role='img' aria-label='{html.escape(hint)}' data-tooltip='{html.escape(hint)}'>?</span></b>"
-            f"<div class='bar'><span style='width:{pct}%'></span></div><small>{html.escape(label)}</small></div>"
-        )
+        category_cards.append(render_category_card(name, hint, label, cat.score))
     recs: list[str] = []
     for idx, rec in enumerate(report.recommendations):
         loc = localized["recommendations"][idx]
@@ -234,45 +255,76 @@ def _render_html_body(report: ScanReport, lang: str, generated: str) -> str:
         len(recs),
         len(remediation),
     )
-    return (
-        f"<h1>{html.escape(tr(lang, 'report_title'))}</h1>"
-        f"<p class='report-generated'><small>{html.escape(tr(lang, 'generated_by'))}: {html.escape(generated)}</small></p>"
-        f"<p><b>{html.escape(tr(lang, 'target'))}:</b> {html.escape(report.target)}<br>"
-        f"<b>{html.escape(tr(lang, 'score'))}:</b> {report.score}/100<br>"
+    summary_content = (
+        f"<p><b>{html.escape(tr(lang, 'target'))}:</b> {html.escape(report.target)}</p>"
+        f"{render_score_meter(report.score, tr(lang, 'score'), title_id=score_title_id)}"
+        f"<p>"
         + (f"<b>{html.escape(tr(lang, 'ai_search_score'))}:</b> {report.ai_search_score}/100 "
            f"({report.ai_search_applicable} {html.escape(tr(lang, 'applicable_checks'))})<br>" if report.ai_search_score is not None else "")
         + f"<b>{html.escape(tr(lang, 'level'))}:</b> {report.level} — {html.escape(level_name(report.level, report.level_name, lang))}</p>"
         f"<p><small>{html.escape(str(localized['level_model']))}</small></p>{next_html}"
-        f"<h2>{html.escape(tr(lang, 'category_scores'))}</h2><div class='grid'>{''.join(category_cards)}</div>"
-        f"<h2>{html.escape(tr(lang, 'checks'))}</h2><table><thead><tr>"
-        f"<th>{html.escape(tr(lang, 'status'))}</th><th>{html.escape(tr(lang, 'category'))}</th>"
-        f"<th>{html.escape(tr(lang, 'check'))}</th><th>{html.escape(tr(lang, 'scored'))}</th>"
-        f"<th>{html.escape(tr(lang, 'type'))}</th><th>{html.escape(tr(lang, 'result'))}</th>"
-        f"</tr></thead><tbody>{''.join(rows)}</tbody></table>"
-        f"<details class='report-section'><summary>{html.escape(tr(lang, 'prioritized_recommendations'))}</summary>"
-        f"<ol>{''.join(recs) or '<li>' + html.escape(tr(lang, 'none')) + '</li>'}</ol></details>"
-        f"<details class='report-section'><summary>{html.escape(tr(lang, 'remediation_prompts_short'))}</summary>"
-        f"{''.join(remediation) or '<p>' + html.escape(tr(lang, 'no_remediation')) + '</p>'}</details>"
+        f"<h3>{html.escape(tr(lang, 'category_scores'))}</h3><div class='grid'>{''.join(category_cards)}</div>"
+    )
+    checks_content = (
+        f"<div class='report-filters' hidden><label for='{status_filter_id}'>{html.escape(tr(lang, 'filter_status'))}</label><select id='{status_filter_id}' aria-controls='{checks_table_id}'><option value=''>{html.escape(tr(lang, 'filter_all'))}</option><option value='pass'>{html.escape(status_label('pass', lang))}</option><option value='warn'>{html.escape(status_label('warn', lang))}</option><option value='fail'>{html.escape(status_label('fail', lang))}</option><option value='error'>{html.escape(status_label('error', lang))}</option><option value='skip'>{html.escape(status_label('skip', lang))}</option></select><label for='{search_id}'>{html.escape(tr(lang, 'filter_search'))}</label><input id='{search_id}' type='search' aria-controls='{checks_table_id}'><p id='{filter_count_id}' role='status' aria-live='polite'></p></div>"
+        + render_report_table(
+            checks_table_id,
+            tr(lang, "checks"),
+            (
+                tr(lang, "status"),
+                tr(lang, "category"),
+                tr(lang, "check"),
+                tr(lang, "scored"),
+                tr(lang, "type"),
+                tr(lang, "result"),
+            ),
+            "".join(rows),
+        )
+    )
+    return (
+        f"<h1>{html.escape(tr(lang, 'report_title'))}</h1>"
+        f"<p class='report-generated'><small>{html.escape(tr(lang, 'generated_by'))}: {html.escape(generated)}</small></p>"
+        f"<nav class='report-nav' aria-label='{html.escape(tr(lang, 'report_navigation'))}'><a href='#{summary_id}'>{html.escape(tr(lang, 'summary'))}</a><a href='#{checks_id}'>{html.escape(tr(lang, 'checks'))}</a><a href='#{recommendations_id}'>{html.escape(tr(lang, 'prioritized_recommendations'))}</a><a href='#{remediation_id}'>{html.escape(tr(lang, 'remediation_prompts_short'))}</a></nav>"
+        + render_section(summary_id, tr(lang, "summary"), summary_content)
+        + render_section(checks_id, tr(lang, "checks"), checks_content)
+        + render_disclosure(
+            recommendations_id,
+            tr(lang, "prioritized_recommendations"),
+            render_recommendation_list("".join(recs), tr(lang, "none")),
+        )
+        + render_disclosure(remediation_id, tr(lang, "remediation_prompts_short"), f"{''.join(remediation) or '<p>' + html.escape(tr(lang, 'no_remediation')) + '</p>'}")
     )
 
 
 def render_html(report: ScanReport, lang: str | None = None) -> str:
     selected = normalize_language(lang or report.language)
     generated = datetime.now().astimezone().isoformat(timespec="seconds")
-    bodies = {language: _render_html_body(report, language, generated) for language in SUPPORTED_LANGUAGES}
+    bodies = {
+        language: _render_html_body(
+            report,
+            language,
+            generated,
+            instance_suffix="" if language == selected else language,
+        )
+        for language in SUPPORTED_LANGUAGES
+    }
     options = "".join(
         f"<option value='{code}'{' selected' if code == selected else ''}>{html.escape(tr(code, 'english' if code == 'en' else 'russian'))}</option>"
         for code in SUPPORTED_LANGUAGES
     )
     mains = "".join(
-        f"<main data-lang='{code}'{' hidden' if code != selected else ''}>{body}</main>" for code, body in bodies.items()
+        f"<main id='{('report-content' if code == selected else 'report-content-' + code)}' data-lang='{code}'{' hidden' if code != selected else ''}>{body}</main>" for code, body in bodies.items()
+    )
+    filter_templates = json.dumps(
+        {code: tr(code, "filter_count") for code in SUPPORTED_LANGUAGES},
+        ensure_ascii=False,
     )
     return f"""<!doctype html>
 <html lang='{selected}'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>{html.escape(tr(selected, 'report_title'))} — {html.escape(report.target)}</title>
-<style>{BASE_REPORT_CSS}.toolbar{{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:16px}}.pass,.fail,.error,.warn{{font-weight:400}}code,pre{{background:#f4f4f4;padding:2px 4px}}pre{{padding:12px;overflow:auto;white-space:pre-wrap}}.bar{{height:8px;background:#eee;margin:8px 0;border-radius:8px;overflow:hidden}}.bar span{{display:block;height:100%;background:currentColor}}.pill{{font-size:.8em;border:1px solid #ccc;border-radius:20px;padding:2px 8px}}details.report-section{{margin:20px 0;border:1px solid #ddd;border-radius:8px;padding:0 12px}}details.report-section>summary{{cursor:pointer;font-weight:700;padding:12px 0}}li{{margin:12px 0}}select{{font:inherit;padding:5px 8px}}</style></head>
-<body><div class='toolbar'><label for='lang'>{html.escape(tr(selected, 'language_selector'))}:</label><select id='lang'>{options}</select></div>{mains}
-<script>(function(){{const s=document.getElementById('lang');function setLang(v){{document.documentElement.lang=v;document.querySelectorAll('main[data-lang]').forEach(x=>x.hidden=x.dataset.lang!==v);const label=document.querySelector('.toolbar label');label.textContent=(v==='ru'?'Язык отчёта':'Report language')+':';localStorage.setItem('agentready-report-lang',v)}};const saved=localStorage.getItem('agentready-report-lang');if(saved&&['en','ru'].includes(saved)){{s.value=saved;setLang(saved)}}s.addEventListener('change',()=>setLang(s.value));window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));}})();</script></body></html>"""
+<style>{BASE_REPORT_CSS}.toolbar{{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:16px}}.report-nav{{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 20px}}.report-nav a{{min-height:44px;display:inline-flex;align-items:center;padding:8px 12px;border:1px solid #ccc;border-radius:8px;color:inherit}}.report-filters{{display:grid;grid-template-columns:auto minmax(140px,220px) auto minmax(180px,1fr);gap:8px;align-items:center;margin:12px 0}}.report-filters p{{grid-column:1/-1;margin:0;font-size:.9rem}}.pass,.fail,.error,.warn{{font-weight:400}}code,pre{{background:#f4f4f4;padding:2px 4px}}pre{{padding:12px;overflow:auto;white-space:pre-wrap}}.bar{{height:8px;background:#eee;margin:8px 0;border-radius:8px;overflow:hidden}}.bar span{{display:block;height:100%;background:currentColor}}.pill{{font-size:.8em;border:1px solid #ccc;border-radius:20px;padding:2px 8px}}details.report-section{{margin:20px 0;border:1px solid #ddd;border-radius:8px;padding:0 12px}}details.report-section>summary{{cursor:pointer;font-weight:700;padding:12px 0}}li{{margin:12px 0}}select{{font:inherit;padding:5px 8px}}@media(max-width:700px){{.report-filters{{grid-template-columns:1fr}}}}</style></head>
+<body><a class='skip-link' href='#report-content'>Skip to report content</a><div class='toolbar'><label for='lang'>{html.escape(tr(selected, 'language_selector'))}:</label><select id='lang'>{options}</select></div>{mains}
+<script>(function(){{const s=document.getElementById('lang');const mains=[...document.querySelectorAll('main[data-lang]')];const filterTemplates={filter_templates};function setLang(v){{document.documentElement.lang=v;mains.forEach(x=>x.hidden=x.dataset.lang!==v);const activeMain=mains.find(x=>x.dataset.lang===v),skip=document.querySelector('.skip-link');if(activeMain&&skip)skip.href='#'+activeMain.id;const label=document.querySelector('.toolbar label');label.textContent=(v==='ru'?'Язык отчёта':'Report language')+':';localStorage.setItem('agentready-report-lang',v)}}function bindFilters(main){{const status=main.querySelector("select[id^='report-status-filter']"),search=main.querySelector("input[id^='report-search']"),count=main.querySelector("p[id^='report-filter-count']"),table=main.querySelector("table[id^='report-checks-table']");if(!status||!search||!count||!table)return;const rows=[...table.tBodies[0].rows],filters=main.querySelector('.report-filters'),template=filterTemplates[main.dataset.lang]||filterTemplates.en;filters.hidden=false;function apply(){{const needle=search.value.trim().toLowerCase(),wanted=status.value;let visible=0;rows.forEach(row=>{{const match=(!wanted||row.dataset.status===wanted)&&(!needle||row.dataset.search.toLowerCase().includes(needle));row.hidden=!match;if(match)visible++}});count.textContent=template.replace('{{visible}}',visible).replace('{{total}}',rows.length)}}status.addEventListener('change',apply);search.addEventListener('input',apply);search.addEventListener('keydown',event=>{{if(event.key==='Escape'){{search.value='';apply()}}}});apply()}}mains.forEach(bindFilters);const saved=localStorage.getItem('agentready-report-lang');if(saved&&['en','ru'].includes(saved)){{s.value=saved;setLang(saved)}}s.addEventListener('change',()=>setLang(s.value));window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));}})();</script></body></html>"""
 
 
 def render(report: ScanReport, fmt: str, lang: str | None = None) -> str:

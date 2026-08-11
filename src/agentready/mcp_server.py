@@ -16,6 +16,7 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 from .agentfindings import build_findings, build_remediation_plan
+from .audit_service import AuditRequest, AuditService
 from .i18n import localized_report_dict
 from .mobile_scanner import audit_mobile
 from .scanner import scan
@@ -55,6 +56,50 @@ def scan_site(
         language=language,
     )
     return localized_report_dict(report, language)
+
+
+@mcp.tool()
+def audit_v2(
+    url: str,
+    preset: str = "all",
+    profile: str = "standard",
+    max_pages: int = 25,
+    timeout: float = 5.0,
+    limits: dict[str, int | float] | None = None,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
+    render: bool = False,
+    provider: str | None = None,
+    language: str = "en",
+    rescan_of: str | None = None,
+    selected_urls: list[str] | None = None,
+) -> dict:
+    """Run the shared bounded v2 audit application service."""
+    effective_limits = limits or {}
+    effective_max_pages = (
+        int(effective_limits["max_pages"])
+        if max_pages == 25 and "max_pages" in effective_limits
+        else max_pages
+    )
+    result = AuditService().run(
+        AuditRequest(
+            target=url,
+            preset=preset,
+            profile=profile,
+            max_pages=effective_max_pages,
+            timeout=timeout,
+            limits=effective_limits,
+            include=tuple(include or ()),
+            exclude=tuple(exclude or ()),
+            render=render,
+            provider=provider,
+            language=language,
+            parent_run_id=rescan_of,
+            selected_urls=tuple(selected_urls or ()),
+            allow_private=False,
+        )
+    )
+    return result.to_dict()
 
 
 @mcp.tool()

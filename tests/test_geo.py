@@ -65,8 +65,8 @@ def test_geo_score_is_rendered_but_machine_fields_stay_stable():
     assert "Оценка AI Search / GEO" in markdown
     assert "Оценка AI Search / GEO" in html
     assert html.count("<details class='report-section'>") == 4
-    assert "<summary>Prioritized recommendations</summary>" in html
-    assert "<summary>Remediation prompts</summary>" in html
+    assert "<summary id='report-recommendations'><h3>Приоритетные рекомендации</h3></summary>" in html
+    assert "<summary id='report-remediation'><h3>Инструкции по исправлению</h3></summary>" in html
     assert payload["ai_search_score"] == 100
     assert payload["checks"][0]["id"] == "search-indexability"
     assert payload["checks"][0]["status"] == "pass"

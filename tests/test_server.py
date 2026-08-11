@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
 
 import agentready.server as server_module
 from agentready.ai_provider import ProviderModel
@@ -23,6 +24,63 @@ def test_server_exposes_all_read_only_audit_modes():
         "/seo/audit",
         "/seo/audit/dashboard",
     } <= paths
+
+
+def test_v2_endpoint_maps_request_fields_to_shared_audit_service(monkeypatch):
+    captured = {}
+
+    def fake_run(request):
+        captured["request"] = request
+        return SimpleNamespace(to_dict=lambda: {"schema": "agentready.audit.v2"})
+
+    monkeypatch.setattr(server_module._AUDIT_SERVICE, "run", fake_run)
+    response = server_module.audit_v2_endpoint(
+        server_module.V2AuditRequest(
+            url="https://example.com",
+            profile="quick",
+            max_pages=7,
+            limits={"max_depth": 3},
+            include=["https://example.com/*"],
+            exclude=["https://example.com/private"],
+            render=True,
+            provider="local",
+            language="ru",
+            selected_urls=["https://example.com/page"],
+        )
+    )
+    request = captured["request"]
+    assert response["schema"] == "agentready.audit.v2"
+    assert request.profile == "quick"
+    assert request.max_pages == 7
+    assert request.limits == {"max_depth": 3}
+    assert request.include == ("https://example.com/*",)
+    assert request.exclude == ("https://example.com/private",)
+    assert request.render is True
+    assert request.provider == "local"
+    assert request.language == "ru"
+    assert request.selected_urls == ("https://example.com/page",)
+
+
+def test_v2_endpoint_propagates_all_supported_profiles(monkeypatch):
+    captured = []
+
+    def fake_run(request):
+        captured.append(request)
+        return SimpleNamespace(to_dict=lambda: {"schema": "agentready.audit.v2"})
+
+    monkeypatch.setattr(server_module._AUDIT_SERVICE, "run", fake_run)
+    for profile in ("quick", "standard", "deep", "custom"):
+        response = server_module.audit_v2_endpoint(
+            server_module.V2AuditRequest(
+                url="https://example.com",
+                profile=profile,
+                limits={"max_depth": 2} if profile == "custom" else {},
+            )
+        )
+        assert response["schema"] == "agentready.audit.v2"
+
+    assert [request.profile for request in captured] == ["quick", "standard", "deep", "custom"]
+    assert captured[-1].limits == {"max_depth": 2}
 
 
 def test_ai_tools_exposes_localized_builtin_skills(monkeypatch, tmp_path):

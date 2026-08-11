@@ -54,6 +54,11 @@ limits are enforced server-side; incompatible baselines are rejected rather
 than silently compared. The canonical CLI equivalent is
 `agentready audit https://example.com --fail-on-checks`.
 
+For a selective child rescan, send `rescan_of` together with `selected_urls`.
+The crawler validates those URLs against the target origin and does not expand
+links from selected pages, so a three-URL rescan does not fetch the remaining
+run inventory.
+
 `POST /v2/jobs` returns a job identifier for bounded asynchronous execution.
 Poll `GET /v2/jobs/{job_id}` for a typed snapshot and use
 `POST /v2/jobs/{job_id}/cancel` to request cancellation. Job state is

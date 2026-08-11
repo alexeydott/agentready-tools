@@ -21,6 +21,16 @@ src/agentready/
   security.py         shared redaction and security helpers
   report.py           console/JSON/Markdown/HTML
   report_v2.py        additive v2 report contract and evidence projection
+  audit_service.py    shared v2 application boundary and child-run lineage
+  audit_core/         run lifecycle, canonical contracts, and Memory/SQLite store
+  query_service.py    typed bounded inventory projections and pagination
+  saved_views.py      bounded persisted QuerySpec views
+  discovery.py        URL/list/sitemap/crawl discovery sources
+  sitemap_reconciliation.py  sitemap inventory reconciliation and XML export
+  link_graph.py       bounded internal link graph and authority projections
+  duplicates.py       boilerplate-aware exact/near duplicate signatures
+  custom_rules.py     bounded declarative extraction and debugger
+  exports.py          bounded inventory formats and presentation branding
   jobs_v2.py          bounded asynchronous job lifecycle
   compatibility.py    v1/v2 compatibility manifest and migration metadata
   gitutils.py         Git→URL mapping and publication-date audit
@@ -93,7 +103,9 @@ version information and `packaging\agentready.ico` as the application icon.
 ## Source archive
 
 Create a distributable source archive without AI Factory files, agent
-artifacts, caches, reports, or previous build outputs:
+artifacts, hidden working directories, caches, reports, or previous build outputs.
+The script also excludes the planning-only `docs\vNext` and
+`docs\presentations` trees; product schemas under `schemas\` remain included:
 
 ```powershell
 .\scripts\package-source.ps1

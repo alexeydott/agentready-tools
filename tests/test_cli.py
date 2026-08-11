@@ -149,3 +149,156 @@ def test_ai_nested_help_includes_simple_and_complex_examples():
         for index, line in enumerate(lines):
             if line.startswith("agentready ai"):
                 assert index > 0 and lines[index - 1].startswith("# ")
+
+
+def test_audit_cli_maps_execution_fields_to_shared_request(monkeypatch, capsys):
+    captured = {}
+
+    class FakeResult:
+        report = type("Report", (), {"findings": ()})()
+
+        def to_dict(self):
+            return {"schema": "agentready.audit.v2"}
+
+    class FakeService:
+        def run(self, request):
+            captured["request"] = request
+            return FakeResult()
+
+    monkeypatch.setattr(cli, "AuditService", FakeService)
+    args = build_parser().parse_args(
+        [
+            "audit",
+            "https://example.test",
+            "--profile",
+            "quick",
+            "--max-pages",
+            "7",
+            "--max-depth",
+            "2",
+            "--include",
+            "/docs",
+            "--exclude",
+            "/private",
+            "--select-url",
+            "https://example.test/page",
+            "--render",
+            "--provider",
+            "pagespeed",
+            "--lang",
+            "ru",
+        ]
+    )
+
+    assert cli._cmd_audit(args) == 0
+    request = captured["request"]
+    assert request.profile == "quick"
+    assert request.max_pages == 7
+    assert request.limits == {"max_depth": 2}
+    assert request.include == ("/docs",)
+    assert request.exclude == ("/private",)
+    assert request.selected_urls == ("https://example.test/page",)
+    assert request.render is True
+    assert request.provider == "pagespeed"
+    assert request.language == "ru"
+    import json
+
+    assert json.loads(capsys.readouterr().out) == {"schema": "agentready.audit.v2"}
+
+
+def test_audit_cli_propagates_all_supported_profiles(monkeypatch, capsys):
+    captured = []
+
+    class FakeResult:
+        def to_dict(self):
+            return {"schema": "agentready.audit.v2"}
+
+    class FakeService:
+        def run(self, request):
+            captured.append(request)
+            return FakeResult()
+
+    monkeypatch.setattr(cli, "AuditService", FakeService)
+    for profile in ("quick", "standard", "deep", "custom"):
+        args = build_parser().parse_args(
+            ["audit", "https://example.test", "--profile", profile]
+            + (["--max-depth", "2"] if profile == "custom" else [])
+        )
+        assert cli._cmd_audit(args) == 0
+
+    assert [request.profile for request in captured] == ["quick", "standard", "deep", "custom"]
+    assert captured[-1].limits == {"max_depth": 2}
+    capsys.readouterr()
+
+
+def test_mcp_v2_maps_execution_fields_to_shared_request(monkeypatch):
+    import pytest
+
+    pytest.importorskip("mcp")
+    import agentready.mcp_server as mcp_server
+
+    captured = {}
+
+    class FakeResult:
+        def to_dict(self):
+            return {"schema": "agentready.audit.v2"}
+
+    class FakeService:
+        def run(self, request):
+            captured["request"] = request
+            return FakeResult()
+
+    monkeypatch.setattr(mcp_server, "AuditService", FakeService)
+    result = mcp_server.audit_v2(
+        "https://example.test",
+        profile="quick",
+        max_pages=7,
+        timeout=4,
+        limits={"max_depth": 2},
+        include=["/docs"],
+        exclude=["/private"],
+        render=True,
+        provider="pagespeed",
+        language="ru",
+        selected_urls=["https://example.test/page"],
+    )
+
+    request = captured["request"]
+    assert result == {"schema": "agentready.audit.v2"}
+    assert request.profile == "quick"
+    assert request.max_pages == 7
+    assert request.limits == {"max_depth": 2}
+    assert request.selected_urls == ("https://example.test/page",)
+    assert request.render is True
+    assert request.provider == "pagespeed"
+    assert request.language == "ru"
+
+
+def test_mcp_v2_propagates_all_supported_profiles(monkeypatch):
+    import pytest
+
+    pytest.importorskip("mcp")
+    import agentready.mcp_server as mcp_server
+
+    captured = []
+
+    class FakeResult:
+        def to_dict(self):
+            return {"schema": "agentready.audit.v2"}
+
+    class FakeService:
+        def run(self, request):
+            captured.append(request)
+            return FakeResult()
+
+    monkeypatch.setattr(mcp_server, "AuditService", FakeService)
+    for profile in ("quick", "standard", "deep", "custom"):
+        result = mcp_server.audit_v2(
+            "https://example.test",
+            profile=profile,
+            limits={"max_depth": 2} if profile == "custom" else None,
+        )
+        assert result == {"schema": "agentready.audit.v2"}
+
+    assert [request.profile for request in captured] == ["quick", "standard", "deep", "custom"]
+    assert captured[-1].limits == {"max_depth": 2}
