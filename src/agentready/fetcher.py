@@ -4,17 +4,31 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any, Protocol
 from urllib.parse import urljoin, urlsplit
 
 import httpx
 
-from .egress import EgressPolicy, EgressPolicyError
+from .egress import (
+    EgressPolicy,
+    EgressPolicyError,
+    PassivePublicContext,
+    TrustedLocalCredentialContext,
+)
 from .security import SecretRedactor
 
 logger = logging.getLogger(__name__)
 _REDIRECTS = {301, 302, 303, 307, 308}
+
+
+class FetchTransport(Protocol):
+    """Minimal async transport accepted by the Fetcher boundary."""
+
+    async def handle_async_request(self, request: Any) -> Any:
+        """Send one request through an async HTTP transport."""
 
 
 class FetchErrorKind(StrEnum):
@@ -35,8 +49,10 @@ class FetchRequest:
     url: str
     method: str = "GET"
     purpose: str = "audit"
+    run_id: str | None = None
     headers: dict[str, str] = field(default_factory=dict)
     credential_context: str | None = None
+    security_context: PassivePublicContext | TrustedLocalCredentialContext | None = None
     cache_mode: str = "run-deduplicate"
 
 
@@ -70,6 +86,22 @@ class FetchError(RuntimeError):
         self.kind = kind
 
 
+class FetcherBoundary(Protocol):
+    """Network collection contract exposed to crawler orchestration."""
+
+    async def __aenter__(self) -> "FetcherBoundary":
+        ...
+
+    async def __aexit__(self, *_: object) -> None:
+        ...
+
+    async def get(self, request: FetchRequest, *, use_cache: bool = True) -> FetchResult:
+        ...
+
+
+FetcherFactory = Callable[..., FetcherBoundary]
+
+
 class Fetcher:
     def __init__(
         self,
@@ -77,7 +109,7 @@ class Fetcher:
         policy: EgressPolicy | None = None,
         timeout: float = 5.0,
         verify: bool = True,
-        transport: httpx.AsyncBaseTransport | None = None,
+        transport: FetchTransport | None = None,
         max_retries: int = 0,
         retry_backoff: float = 0.0,
     ) -> None:
@@ -109,7 +141,12 @@ class Fetcher:
         await self._client.aclose()
 
     async def get(self, request: FetchRequest, *, use_cache: bool = True) -> FetchResult:
-        headers = self.policy.validate_headers(request.headers, purpose=request.purpose)
+        headers = self.policy.validate_headers(
+            request.headers,
+            purpose=request.purpose,
+            context=request.security_context,
+            target_url=request.url,
+        )
         method = request.method.upper()
         if method not in {"GET", "HEAD", "OPTIONS"}:
             raise FetchError("Fetcher only permits safe methods", kind=FetchErrorKind.PROTOCOL)
@@ -119,6 +156,7 @@ class Fetcher:
             tuple(sorted((key.lower(), value) for key, value in headers.items())),
             request.purpose,
             request.credential_context,
+            request.run_id,
         )
         if use_cache and request.cache_mode == "run-deduplicate" and cache_key in self._run_dedup:
             logger.debug("[WP2.2] Fetch cache hit purpose=%s url=%s", request.purpose, request.url)
@@ -138,10 +176,16 @@ class Fetcher:
                         target = urljoin(current, response.headers["location"])
                         if target in visited:
                             raise FetchError("Redirect loop", kind=FetchErrorKind.REDIRECT_LOOP)
-                        self.policy.validate_redirect(current, target, hop + 1, purpose=request.purpose)
-                        redirects.append(current)
                         source = urlsplit(current)
                         destination = urlsplit(target)
+                        if (
+                            (source.scheme, source.netloc) != (destination.scheme, destination.netloc)
+                            and not self.policy.allow_cross_origin_credentials
+                            and any(key.lower() in {"authorization", "proxy-authorization", "cookie"} for key in headers)
+                        ):
+                            raise EgressPolicyError("credential-bearing headers cannot cross origins")
+                        self.policy.validate_redirect(current, target, hop + 1, purpose=request.purpose)
+                        redirects.append(current)
                         redirect_records.append(
                             RedirectHop(
                                 from_url=current,

@@ -20,6 +20,14 @@ PROFILES = {
     "standard": CrawlProfile("standard", CrawlConfig(), normative_limits=()),
     "deep": CrawlProfile("deep", CrawlConfig(max_pages=25000, max_depth=32, concurrency=16, per_origin_concurrency=8, min_request_interval_ms=50, timeout=30, max_duration=10800)),
 }
+HARD_CAPS = CrawlConfig(
+    max_pages=25_000,
+    max_depth=32,
+    concurrency=16,
+    per_origin_concurrency=8,
+    timeout=30,
+    max_duration=10_800,
+)
 
 
 def resolve_profile(name: str = "standard", *, overrides: dict[str, Any] | None = None, hard_caps: CrawlConfig | None = None) -> CrawlProfile:
@@ -30,6 +38,8 @@ def resolve_profile(name: str = "standard", *, overrides: dict[str, Any] | None 
         profile = CrawlProfile("custom", config)
     elif name in PROFILES:
         profile = PROFILES[name]
+        if overrides:
+            profile = CrawlProfile(profile.name, replace(profile.config, **overrides), profile.normative_limits)
     else:
         raise ValueError(f"unknown crawl profile: {name}")
     if hard_caps is None:

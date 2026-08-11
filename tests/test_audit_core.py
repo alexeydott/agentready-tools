@@ -46,6 +46,13 @@ def test_url_identity_preserves_original_and_normalizes_host():
     assert identity.origin.to_string() == "https://example.com:443"
 
 
+def test_url_identity_covers_encoding_default_port_and_fetch_fragment_split():
+    identity = UrlIdentity.parse("https://EXAMPLE.com:443/a%2Fb?x=1#section")
+    assert identity.origin.to_string() == "https://example.com:443"
+    assert identity.normalized() == "https://example.com:443/a%2Fb?x=1#section"
+    assert identity.normalized().split("#", 1)[0] == "https://example.com:443/a%2Fb?x=1"
+
+
 def test_fingerprint_is_deterministic_and_redacts_secret_inputs():
     target = UrlIdentity.parse("https://example.com/a")
     first = fingerprint("robots-txt", "1.0.0", target, {"authorization": "secret", "status": 200})

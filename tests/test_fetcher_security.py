@@ -4,7 +4,7 @@ import ipaddress
 import httpx
 import pytest
 
-from agentready.egress import EgressPolicy, EgressPolicyError
+from agentready.egress import EgressPolicy, EgressPolicyError, PassivePublicContext, TrustedLocalCredentialContext
 from agentready.fetcher import FetchError, FetchErrorKind, FetchRequest, Fetcher
 from agentready.security import SecretRedactor
 
@@ -24,6 +24,140 @@ def test_secret_redactor_removes_bearer_and_nested_secret_values():
     assert "secret" not in redactor.text("Authorization: Bearer secret")
 
 
+def test_trusted_credentials_require_cli_loopback_and_explicit_header_allowlist():
+    policy = EgressPolicy()
+    context = TrustedLocalCredentialContext(
+        credential_ref="local-test",
+        allowed_headers=frozenset({"authorization"}),
+    )
+    assert policy.validate_headers(
+        {"Authorization": "Bearer local"},
+        context=context,
+        target_url="http://127.0.0.1:8000/",
+    ) == {"Authorization": "Bearer local"}
+    with pytest.raises(EgressPolicyError, match="loopback"):
+        policy.validate_headers(
+            {"Authorization": "Bearer local"},
+            context=context,
+            target_url="https://example.com/",
+        )
+    with pytest.raises(EgressPolicyError, match="credential-bearing"):
+        policy.validate_headers(
+            {"Cookie": "secret"},
+            context=PassivePublicContext(),
+            target_url="https://example.com/",
+        )
+    assert TrustedLocalCredentialContext(
+        basic_auth_ref="basic-local",
+        storage_state_ref="state-local",
+        proxy_url="http://127.0.0.1:8080",
+    ).permits("http://127.0.0.1:8000/")
+    assert not TrustedLocalCredentialContext(proxy_url="https://proxy.example.com").permits(
+        "http://127.0.0.1:8000/"
+    )
+
+
+def test_fetcher_accepts_trusted_local_headers_only_with_explicit_context():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer local"
+        return httpx.Response(200, request=request)
+
+    async def run() -> object:
+        async with Fetcher(transport=httpx.MockTransport(handler)) as fetcher:
+            return await fetcher.get(
+                FetchRequest(
+                    "http://127.0.0.1:8000/",
+                    headers={"Authorization": "Bearer local"},
+                    security_context=TrustedLocalCredentialContext(
+                        credential_ref="local-test",
+                        allowed_headers=frozenset({"authorization"}),
+                    ),
+                )
+            )
+
+    result = asyncio.run(run())
+    assert result.status_code == 200
+
+
+def test_fetcher_blocks_trusted_credentials_on_cross_origin_redirect():
+    calls = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        return httpx.Response(302, headers={"location": "https://example.com/final"}, request=request)
+
+    async def run() -> None:
+        async with Fetcher(transport=httpx.MockTransport(handler)) as fetcher:
+            with pytest.raises(FetchError, match="cannot cross origins"):
+                await fetcher.get(
+                    FetchRequest(
+                        "http://127.0.0.1:8000/start",
+                        headers={"Authorization": "******"},
+                        security_context=TrustedLocalCredentialContext(
+                            credential_ref="local-test",
+                            allowed_headers=frozenset({"authorization"}),
+                        ),
+                    )
+                )
+
+    asyncio.run(run())
+    assert calls == ["http://127.0.0.1:8000/start"]
+
+
+def test_fetcher_allows_explicit_cross_origin_credential_forwarding():
+    seen = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((str(request.url), request.headers.get("authorization")))
+        if request.url.path == "/start":
+            return httpx.Response(302, headers={"location": "https://example.com/final"}, request=request)
+        return httpx.Response(200, content=b"ok", request=request)
+
+    async def run() -> object:
+        async with Fetcher(
+            policy=EgressPolicy(allow_cross_origin_credentials=True),
+            transport=httpx.MockTransport(handler),
+        ) as fetcher:
+            return await fetcher.get(
+                FetchRequest(
+                    "http://127.0.0.1:8000/start",
+                    headers={"Authorization": "******"},
+                    security_context=TrustedLocalCredentialContext(
+                        credential_ref="local-test",
+                        allowed_headers=frozenset({"authorization"}),
+                    ),
+                )
+            )
+
+    result = asyncio.run(run())
+    assert result.status_code == 200
+    assert seen == [
+        ("http://127.0.0.1:8000/start", "******"),
+        ("https://example.com/final", "******"),
+    ]
+
+
+def test_fetcher_redacts_sensitive_response_headers():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={
+                "authorization": "Bearer response-secret",
+                "set-cookie": "session=response-secret",
+                "x-safe": "visible",
+            },
+            request=request,
+        )
+
+    async def run() -> object:
+        async with Fetcher(transport=httpx.MockTransport(handler)) as fetcher:
+            return await fetcher.get(FetchRequest("https://example.com/"))
+
+    result = asyncio.run(run())
+    assert result.headers["authorization"] == "[REDACTED]"
+    assert result.headers["set-cookie"] == "[REDACTED]"
+    assert result.headers["x-safe"] == "visible"
+
 
 def test_fetcher_revalidates_redirects_and_preserves_chain():
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -41,7 +175,6 @@ def test_fetcher_revalidates_redirects_and_preserves_chain():
     assert result.redirects == ("https://example.com/start",)
     assert result.redirect_records[0].status_code == 302
     assert not result.redirect_records[0].cross_origin
-
 
 
 def test_fetcher_enforces_response_limit():
@@ -73,6 +206,14 @@ def test_browser_subresources_use_the_same_egress_policy():
     policy.validate_browser_request("https://example.com/script.js", resource_type="script")
     with pytest.raises(EgressPolicyError, match="allowlist"):
         policy.validate_browser_request("https://cdn.example.net/script.js", resource_type="script")
+
+
+def test_browser_and_http_requests_share_denied_host_policy():
+    policy = EgressPolicy(denied_hosts=("blocked.example",))
+    with pytest.raises(EgressPolicyError, match="host is denied"):
+        policy.validate_request("https://blocked.example/page")
+    with pytest.raises(EgressPolicyError, match="host is denied"):
+        policy.validate_browser_request("https://blocked.example/script.js", resource_type="script")
 
 
 def test_fetcher_run_deduplicates_by_purpose_and_headers():

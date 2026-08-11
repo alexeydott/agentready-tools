@@ -3,14 +3,56 @@ from __future__ import annotations
 
 import logging
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, AsyncContextManager, Protocol
 
 from .egress import EgressPolicy, EgressPolicyError
 
 logger = logging.getLogger(__name__)
+
+
+class CapabilityUnavailableError(RuntimeError):
+    """Raised when an optional audit capability cannot be started safely."""
+
+    def __init__(self, capability: str, remediation: str) -> None:
+        self.capability = capability
+        self.remediation = remediation
+        super().__init__(f"{capability} unavailable. {remediation}")
+
+
+class BrowserPage(Protocol):
+    """Rendered page surface consumed by the crawler."""
+
+    url: str
+
+    async def content(self) -> str:
+        ...
+
+
+class BrowserPoolBoundary(Protocol):
+    """Lifecycle and navigation contract exposed to crawler orchestration."""
+
+    async def start(self) -> None:
+        ...
+
+    async def close(self) -> None:
+        ...
+
+    def page(
+        self,
+        *,
+        user_agent: str | None = None,
+        viewport: dict[str, int] | None = None,
+    ) -> AsyncContextManager[BrowserPage]:
+        ...
+
+    async def goto(self, page: BrowserPage, url: str, **kwargs: Any) -> Any:
+        ...
+
+
+BrowserPoolFactory = Callable[[EgressPolicy], BrowserPoolBoundary]
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,28 +84,40 @@ class BrowserPool:
             from playwright.async_api import Error as PlaywrightError
             from playwright.async_api import async_playwright
         except ImportError as exc:
-            raise RuntimeError("BrowserPool requires the optional browser extra (playwright)") from exc
-        self._playwright = await async_playwright().start()
-        try:
-            self._browser = await self._playwright.chromium.launch(headless=True)
-        except PlaywrightError as exc:
-            await self._playwright.stop()
-            self._playwright = None
-            raise RuntimeError(
-                "BrowserPool requires the Chromium browser binary; run "
-                "'python -m playwright install chromium'"
+            raise CapabilityUnavailableError(
+                "Playwright browser support",
+                "Install the optional browser extra with `python -m pip install -e \".[portable]\"`.",
             ) from exc
+        playwright = await async_playwright().start()
+        self._playwright = playwright
+        try:
+            self._browser = await playwright.chromium.launch(headless=True)
+        except PlaywrightError as exc:
+            await asyncio.shield(playwright.stop())
+            self._playwright = None
+            raise CapabilityUnavailableError(
+                "Chromium browser binary",
+                "Run `python -m playwright install chromium`.",
+            ) from exc
+        except BaseException:
+            await asyncio.shield(playwright.stop())
+            self._playwright = None
+            raise
         self._started = True
         logger.info("[WP4.3] browser pool started max_contexts=%d", self.config.max_contexts)
 
     async def close(self) -> None:
-        if self._browser is not None:
-            await self._browser.close()
-        if self._playwright is not None:
-            await self._playwright.stop()
+        browser = self._browser
+        playwright = self._playwright
         self._browser = None
         self._playwright = None
         self._started = False
+        try:
+            if browser is not None:
+                await browser.close()
+        finally:
+            if playwright is not None:
+                await playwright.stop()
 
     async def __aenter__(self) -> "BrowserPool":
         await self.start()
@@ -73,12 +127,18 @@ class BrowserPool:
         await self.close()
 
     @asynccontextmanager
-    async def page(self, *, user_agent: str | None = None) -> AsyncIterator[Any]:
+    async def page(
+        self,
+        *,
+        user_agent: str | None = None,
+        viewport: dict[str, int] | None = None,
+    ) -> AsyncIterator[Any]:
         if not self._started or self._browser is None:
             raise RuntimeError("BrowserPool must be started before acquiring a page")
         async with self._slots:
             context = await self._browser.new_context(
                 user_agent=user_agent,
+                viewport=viewport,
                 service_workers="block" if self.config.block_service_workers else "allow",
             )
             await context.route("**/*", self._route_request)

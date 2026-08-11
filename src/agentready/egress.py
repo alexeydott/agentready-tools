@@ -14,6 +14,35 @@ logger = logging.getLogger(__name__)
 _SENSITIVE_HEADERS = {"authorization", "proxy-authorization", "cookie"}
 
 
+@dataclass(frozen=True, slots=True)
+class PassivePublicContext:
+    """Default context: public targets and no credential forwarding."""
+
+    interface: str = "api"
+
+
+@dataclass(frozen=True, slots=True)
+class TrustedLocalCredentialContext:
+    """Explicit local-only credential context for CLI operations."""
+
+    interface: str = "cli"
+    credential_ref: str | None = None
+    allowed_headers: frozenset[str] = frozenset()
+    basic_auth_ref: str | None = None
+    storage_state_ref: str | None = None
+    proxy_url: str | None = None
+
+    def permits(self, url: str) -> bool:
+        hostname = (urlsplit(url).hostname or "").lower()
+        if self.interface != "cli" or hostname not in {"localhost", "127.0.0.1", "::1"}:
+            return False
+        if self.proxy_url:
+            proxy_host = (urlsplit(self.proxy_url).hostname or "").lower()
+            if proxy_host not in {"localhost", "127.0.0.1", "::1"}:
+                return False
+        return True
+
+
 class EgressPolicyError(TargetError):
     """Raised when a request violates the audit egress boundary."""
 
@@ -36,7 +65,7 @@ class EgressPolicy:
             raise ValueError("max_response_bytes must be positive")
 
     def validate_request(self, url: str, *, purpose: str = "audit") -> None:
-        logger.debug("[WP2.3] validating egress purpose=%s url=%s", purpose, url)
+        logger.debug("[WP2.3] validating egress purpose=%s url=%s", purpose, _safe_url(url))
         parsed = urlsplit(url)
         if parsed.username or parsed.password:
             raise EgressPolicyError("credential-bearing URLs are not allowed")
@@ -67,9 +96,28 @@ class EgressPolicy:
         """Apply the same destination policy to browser documents and subresources."""
         self.validate_request(url, purpose=f"browser:{resource_type}")
 
-    def validate_headers(self, headers: dict[str, str] | None, *, purpose: str = "audit") -> dict[str, str]:
+    def validate_headers(
+        self,
+        headers: dict[str, str] | None,
+        *,
+        purpose: str = "audit",
+        context: PassivePublicContext | TrustedLocalCredentialContext | None = None,
+        target_url: str | None = None,
+    ) -> dict[str, str]:
         values = {key: value for key, value in (headers or {}).items()}
         blocked = sorted(key for key in values if key.lower() in _SENSITIVE_HEADERS)
+        trusted = isinstance(context, TrustedLocalCredentialContext)
+        if trusted and (target_url is None or not context.permits(target_url)):
+            raise EgressPolicyError("trusted credentials require a loopback target and CLI interface")
+        allowed = {item.lower() for item in context.allowed_headers} if trusted else set()
+        blocked = [key for key in blocked if key.lower() not in allowed]
+        if trusted:
+            logger.info(
+                "trusted-local header policy interface=%s credential_ref=%s target=%s",
+                context.interface,
+                context.credential_ref or "none",
+                _safe_url(target_url or ""),
+            )
         if blocked:
             raise EgressPolicyError(
                 f"credential-bearing headers are forbidden for passive egress purpose {purpose}: {', '.join(blocked)}"
@@ -79,3 +127,8 @@ class EgressPolicy:
     def validate_response_size(self, size: int) -> None:
         if size > self.max_response_bytes:
             raise EgressPolicyError(f"Response exceeds {self.max_response_bytes} byte limit")
+
+
+def _safe_url(url: str) -> str:
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}{parts.path or '/'}"

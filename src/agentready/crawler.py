@@ -6,17 +6,28 @@ import fnmatch
 import heapq
 import logging
 import time
+from datetime import datetime, timezone
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from urllib.parse import urldefrag, urljoin, urlsplit
 
-import httpx
-
-from .audit_core.store import PageRecord, SiteStore
+from .audit_core.store import PageRecord, RunRecord, RunUrlRecord, RunUrlState, SiteStore
+from .audit_core.run_context import AuditRunContext, RunCoordinator, RunState
+from .audit_core.urls import UrlIdentity
+from .browser_pool import BrowserPool, BrowserPoolBoundary, BrowserPoolFactory
 from .egress import EgressPolicy
-from .fetcher import FetchError, FetchRequest, Fetcher
-from .page_parser import ParsedPage, parse_page
+from .fetcher import (
+    FetchError,
+    FetchErrorKind,
+    FetchRequest,
+    FetchResult,
+    FetchTransport,
+    Fetcher,
+    FetcherBoundary,
+    FetcherFactory,
+)
+from .page_parser import ParsedPage, Representation, RepresentationSource, parse_page
 
 logger = logging.getLogger(__name__)
 
@@ -47,20 +58,69 @@ class CrawlItem:
 
 
 @dataclass(frozen=True, slots=True)
-class CrawlScope:
-    seed_origins: tuple[str, ...]
-    allowed_origins: tuple[str, ...] = ()
+class CrawlSeeds:
+    urls: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ScopePolicy:
+    allowed_origins: tuple[str, ...]
     include_rules: tuple[str, ...] = ()
     exclude_rules: tuple[str, ...] = ()
+    allow_external_links: bool = False
 
     def allows(self, url: str) -> bool:
         parts = urlsplit(url)
         origin = f"{parts.scheme}://{parts.netloc}"
-        if origin not in (self.allowed_origins or self.seed_origins):
+        if origin not in self.allowed_origins:
             return False
         if self.include_rules and not any(fnmatch.fnmatch(url, rule) for rule in self.include_rules):
             return False
         return not any(fnmatch.fnmatch(url, rule) for rule in self.exclude_rules)
+
+    def reason(self, url: str) -> str:
+        parts = urlsplit(url)
+        origin = f"{parts.scheme}://{parts.netloc}"
+        if origin not in self.allowed_origins:
+            return "origin"
+        if self.include_rules and not any(fnmatch.fnmatch(url, rule) for rule in self.include_rules):
+            return "include"
+        if any(fnmatch.fnmatch(url, rule) for rule in self.exclude_rules):
+            return "exclude"
+        return "allowed"
+
+
+@dataclass(frozen=True, slots=True)
+class CrawlScope:
+    seed_urls: tuple[str, ...]
+    allowed_origins: tuple[str, ...] = ()
+    include_rules: tuple[str, ...] = ()
+    exclude_rules: tuple[str, ...] = ()
+    follow_links: bool = True
+
+    @classmethod
+    def from_parts(cls, seeds: CrawlSeeds, policy: ScopePolicy) -> "CrawlScope":
+        return cls(seeds.urls, policy.allowed_origins, policy.include_rules, policy.exclude_rules)
+
+    @property
+    def seed_origins(self) -> tuple[str, ...]:
+        """Compatibility alias for callers that used the pre-v2 name."""
+        return self.seed_urls
+
+    @property
+    def seeds(self) -> CrawlSeeds:
+        return CrawlSeeds(self.seed_urls)
+
+    @property
+    def policy(self) -> ScopePolicy:
+        return ScopePolicy(
+            self.allowed_origins or tuple(_origin(seed) for seed in self.seed_urls),
+            self.include_rules,
+            self.exclude_rules,
+        )
+
+    def allows(self, url: str) -> bool:
+        return self.policy.allows(url)
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,11 +139,11 @@ class CrawlCoverage:
     @property
     def classification(self) -> CrawlClassification:
         return (
-            CrawlClassification.COMPLETE_WITHIN_SCOPE
-            if self.frontier_exhausted and not self.failed
-            else CrawlClassification.PARTIAL_ERROR
+            CrawlClassification.PARTIAL_ERROR
             if self.failed
             else CrawlClassification.PARTIAL_LIMIT
+            if self.max_pages_hit or self.max_depth_hit or self.deadline_hit or not self.frontier_exhausted
+            else CrawlClassification.COMPLETE_WITHIN_SCOPE
         )
 
 
@@ -100,6 +160,7 @@ class CrawledPage:
 class CrawlResult:
     pages: tuple[CrawledPage, ...]
     coverage: CrawlCoverage
+    run: RunSnapshot | None = None
 
 
 class Frontier:
@@ -165,26 +226,58 @@ class AsyncCrawler:
         *,
         config: CrawlConfig | None = None,
         policy: EgressPolicy | None = None,
-        transport: httpx.AsyncBaseTransport | None = None,
+        transport: FetchTransport | None = None,
         store: SiteStore | None = None,
+        run_context: AuditRunContext | None = None,
+        render: bool = False,
+        fetcher_factory: FetcherFactory | None = None,
+        browser_pool_factory: BrowserPoolFactory | None = None,
     ) -> None:
         self.scope = scope
         self.config = config or CrawlConfig()
         self.policy = policy or EgressPolicy(
             max_response_bytes=5 * 1024 * 1024,
-            allowed_origins=frozenset(scope.allowed_origins or scope.seed_origins),
+            allowed_origins=frozenset(scope.policy.allowed_origins),
         )
         self.transport = transport
         self.store = store
+        self.run_context = run_context
+        self.render = render
+        self.fetcher_factory = fetcher_factory or Fetcher
+        self.browser_pool_factory = browser_pool_factory or BrowserPool
 
     async def crawl(self) -> CrawlResult:
         started = time.monotonic()
+        run_id = self.run_context.run_id if self.run_context is not None else "crawl"
+        coordinator = RunCoordinator(self.run_context) if self.run_context is not None else None
+        if coordinator is not None:
+            coordinator.transition(RunState.RUNNING)
+        if self.store is not None:
+            self.store.begin_run(
+                RunRecord(
+                    run_id,
+                    self.run_context.config_hash if self.run_context is not None else "crawler",
+                    self.run_context.tool_version if self.run_context is not None else "crawler",
+                    self.run_context.rule_catalog_version if self.run_context is not None else "crawler",
+                )
+            )
+
+        def persist_run_state(state: RunState, *, finished_at: str | None = None) -> None:
+            if self.store is not None:
+                self.store.update_run_state(run_id, state.value, finished_at=finished_at)
+
+        def record_url(url: str, state: RunUrlState, depth: int, *, error_kind: str | None = None) -> None:
+            if self.store is not None:
+                self.store.put_run_url(RunUrlRecord(run_id, url, state, depth=depth, error_kind=error_kind))
+
         deadline = started + self.config.max_duration
         frontier = Frontier()
-        for seed in sorted({_normalize(url) for url in self.scope.seed_origins}):
-            frontier.add(CrawlItem(seed, 0))
+        for seed in sorted({_normalize(url) for url in self.scope.seeds.urls}):
+            if frontier.add(CrawlItem(seed, 0)):
+                record_url(seed, RunUrlState.QUEUED, 0)
         pages: dict[str, CrawledPage] = {}
         fetched = parsed_html = skipped_policy = failed = 0
+        completed_items = 0
         max_depth_hit = False
         deadline_hit = False
         queue: asyncio.Queue[CrawlItem | None] = asyncio.Queue()
@@ -193,6 +286,7 @@ class AsyncCrawler:
         origin_last_request: dict[str, float] = {}
         result_lock = asyncio.Lock()
         reserved_fetches = 0
+        active_items = 0
 
         async def refill() -> None:
             async with queue_lock:
@@ -201,26 +295,45 @@ class AsyncCrawler:
                     if item is not None:
                         await queue.put(item)
 
-        async def worker(fetcher: Fetcher) -> None:
-            nonlocal fetched, parsed_html, skipped_policy, failed, max_depth_hit, deadline_hit, reserved_fetches
+        async def worker(fetcher: FetcherBoundary) -> None:
+            nonlocal fetched, parsed_html, skipped_policy, failed, completed_items
+            nonlocal max_depth_hit, deadline_hit, reserved_fetches, active_items
             while True:
                 item = await queue.get()
                 if item is None:
                     queue.task_done()
                     return
+                async with result_lock:
+                    active_items += 1
                 try:
+                    record_url(item.url, RunUrlState.FETCHING, item.depth)
                     async with result_lock:
                         if reserved_fetches >= self.config.max_pages:
                             frontier.set_state(item.url, CrawlItemState.SKIPPED_POLICY)
+                            skipped_policy += 1
+                            record_url(item.url, RunUrlState.SKIPPED, item.depth)
                             continue
                         reserved_fetches += 1
                     if time.monotonic() >= deadline:
                         deadline_hit = True
                         frontier.set_state(item.url, CrawlItemState.FAILED)
+                        record_url(item.url, RunUrlState.FAILED, item.depth, error_kind="deadline")
                         continue
                     if not self.scope.allows(item.url):
+                        logger.debug(
+                            "crawl scope decision run_id=%s url=%s reason=%s",
+                            run_id,
+                            _safe_log_url(item.url),
+                            self.scope.policy.reason(item.url),
+                        )
+                        logger.warning(
+                            "crawl URL blocked by scope run_id=%s reason=%s",
+                            run_id,
+                            self.scope.policy.reason(item.url),
+                        )
                         skipped_policy += 1
                         frontier.set_state(item.url, CrawlItemState.SKIPPED_POLICY)
+                        record_url(item.url, RunUrlState.SKIPPED, item.depth, error_kind="scope")
                         continue
                     origin = f"{urlsplit(item.url).scheme}://{urlsplit(item.url).netloc}"
                     semaphore = origin_semaphores.setdefault(origin, asyncio.Semaphore(self.config.per_origin_concurrency))
@@ -230,52 +343,174 @@ class AsyncCrawler:
                             await asyncio.sleep(max(0, self.config.min_request_interval_ms / 1000 - (time.monotonic() - previous)))
                         origin_last_request[origin] = time.monotonic()
                         try:
-                            response = await fetcher.get(FetchRequest(item.url, purpose="crawl"))
+                            if self.render:
+                                response_started = time.monotonic()
+                                try:
+                                    async with browser_pool.page() as page:  # type: ignore[union-attr]
+                                        navigation = await browser_pool.goto(  # type: ignore[union-attr]
+                                            page,
+                                            item.url,
+                                            wait_until="domcontentloaded",
+                                        )
+                                        response = FetchResult(
+                                            url=page.url or item.url,
+                                            status_code=getattr(navigation, "status", None) or 200,
+                                            headers={"content-type": "text/html"},
+                                            body=(await page.content()).encode("utf-8"),
+                                            redirects=(),
+                                            elapsed_ms=int((time.monotonic() - response_started) * 1000),
+                                        )
+                                except Exception as exc:
+                                    raise FetchError(str(exc), kind=FetchErrorKind.PROTOCOL) from exc
+                            else:
+                                response = await fetcher.get(FetchRequest(item.url, purpose="crawl", run_id=run_id))
                         except FetchError as exc:
                             failed += 1
                             frontier.set_state(item.url, CrawlItemState.FAILED)
+                            record_url(item.url, RunUrlState.FAILED, item.depth, error_kind=exc.kind.value)
                             pages[item.url] = CrawledPage(item.url, item.depth, None, None, str(exc))
                             continue
+                    if time.monotonic() >= deadline:
+                        deadline_hit = True
                     fetched += 1
                     parsed: ParsedPage | None = None
                     if response.status_code == 200 and response.headers.get("content-type", "").split(";", 1)[0] in {"text/html", "application/xhtml+xml"}:
-                        parsed = parse_page(response.body)
+                        representation = Representation.from_body(
+                            response.body,
+                            run_id=run_id,
+                            url_key=item.url,
+                            source=(
+                                RepresentationSource.RENDERED_DOM
+                                if self.render
+                                else RepresentationSource.STATIC_HTML
+                            ),
+                            content_type=response.headers.get("content-type", "text/html"),
+                        )
+                        parsed = parse_page(response.body, representation=representation)
                         parsed_html += 1
                         frontier.set_state(item.url, CrawlItemState.PARSED)
-                        for link in parsed.links:
+                        occurrences = parsed.facts.links if parsed.facts is not None else ()
+                        for occurrence in occurrences:
+                            link = occurrence.raw_href
                             child = _normalize(urljoin(response.url, link))
+                            if self.store is not None:
+                                self.store.put_link(
+                                    run_id,
+                                    item.url,
+                                    link,
+                                    target_key=child,
+                                    resolved_url=child,
+                                    discovery_method="html-link",
+                                    ordinal=occurrence.ordinal,
+                                    representation_id=occurrence.source_representation_id,
+                                    rel=occurrence.rel,
+                                    element=occurrence.element,
+                                    dom_path=occurrence.dom_path,
+                                    anchor_text=occurrence.anchor_text,
+                                )
+                            if not self.scope.follow_links:
+                                continue
                             if item.depth + 1 > self.config.max_depth:
                                 max_depth_hit = True
                             elif self.scope.allows(child):
-                                frontier.add(CrawlItem(child, item.depth + 1, item.url, "html-link"))
+                                if frontier.add(CrawlItem(child, item.depth + 1, item.url, "html-link")):
+                                    record_url(child, RunUrlState.QUEUED, item.depth + 1)
+                            else:
+                                logger.debug(
+                                    "crawl scope decision run_id=%s url=%s reason=%s",
+                                    run_id,
+                                    _safe_log_url(child),
+                                    self.scope.policy.reason(child),
+                                )
+                        if self.store is not None:
+                            resources = parsed.facts.resources if parsed.facts is not None else ()
+                            for resource in resources:
+                                self.store.put_resource(
+                                    run_id,
+                                    item.url,
+                                    resource.url,
+                                    resource.resource_type,
+                                    ordinal=resource.ordinal,
+                                    resolved_url=_normalize(urljoin(response.url, resource.url)),
+                                    representation_id=resource.source_representation_id,
+                                    element=resource.element,
+                                    dom_path=resource.dom_path,
+                                )
                     else:
                         frontier.set_state(item.url, CrawlItemState.FETCHED)
+                    record_url(
+                        item.url,
+                        RunUrlState.PARSED if parsed is not None else RunUrlState.FETCHED,
+                        item.depth,
+                    )
                     pages[item.url] = CrawledPage(response.url, item.depth, response.status_code, parsed)
+                    completed_items += 1
                     if self.store is not None:
-                        self.store.put_page(PageRecord("crawl", item.url, item.url, response.url, item.depth, response.status_code, response.headers.get("content-type")))
+                        self.store.put_page(PageRecord(run_id, item.url, item.url, response.url, item.depth, response.status_code, response.headers.get("content-type")))
                 finally:
                     queue.task_done()
+                    async with result_lock:
+                        active_items -= 1
                     await refill()
 
-        async with Fetcher(policy=self.policy, timeout=self.config.timeout, transport=self.transport) as fetcher:
-            await refill()
-            workers = [asyncio.create_task(worker(fetcher)) for _ in range(self.config.concurrency)]
-            try:
-                while not queue.empty() or frontier.queued:
-                    if len(pages) >= self.config.max_pages:
-                        break
-                    await asyncio.sleep(0)
-                    await refill()
-                for _ in workers:
-                    await queue.put(None)
-                await queue.join()
-                for task in workers:
-                    await task
-            finally:
-                for task in workers:
-                    if not task.done():
-                        task.cancel()
-                await asyncio.gather(*workers, return_exceptions=True)
+        browser_pool = self.browser_pool_factory(self.policy) if self.render else None
+        try:
+            if browser_pool is not None:
+                await browser_pool.start()
+            async with self.fetcher_factory(
+                policy=self.policy,
+                timeout=self.config.timeout,
+                transport=self.transport,
+            ) as fetcher:
+                await refill()
+                workers = [asyncio.create_task(worker(fetcher)) for _ in range(self.config.concurrency)]
+                try:
+                    while True:
+                        async with result_lock:
+                            active = active_items
+                        logger.debug(
+                            "[WP4.2] scheduler queued=%d active=%d completed=%d skipped=%d failed=%d",
+                            frontier.queued,
+                            active,
+                            completed_items,
+                            skipped_policy,
+                            failed,
+                        )
+                        if len(pages) >= self.config.max_pages:
+                            break
+                        if queue.empty() and frontier.queued == 0 and active == 0:
+                            break
+                        await asyncio.sleep(0)
+                        await refill()
+                    for _ in workers:
+                        await queue.put(None)
+                    await queue.join()
+                    for task in workers:
+                        await task
+                finally:
+                    for task in workers:
+                        if not task.done():
+                            task.cancel()
+                    await asyncio.gather(*workers, return_exceptions=True)
+        except asyncio.CancelledError:
+            if coordinator is not None and coordinator.state is RunState.RUNNING:
+                coordinator.transition(RunState.INTERRUPTED, error_kind="cancelled")
+                persist_run_state(RunState.INTERRUPTED)
+            logger.info("audit crawl interrupted run_id=%s", run_id)
+            raise
+        except Exception as exc:
+            if coordinator is not None and coordinator.state is RunState.RUNNING:
+                coordinator.transition(RunState.FAILED, error_kind=type(exc).__name__)
+                persist_run_state(RunState.FAILED, finished_at=datetime.now(timezone.utc).isoformat())
+            logger.error(
+                "audit crawl failed run_id=%s error_kind=%s",
+                run_id,
+                type(exc).__name__,
+            )
+            raise
+        finally:
+            if browser_pool is not None:
+                await _close_browser_pool(browser_pool)
         coverage = CrawlCoverage(
             discovered=frontier.discovered,
             queued_remaining=frontier.queued,
@@ -289,9 +524,54 @@ class AsyncCrawler:
             frontier_exhausted=frontier.queued == 0 and not deadline_hit,
         )
         ordered = tuple(pages[url] for url in sorted(pages))
-        logger.info("[WP4.1] crawl complete discovered=%d fetched=%d failed=%d", coverage.discovered, fetched, failed)
-        return CrawlResult(ordered, coverage)
+        logger.info(
+            "[WP4.1] crawl complete discovered=%d fetched=%d completed=%d skipped=%d failed=%d",
+            coverage.discovered,
+            fetched,
+            completed_items,
+            skipped_policy,
+            failed,
+        )
+        if coverage.classification is not CrawlClassification.COMPLETE_WITHIN_SCOPE:
+            logger.warning(
+                "[WP4.3] crawl partial classification=%s queued_remaining=%d deadline_hit=%s",
+                coverage.classification,
+                coverage.queued_remaining,
+                coverage.deadline_hit,
+            )
+        if coordinator is not None:
+            terminal_state = (
+                RunState.COMPLETED
+                if coverage.classification is CrawlClassification.COMPLETE_WITHIN_SCOPE
+                else RunState.PARTIAL
+            )
+            coordinator.transition(terminal_state, error_kind="crawl-partial" if coverage.failed else None)
+            persist_run_state(terminal_state, finished_at=coordinator.completed_at)
+        return CrawlResult(ordered, coverage, coordinator.snapshot() if coordinator is not None else None)
 
 
 def _normalize(url: str) -> str:
-    return urldefrag(url.strip())[0].rstrip("/") or url
+    value = urldefrag(url.strip())[0]
+    return UrlIdentity.parse(value).normalized()
+
+
+def _origin(url: str) -> str:
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+def _safe_log_url(url: str) -> str:
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}{parts.path or '/'}"
+
+
+async def _close_browser_pool(browser_pool: BrowserPoolBoundary) -> None:
+    """Complete browser cleanup before propagating cancellation."""
+    logger.debug("[WP4.3] closing rendered browser pool")
+    close_task = asyncio.create_task(browser_pool.close())
+    try:
+        await asyncio.shield(close_task)
+    except asyncio.CancelledError:
+        await close_task
+        raise
+    logger.debug("[WP4.3] rendered browser pool closed")
