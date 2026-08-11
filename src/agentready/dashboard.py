@@ -74,6 +74,9 @@ _TEXT = {
         "ai_title": "SEO/GEO AI assistant",
         "ai_message": "Request",
         "ai_run": "Ask AI assistant",
+        "ai_simple_ask": "Ask simply",
+        "ai_retry_link": "Retry request",
+        "ai_export_link": "Export chat",
         "ai_run_hint": "Generate a one-time structured AI report from the current audit.",
         "ai_chat": "Chat with AI assistant",
         "ai_send": "Send",
@@ -100,7 +103,10 @@ _TEXT = {
         "ai_chat_history_hint": "The current user and assistant message history used for follow-up questions.",
         "ai_prompt_library": "Prompt library",
         "ai_prompt_apply": "Use prompt",
+        "ai_prompt_edit": "Edit prompt",
+        "ai_prompt_edit_hint": "Show the prompt title field so this template can be edited and saved.",
         "ai_prompt_save": "Save prompt",
+        "ai_prompt_save_as": "Save as prompt",
         "ai_prompt_title": "Prompt title",
         "ai_chat_save": "Save chat to file",
         "ai_chat_export": "Export OpenAI/DeepSeek JSON",
@@ -298,6 +304,9 @@ _TEXT = {
         "ai_title": "AI-помощник SEO/GEO",
         "ai_message": "Запрос",
         "ai_run": "Спросить AI-помощника",
+        "ai_simple_ask": "Просто спросить",
+        "ai_retry_link": "Повторить запрос",
+        "ai_export_link": "Экспорт чата",
         "ai_run_hint": "Сформировать разовый структурированный AI-отчёт по текущему аудиту.",
         "ai_chat": "Открыть чат с AI-помощником",
         "ai_send": "Отправить",
@@ -324,7 +333,10 @@ _TEXT = {
         "ai_chat_history_hint": "Текущая история сообщений пользователя и помощника для продолжения вопросов.",
         "ai_prompt_library": "Библиотека промтов",
         "ai_prompt_apply": "Использовать промт",
+        "ai_prompt_edit": "Изменить промт",
+        "ai_prompt_edit_hint": "Показать поле названия промта для редактирования и сохранения шаблона.",
         "ai_prompt_save": "Сохранить промт",
+        "ai_prompt_save_as": "Сохранить как промт",
         "ai_prompt_title": "Название промта",
         "ai_chat_save": "Сохранить чат в файл",
         "ai_chat_export": "Экспорт JSON для OpenAI/DeepSeek",
@@ -622,10 +634,22 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-composer {{ position:sticky; bottom:0; margin:14px 0 0; padding:14px 0 18px; background:#fff; border-top:1px solid #f3dfd2; }}
 .ai-composer textarea {{ min-height:92px; border-color:#d9b9a5; border-radius:14px; padding:14px; }}
 .ai-prompt-composer {{ margin-top:8px; padding:10px; border:1px solid #efcdb8; border-radius:12px; background:#fffaf6; }}
+.ai-message-row {{ display:grid; grid-template-columns:minmax(0,1fr) 150px; gap:8px; align-items:stretch; }}
+.ai-message-row textarea,.ai-message-row #ai-message {{ min-height:260px; height:100%; }}
+.ai-side-actions {{ display:flex; flex-direction:column; gap:8px; }}
+.ai-side-actions > * {{ width:100%; min-height:58px; box-sizing:border-box; }}
+.ai-side-actions label,.ai-side-actions button {{ display:flex; align-items:center; justify-content:center; padding:8px; text-align:center; }}
+.ai-side-actions label {{ border:1px solid #efcdb8; border-radius:9px; cursor:pointer; font-weight:600; }}
+.ai-prompt-composer {{ margin-top:14px; padding:0; border:0; background:transparent; }}
 .ai-prompt-composer-row {{ display:flex; align-items:stretch; gap:8px; }}
-.ai-prompt-composer-row select {{ flex:1 1 auto; min-width:0; min-height:86px; padding:8px 10px; border-color:#d9b9a5; border-radius:10px; background:#fff; }}
-.ai-prompt-composer-row button {{ flex:0 0 auto; align-self:stretch; min-width:150px; }}
+.ai-prompt-composer-row select {{ flex:1 1 auto; min-width:0; min-height:54px; padding:8px 10px; border-color:#d9b9a5; border-radius:10px; background:#fff; }}
+.ai-prompt-composer-row button {{ flex:0 0 145px; align-self:stretch; }}
 .ai-prompt-management {{ display:flex; gap:8px; align-items:center; margin-top:8px; }} .ai-prompt-management input {{ flex:1 1 auto; min-width:0; min-height:34px; }} .ai-prompt-management button {{ width:auto; min-height:34px; padding:6px 10px; }}
+.ai-prompt-edit-field {{ display:none; }} .ai-prompt-edit-field.open {{ display:block; }}
+.ai-composer-links {{ margin-top:12px; color:#765b4d; line-height:1.6; }} .ai-composer-links .text-link {{ margin-right:4px; }} .ai-composer-links .text-link + .text-link::before {{ content:", "; color:#765b4d; text-decoration:none; display:inline-block; margin-right:4px; }}
+.ai-composer-links .text-link.is-disabled {{ opacity:.5; pointer-events:none; }}
+.ai-composer-toolbar {{ display:none; }}
+.ai-composer-toolbar[hidden] {{ display:none !important; }}
 .ai-composer-toolbar {{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; }}
 .ai-composer-tools {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }} .ai-composer-tools input[type=file] {{ display:none; }}
 .ai-composer-tools label,.ai-composer-tools button {{ width:auto; min-height:36px; padding:7px 10px; font-size:.9rem; }}
@@ -652,7 +676,7 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-hidden-compatible {{ position:absolute !important; width:1px !important; height:1px !important; overflow:hidden !important; clip:rect(0 0 0 0) !important; white-space:nowrap !important; }}
 @media (max-width:1279px) {{ .ai-drawer-toggle.context-toggle {{ display:inline-flex; }} .ai-workspace-grid {{ grid-template-columns:220px minmax(0,1fr); }} .ai-context-sidebar {{ display:none; }} .ai-workspace.context-open .ai-context-sidebar {{ display:block; position:absolute; right:18px; z-index:25; width:min(320px,calc(100% - 36px)); border:1px solid #efcdb8; border-radius:12px; box-shadow:0 8px 28px #0002; }} .ai-workspace-grid {{ position:relative; }} }}
 @media (max-width:900px) {{ .ai-drawer-toggle.history-toggle {{ display:inline-flex; }} .ai-workspace-grid {{ grid-template-columns:1fr; }} .ai-history-sidebar {{ display:none; }} .ai-workspace.history-open .ai-history-sidebar {{ display:block; position:absolute; left:18px; right:18px; z-index:25; border:1px solid #efcdb8; border-radius:12px; box-shadow:0 8px 28px #0002; }} .ai-conversation {{ padding:16px; }} }}
-@media (max-width:600px) {{ .ai-workspace-header {{ align-items:flex-start; flex-direction:column; }} .ai-mode-switch {{ width:100%; justify-content:flex-start; }} .ai-mode-segmented {{ width:100%; }} .ai-mode-segmented button {{ flex:1; }} .ai-composer-toolbar {{ align-items:stretch; flex-direction:column; }} .ai-composer-tools {{ width:100%; }} .ai-composer-tools > * {{ flex:1 1 auto; text-align:center; }} .ai-composer-primary {{ width:100%; }} .ai-chat-message {{ max-width:100%; }} }}
+@media (max-width:600px) {{ .ai-workspace-header {{ align-items:flex-start; flex-direction:column; }} .ai-mode-switch {{ width:100%; justify-content:flex-start; }} .ai-mode-segmented {{ width:100%; }} .ai-mode-segmented button {{ flex:1; }} .ai-message-row {{ grid-template-columns:1fr; }} .ai-side-actions {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }} .ai-side-actions > * {{ min-height:48px; }} .ai-prompt-composer-row {{ flex-wrap:wrap; }} .ai-prompt-composer-row select {{ flex-basis:100%; }} .ai-prompt-composer-row button {{ flex:1 1 0; }} .ai-chat-message {{ max-width:100%; }} }}
 .dashboard-layout {{ display:grid; grid-template-columns:minmax(0,1fr) 0; gap:20px; align-items:start; }}
 .dashboard-layout.help-open {{ grid-template-columns:minmax(0,1fr) minmax(220px,auto); }}
 .dashboard-main {{ min-width:0; }}
@@ -866,7 +890,7 @@ function setAiBusy(busy) {{
   const output = document.getElementById("ai-result");
   ["ai-run-button","ai-chat-button"].forEach(id => {{
     const button = document.getElementById(id);
-    if (button) button.disabled = busy;
+    if (button) {{ button.disabled = busy; button.setAttribute("aria-disabled", String(busy)); button.classList.toggle("is-disabled", busy); }}
   }});
   if (busy) {{
     output.hidden = false;
@@ -1325,7 +1349,7 @@ function setupPromptComposer() {{
   composer.className = "ai-prompt-composer";
   const row = document.createElement("div");
   row.className = "ai-prompt-composer-row";
-  select.size = 3;
+  select.size = 1;
   select.title = translations[language.value].ai_prompt_library;
   select.setAttribute("aria-label", translations[language.value].ai_prompt_library);
   row.append(select);
@@ -1336,9 +1360,16 @@ function setupPromptComposer() {{
   apply.title = translations[language.value].ai_prompt_apply;
   apply.addEventListener("click", applyPrompt);
   row.append(apply);
+  const edit = document.createElement("button");
+  edit.type = "button";
+  edit.className = "secondary";
+  edit.textContent = translations[language.value].ai_prompt_edit || "Edit prompt";
+  edit.title = translations[language.value].ai_prompt_edit_hint || translations[language.value].ai_prompt_save;
+  edit.addEventListener("click", () => {{ title.classList.toggle("open"); if (title.classList.contains("open")) title.focus(); }});
+  row.append(edit);
   const management = document.createElement("div");
   management.className = "ai-prompt-management";
-  title.classList.remove("ai-hidden-compatible");
+  title.classList.add("ai-prompt-edit-field");
   title.type = "text";
   title.placeholder = translations[language.value].ai_prompt_title;
   title.title = translations[language.value].ai_prompt_title;
@@ -1347,19 +1378,39 @@ function setupPromptComposer() {{
   const save = document.createElement("button");
   save.type = "button";
   save.className = "secondary";
-  save.textContent = translations[language.value].ai_prompt_save;
+  save.textContent = translations[language.value].ai_prompt_save_as;
   save.title = translations[language.value].ai_prompt_save;
   save.addEventListener("click", savePrompt);
   management.append(save);
-  const saveChatButton = document.createElement("button");
-  saveChatButton.type = "button";
-  saveChatButton.className = "secondary";
-  saveChatButton.textContent = translations[language.value].ai_chat_save;
-  saveChatButton.title = translations[language.value].ai_chat_save;
-  saveChatButton.addEventListener("click", saveChat);
-  management.append(saveChatButton);
   composer.append(row, management);
-  toolbar.parentNode.insertBefore(composer, toolbar);
+  const message = document.getElementById("ai-message");
+  const messageRow = document.createElement("div");
+  messageRow.className = "ai-message-row";
+  message.parentNode.insertBefore(messageRow, message);
+  messageRow.append(message);
+  const tools = toolbar.querySelector(".ai-composer-tools");
+  const attachment = tools.querySelector("label[for='ai-attachments']");
+  const send = document.getElementById("ai-chat-button");
+  const sideActions = document.createElement("div");
+  sideActions.className = "ai-side-actions";
+  sideActions.append(attachment, save, send);
+  messageRow.append(sideActions);
+  messageRow.parentNode.insertBefore(composer, toolbar);
+  const links = document.createElement("div");
+  links.className = "ai-composer-links";
+  const link = (id, label, hint, action) => {{
+    const item = document.createElement("a"); item.id = id; item.href = "#"; item.className = "text-link"; item.textContent = label; item.title = hint; item.setAttribute("aria-label", hint); item.addEventListener("click", event => {{ event.preventDefault(); action(); }}); return item;
+  }};
+  const runButton = document.getElementById("ai-run-button");
+  const retryButton = document.getElementById("ai-retry-button");
+  const exportButton = tools.querySelector("button[onclick='exportChat()']");
+  runButton.remove(); retryButton.remove(); exportButton.remove();
+  links.append(link("ai-run-button", translations[language.value].ai_simple_ask, translations[language.value].ai_run_hint, () => runAi("/ai/recommend")));
+  links.append(link("ai-retry-button", translations[language.value].ai_retry_link, translations[language.value].ai_retry, () => runAi("/ai/chat", true)));
+  links.append(link("ai-save-chat-link", translations[language.value].ai_chat_save, translations[language.value].ai_chat_save, () => saveChat()));
+  links.append(link("ai-export-chat-link", translations[language.value].ai_export_link, translations[language.value].ai_chat_export, () => exportChat()));
+  composer.parentNode.insertBefore(links, toolbar);
+  toolbar.hidden = true;
   if (libraryPanel) libraryPanel.hidden = true;
 }}
 async function savePrompt() {{
