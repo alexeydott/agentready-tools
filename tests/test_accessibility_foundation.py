@@ -205,6 +205,10 @@ def test_dashboard_ai_workspace_has_history_conversation_and_context_zones():
     assert 'function openPromptEditor()' in html
     assert 'ai-prompt-edit-dialog' in html
     assert 'ai-prompt-edit-text' in html
+    assert 'AI settings' in html
+    history_sidebar = html.split('class="ai-history-sidebar"', 1)[1].split('</aside>', 1)[0]
+    assert 'AI settings' not in history_sidebar
+    assert 'class="ai-model-actions"' in html
     assert 'id="ai-skills-trigger"' in html
     assert 'id="ai-context-trigger"' in html
     assert 'function toggleAiToolPicker(kind)' in html

@@ -656,6 +656,7 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-prompt-edit-field {{ display:none; }} .ai-prompt-edit-field.open {{ display:block; }}
 .ai-prompt-edit-dialog {{ width:min(620px,calc(100vw - 32px)); border:1px solid #efcdb8; border-radius:16px; padding:22px; color:#441d0c; box-shadow:0 16px 50px #0003; }}
 .ai-prompt-edit-dialog::backdrop {{ background:#24130d66; }} .ai-prompt-edit-dialog h2 {{ margin-top:0; }}
+.ai-prompt-edit-dialog input,.ai-prompt-edit-dialog textarea {{ width:100%; box-sizing:border-box; }}
 .ai-prompt-edit-dialog textarea {{ min-height:180px; resize:vertical; }} .ai-prompt-edit-dialog .actions {{ justify-content:flex-end; }}
 .ai-composer-links {{ margin-top:12px; color:#765b4d; line-height:1.6; }} .ai-composer-links .text-link {{ margin-right:4px; font-weight:400; }} .ai-composer-links .text-link + .text-link::before {{ content:", "; color:#765b4d; text-decoration:none; display:inline-block; margin-right:4px; }}
 .ai-composer-links .text-link.is-disabled {{ opacity:.5; pointer-events:none; }}
@@ -753,9 +754,9 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <section id="ai-assistant-panel" class="panel ai-workspace" hidden aria-labelledby="ai-workspace-title">
 <div class="ai-workspace-header"><div class="ai-header-title"><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><div class="ai-header-meta"><small>{escape(text["ai_hint"])}</small><span id="ai-model-chip" class="ai-model-chip" title="{escape(text["ai_model_chip"])}">{escape(text["ai_model_chip"])}: —</span></div></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" title="{escape(text["ai_saved_chats"])}" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><div class="ai-mode-segmented" role="group" aria-label="{escape(text["ai_mode"])}"><button type="button" data-ai-mode="both" title="{escape(text["ai_mode_both_hint"])}" onclick="setAiMode('both')">{escape(text["ai_mode_both"])}</button><button type="button" data-ai-mode="seo" title="{escape(text["ai_mode_seo_hint"])}" onclick="setAiMode('seo')">{escape(text["ai_mode_seo"])}</button><button type="button" data-ai-mode="geo" title="{escape(text["ai_mode_geo_hint"])}" onclick="setAiMode('geo')">{escape(text["ai_mode_geo"])}</button></div><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
 <div class="ai-workspace-grid">
-<aside class="ai-history-sidebar" aria-label="{escape(text["ai_saved_chats"])}"><h3 class="ai-sidebar-title">{escape(text["ai_saved_chats"])}<button type="button" class="secondary" title="{escape(text["ai_new_chat"])}" onclick="startNewChat()">{escape(text["ai_new_chat"])}</button></h3><input id="ai-chat-search" class="ai-chat-search" type="search" placeholder="{escape(text["ai_saved_chats"])}" aria-label="{escape(text["ai_saved_chats"])}" title="{escape(text["ai_saved_chats"])}"><label class="sr-only" for="ai-saved-chats">{escape(text["ai_saved_chats"])}</label><select id="ai-saved-chats" size="8"></select><div class="ai-sidebar-footer"><button type="button" class="secondary" title="{escape(text["ai_prompt_library"])}" onclick="openAiPromptPicker()">{escape(text["ai_prompt_footer"])}</button><button type="button" class="secondary" title="{escape(text["ai_credentials_hint"])}" onclick="openAiCredentials()">{escape(text["ai_settings_footer"])}</button></div></aside>
+<aside class="ai-history-sidebar" aria-label="{escape(text["ai_saved_chats"])}"><h3 class="ai-sidebar-title">{escape(text["ai_saved_chats"])}<button type="button" class="secondary" title="{escape(text["ai_new_chat"])}" onclick="startNewChat()">{escape(text["ai_new_chat"])}</button></h3><input id="ai-chat-search" class="ai-chat-search" type="search" placeholder="{escape(text["ai_saved_chats"])}" aria-label="{escape(text["ai_saved_chats"])}" title="{escape(text["ai_saved_chats"])}"><label class="sr-only" for="ai-saved-chats">{escape(text["ai_saved_chats"])}</label><select id="ai-saved-chats" size="8"></select></aside>
 <main class="ai-conversation"><div id="ai-welcome" class="ai-welcome"><div class="ai-welcome-icon" aria-hidden="true">✦</div><h3>{escape(text["ai_welcome"])}</h3><p>{escape(text["ai_welcome_hint"])}</p><div class="ai-suggestions"><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_seo"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_seo"])}</button><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_geo"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_geo"])}</button><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_summary"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_summary"])}</button></div></div><div id="ai-chat-history" class="ai-chat-history" aria-live="polite"></div><div id="ai-result" class="ai-report" hidden role="status" aria-live="polite"></div><div class="ai-composer"><div id="ai-context-chips" class="ai-context-chips"><div id="ai-skills-picker" class="ai-tool-picker"><button type="button" class="secondary" id="ai-skills-trigger" title="{escape(text["ai_skills_hint"])}" onclick="toggleAiToolPicker('skills')">{escape(text["ai_skills_selected"])}</button><div class="ai-tool-picker-panel" role="group" aria-label="{escape(text["ai_skills"])}"><p>{escape(text["ai_picker_hint"])}</p><div id="ai-skills-options"></div></div></div><div id="ai-context-picker" class="ai-tool-picker"><button type="button" class="secondary" id="ai-context-trigger" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiToolPicker('context')">{escape(text["ai_context_selected"])}</button><div class="ai-tool-picker-panel" role="group" aria-label="{escape(text["ai_mcp"])}"><p>{escape(text["ai_picker_hint"])}</p><div id="ai-context-options"></div></div></div></div><label class="sr-only" for="ai-message">{escape(text["ai_message"])}</label><textarea id="ai-message" placeholder="{escape(text["ai_message"])}"></textarea><div class="ai-composer-toolbar"><div class="ai-composer-tools"><label for="ai-attachments" title="{escape(text["ai_attach_hint"])}">＋ {escape(text["ai_attachments"])}<input id="ai-attachments" type="file" multiple accept=".jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.pdf,.txt,.md,.markdown,.json,.csv,.yaml,.yml,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png"></label><button type="button" class="secondary" title="{escape(text["ai_prompt_library"])}" onclick="openAiPromptPicker()">{escape(text["ai_prompt_apply"])}</button><details class="ai-composer-more"><summary title="{escape(text["ai_more"])}">⋯ <span class="sr-only">{escape(text["ai_more"])}</span></summary><div class="ai-more-menu"><button type="button" class="secondary" onclick="exportChat()">{escape(text["ai_chat_export"])}</button><button id="ai-run-button" type="button" class="secondary" title="{escape(text["ai_run_hint"])}" aria-label="{escape(text["ai_run_hint"])}" onclick="runAi('/ai/recommend')">{escape(text["ai_run"])}</button><button id="ai-retry-button" type="button" class="secondary" title="{escape(text["ai_retry"])}" onclick="runAi('/ai/chat', true)">{escape(text["ai_retry"])}</button></div></details></div><button id="ai-chat-button" type="button" class="ai-composer-primary" title="{escape(text["ai_chat_hint"])}" aria-label="{escape(text["ai_chat_hint"])}">{escape(text["ai_send"])}</button></div></div></main>
-<aside class="ai-context-sidebar" aria-label="{escape(text["ai_hint"])}"><details class="ai-hidden-compatible" open><summary title="{escape(text["ai_mcp_hint"])}">{escape(text["ai_mcp"])}</summary><label for="ai-mcp-tool" class="sr-only">{escape(text["ai_mcp"])}</label><select id="ai-mcp-tool" multiple size="3"><option value="agentready.seo_findings" title="Найденные проблемы SEO и связанные доказательства">AgentReady MCP: SEO findings</option><option value="agentready.remediation_plan" title="План исправлений, сформированный по результатам аудита">AgentReady MCP: remediation plan</option></select></details><details class="ai-hidden-compatible" open><summary title="{escape(text["ai_skills_hint"])}">{escape(text["ai_skills"])}</summary><label for="ai-skill" class="sr-only">{escape(text["ai_skills"])}</label><select id="ai-skill" multiple size="4">{skill_options}</select></details><details open><summary>{escape(text["ai_model"])}</summary><label for="ai-chat-provider">{escape(text["ai_provider"])}</label><select id="ai-chat-provider" onchange="selectChatProvider()"></select><label for="ai-model">{escape(text["ai_model"])}</label><select id="ai-model"></select></details><details class="ai-prompt-library-panel" open><summary title="{escape(text["ai_prompt_library"])}">{escape(text["ai_prompt_library"])}</summary><label for="ai-prompt-library">{escape(text["ai_prompt_library"])}</label><select id="ai-prompt-library"></select><input id="ai-prompt-title" class="ai-hidden-compatible" type="text" aria-hidden="true" tabindex="-1"><div class="actions"><button type="button" class="secondary" title="{escape(text["ai_prompt_save"])}" onclick="savePrompt()">{escape(text["ai_prompt_save"])}</button><button type="button" class="secondary" title="{escape(text["ai_chat_save"])}" onclick="saveChat()">{escape(text["ai_chat_save"])}</button></div></details></aside>
+<aside class="ai-context-sidebar" aria-label="{escape(text["ai_hint"])}"><details class="ai-hidden-compatible" open><summary title="{escape(text["ai_mcp_hint"])}">{escape(text["ai_mcp"])}</summary><label for="ai-mcp-tool" class="sr-only">{escape(text["ai_mcp"])}</label><select id="ai-mcp-tool" multiple size="3"><option value="agentready.seo_findings" title="Найденные проблемы SEO и связанные доказательства">AgentReady MCP: SEO findings</option><option value="agentready.remediation_plan" title="План исправлений, сформированный по результатам аудита">AgentReady MCP: remediation plan</option></select></details><details class="ai-hidden-compatible" open><summary title="{escape(text["ai_skills_hint"])}">{escape(text["ai_skills"])}</summary><label for="ai-skill" class="sr-only">{escape(text["ai_skills"])}</label><select id="ai-skill" multiple size="4">{skill_options}</select></details><details open><summary>{escape(text["ai_model"])}</summary><label for="ai-chat-provider">{escape(text["ai_provider"])}</label><select id="ai-chat-provider" onchange="selectChatProvider()"></select><label for="ai-model">{escape(text["ai_model"])}</label><select id="ai-model"></select><div class="ai-model-actions"><button type="button" class="secondary" title="{escape(text["ai_credentials_hint"])}" onclick="openAiCredentials()">{escape(text["ai_settings_footer"])}</button></div></details></aside>
 </div></section>
 </main>
 <aside class="help-sidebar" aria-label="{escape(text["help_title"])}"><section id="help-content" class="panel help-content" hidden tabindex="-1">{faq}</section></aside>
@@ -1323,6 +1324,7 @@ async function saveAiTools() {{
 }}
 let aiPromptLibrary = [];
 let aiPromptEditingId = null;
+let aiPromptEditingMode = null;
 async function loadPromptLibrary() {{
   try {{
     const response = await fetch("/ai/prompts?language=" + encodeURIComponent(language.value));
@@ -1344,6 +1346,7 @@ function applyPrompt() {{
   const prompt = aiPromptLibrary.find(item => item.id === document.getElementById("ai-prompt-library").value);
   if (!prompt) return;
   aiPromptEditingId = prompt.id;
+  aiPromptEditingMode = prompt.mode;
   document.getElementById("ai-prompt-title").value = prompt.title;
   document.getElementById("ai-mode").value = prompt.mode;
   document.getElementById("ai-message").value = prompt.prompt;
@@ -1368,15 +1371,17 @@ function openPromptEditor() {{
     }});
   }}
   const selected = aiPromptLibrary.find(item => item.id === document.getElementById("ai-prompt-library").value);
-  if (selected) aiPromptEditingId = selected.id;
+  if (selected) {{ aiPromptEditingId = selected.id; aiPromptEditingMode = selected.mode; }}
   dialog.querySelector("#ai-prompt-edit-name").value = selected?.title || document.getElementById("ai-prompt-title").value || "";
   dialog.querySelector("#ai-prompt-edit-text").value = selected?.prompt || document.getElementById("ai-message").value || "";
   dialog.showModal();
   dialog.querySelector("#ai-prompt-edit-name").focus();
 }}
 function setupPromptComposer() {{
-  const select = document.getElementById("ai-prompt-library");
-  const title = document.getElementById("ai-prompt-title");
+  let select = document.getElementById("ai-prompt-library");
+  let title = document.getElementById("ai-prompt-title");
+  if (!select) {{ select = document.createElement("select"); select.id = "ai-prompt-library"; select.className = "ai-hidden-compatible"; document.body.append(select); }}
+  if (!title) {{ title = document.createElement("input"); title.id = "ai-prompt-title"; title.className = "ai-hidden-compatible"; document.body.append(title); }}
   const toolbar = document.querySelector(".ai-composer-toolbar");
   const libraryPanel = document.querySelector(".ai-prompt-library-panel");
   if (!select || !title || !toolbar || document.querySelector(".ai-prompt-composer")) return;
@@ -1453,10 +1458,11 @@ async function savePrompt() {{
   const title = document.getElementById("ai-prompt-title").value.trim() || prompt.slice(0, 80);
   if (!prompt || !title) return;
   try {{
-    const response = await fetch("/ai/prompts", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{id:aiPromptEditingId,title,mode:document.getElementById("ai-mode").value,prompt,language:language.value}})}});
+    const response = await fetch("/ai/prompts", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{id:aiPromptEditingId,title,mode:aiPromptEditingMode || document.getElementById("ai-mode").value,prompt,language:language.value}})}});
     if (!response.ok) throw new Error("HTTP " + response.status);
     const data = await response.json();
     aiPromptEditingId = data.prompt && data.prompt.id ? data.prompt.id : aiPromptEditingId;
+    aiPromptEditingMode = data.prompt && data.prompt.mode ? data.prompt.mode : aiPromptEditingMode;
     await loadPromptLibrary();
   }} catch (error) {{
     document.getElementById("ai-result").hidden = false;
@@ -1512,6 +1518,7 @@ async function startNewChat() {{
   aiPromptEditingId = null;
   document.getElementById("ai-prompt-library").value = "";
   document.getElementById("ai-prompt-title").value = "";
+  aiPromptEditingMode = null;
 }}
 function exportChat() {{
   if (!aiConversationHistory.length) return;
