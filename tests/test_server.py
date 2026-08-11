@@ -96,6 +96,31 @@ def test_ai_tools_exposes_localized_builtin_skills(monkeypatch, tmp_path):
     assert skill["description"]
 
 
+def test_ai_prompt_updates_preserve_other_language(monkeypatch, tmp_path):
+    monkeypatch.setattr(server_module, "_SERVER_DATA_DIR", tmp_path)
+    monkeypatch.setattr(server_module, "_require_loopback", lambda request: None)
+    client = TestClient(app, base_url="http://127.0.0.1")
+
+    first = client.post(
+        "/ai/prompts",
+        json={"title": "English title", "prompt": "English prompt", "language": "en"},
+    )
+    assert first.status_code == 200
+    prompt_id = first.json()["prompt"]["id"]
+    second = client.post(
+        "/ai/prompts",
+        json={
+            "id": prompt_id,
+            "title": "Название",
+            "prompt": "Русский промт",
+            "language": "ru",
+        },
+    )
+    assert second.status_code == 200
+    assert second.json()["prompt"]["title"] == {"en": "English title", "ru": "Название"}
+    assert second.json()["prompt"]["prompt"] == {"en": "English prompt", "ru": "Русский промт"}
+
+
 def test_dashboard_is_localized_and_describes_each_operation():
     response = TestClient(app).get("/dashboard", params={"language": "ru"})
     assert response.status_code == 200
@@ -239,10 +264,15 @@ def test_dashboard_refreshes_provider_models_and_clears_new_provider_catalog():
     assert "clipboardData.files" in response.text
     assert "aiConversationHistory" in response.text
     assert "mcp_tools:selectedValues" in response.text
+    assert "let aiPromptEditingId = null" in response.text
+    assert "id:aiPromptEditingId" in response.text
+    assert "language:language.value" in response.text
     assert '<textarea id="ai-message">' in response.text
     assert 'id="ai-retry-button"' in response.text
     assert "function exportChat()" in response.text
     assert "function startNewChat()" in response.text
+    assert "const controller = `<script>" in response.text
+    assert "const controller = \"<script>" not in response.text
 
 
 def test_dashboard_inline_script_does_not_close_html_script_early():

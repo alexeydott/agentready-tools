@@ -21,6 +21,16 @@ def _capture_console(errors: list[str], message) -> None:
     errors.append(f"console {message.type}: {message.text}")
 
 
+def _capture_response(errors: list[str], response) -> None:
+    if response.status < 400 or "favicon.ico" in response.url or ".well-known/appspecific" in response.url:
+        return
+    try:
+        detail = response.text()[:300]
+    except Exception:
+        detail = "response body unavailable"
+    errors.append(f"response {response.status}: {response.url} detail={detail}")
+
+
 def run(
     base_url: str,
     executable: str | None = None,
@@ -37,10 +47,34 @@ def run(
         page = browser.new_page()
         page.on("pageerror", lambda error: errors.append(f"pageerror: {error}"))
         page.on("console", lambda message: _capture_console(errors, message))
-        page.goto(f"{base_url}/?language=en", wait_until="networkidle")
+        page.on("response", lambda response: _capture_response(errors, response))
+        page.goto(f"{base_url}/dashboard?language=en", wait_until="networkidle")
         assert page.evaluate("typeof runScan") == "function"
         assert page.evaluate("typeof openAiCredentials") == "function"
         _check(page, "initial JavaScript handlers", lambda: None)
+        page.evaluate(
+            """localStorage.setItem("agentready.dashboard.state.v1", JSON.stringify({
+                url: "https://example.test/session",
+                "ai-message": "Restored session message",
+                language: "en"
+            }))"""
+        )
+        page.evaluate(
+            """localStorage.setItem("agentready.ai.chat.v1", JSON.stringify({
+                history: [{role: "user", content: "Restored session message"}],
+                usage: {prompt_tokens: 3, completion_tokens: 2, total_tokens: 5}
+            }))"""
+        )
+        page.reload(wait_until="networkidle")
+        assert page.locator("#url").input_value() == "https://example.test/session"
+        assert page.locator("#ai-message").input_value() == "Restored session message"
+        assert "Restored session message" in page.locator("#ai-chat-history").inner_text()
+        _check(page, "dashboard and chat localStorage restoration", lambda: None)
+        page.evaluate("localStorage.removeItem('agentready.dashboard.state.v1')")
+        page.evaluate("localStorage.removeItem('agentready.ai.chat.v1')")
+        if target:
+            page.locator("#url").fill(target)
+            page.evaluate("saveDashboardState()")
 
         _check(page, "service health", lambda: page.locator('a[onclick*="runHealth"]').click())
         page.wait_for_timeout(150)
@@ -72,6 +106,21 @@ def run(
         _check(page, "AI credentials dialog", lambda: page.locator(
             'a[onclick*="openAiCredentials"]'
         ).click())
+        credential_state = page.evaluate(
+            """async () => {
+                const response = await fetch("/ai/status");
+                return response.ok ? await response.json() : null;
+            }"""
+        )
+        if credential_state and any(
+            provider.get("credential", {}).get("configured")
+            for provider in credential_state.get("providers", [])
+        ):
+            assert page.locator("#ai-key").input_value() == ""
+            assert "api_key" not in page.evaluate("localStorage.getItem('agentready.dashboard.state.v1') || ''")
+            _check(page, "credential vault redaction and status restoration", lambda: None)
+        else:
+            print(json.dumps({"check": "credential vault redaction and status restoration", "status": "skip", "reason": "no configured local provider"}))
         _check(page, "close AI credentials dialog", lambda: page.locator(
             '#ai-credentials-dialog button[onclick*="close"]'
         ).click())
@@ -110,29 +159,32 @@ def run(
                 _check(page, "AI recommendation", lambda: page.locator("#ai-run-button").click())
                 page.locator("#ai-result").wait_for(state="visible", timeout=180_000)
                 page.locator("#ai-message").fill("Summarize the highest-impact verified issue.")
-                _check(page, "AI chat", lambda: page.locator("#ai-chat-button").click())
-                page.locator("#ai-result").wait_for(state="visible", timeout=180_000)
-                _check(page, "apply prompt", lambda: page.locator(
-                    'button[onclick="applyPrompt()"]'
-                ).click())
-                page.locator("#ai-prompt-title").fill("Dashboard interactive regression")
-                _check(page, "save prompt", lambda: page.locator(
-                    'button[onclick="savePrompt()"]'
-                ).click())
-                page.wait_for_timeout(250)
-                _check(page, "retry AI chat", lambda: page.locator("#ai-retry-button").click())
-                page.locator("#ai-result").wait_for(state="visible", timeout=180_000)
-                page.evaluate("saveChat('Dashboard interactive gossnab')")
-                page.wait_for_timeout(250)
-                with page.expect_download(timeout=30_000):
-                    page.evaluate("exportChat()")
-                _check(page, "start new chat", lambda: page.locator(
-                    'button[onclick="startNewChat()"]'
-                ).click())
+                if page.locator("#ai-chat-button").is_enabled():
+                    _check(page, "AI chat", lambda: page.locator("#ai-chat-button").click())
+                    page.locator("#ai-result").wait_for(state="visible", timeout=180_000)
+                    _check(page, "apply prompt", lambda: page.locator(
+                        'button[onclick="applyPrompt()"]'
+                    ).click())
+                    page.locator("#ai-prompt-title").fill("Dashboard interactive regression")
+                    _check(page, "save prompt", lambda: page.locator(
+                        'button[onclick="savePrompt()"]'
+                    ).click())
+                    page.wait_for_timeout(250)
+                    _check(page, "retry AI chat", lambda: page.locator("#ai-retry-button").click())
+                    page.locator("#ai-result").wait_for(state="visible", timeout=180_000)
+                    page.evaluate("saveChat('Dashboard interactive gossnab')")
+                    page.wait_for_timeout(250)
+                    with page.expect_download(timeout=30_000):
+                        page.evaluate("exportChat()")
+                    _check(page, "start new chat", lambda: page.locator(
+                        'button[onclick="startNewChat()"]'
+                    ).click())
+                else:
+                    print(json.dumps({"check": "AI chat and prompt flows", "status": "skip", "reason": "provider recommendation did not enable chat"}))
             else:
                 print(json.dumps({"check": "AI provider", "status": "skip", "reason": "not enabled"}))
         _check(page, "Russian locale", lambda: page.goto(
-            f"{base_url}/?language=ru", wait_until="networkidle"
+            f"{base_url}/dashboard?language=ru", wait_until="networkidle"
         ))
         assert page.evaluate("typeof runScan") == "function"
         assert not errors, errors

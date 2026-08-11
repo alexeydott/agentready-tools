@@ -1042,3 +1042,7 @@ def _configure_logging() -> None:
         stream=sys.stderr,
     )
     logger.debug("CLI logging configured: level=%s stream=stderr", level_name)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

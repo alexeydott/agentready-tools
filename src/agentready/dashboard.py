@@ -806,7 +806,7 @@ function combinedReportDocument(geoText, seoText) {{
     Array.from(geo.querySelectorAll("style")),
     Array.from(seo.querySelectorAll("style"))
   ).map(style => style.outerHTML).join("");
-  const controller = "<script>(function(){{const reports=[...document.querySelectorAll('[data-report-instance]')];reports.forEach(report=>{{const selector=report.querySelector(\"select[id$='-lang']\"),mains=[...report.querySelectorAll('main[data-lang]')],skip=report.querySelector('.skip-link');if(!selector||!mains.length)return;function setLang(value){{document.documentElement.lang=value;mains.forEach(main=>main.hidden=main.dataset.lang!==value);const active=mains.find(main=>main.dataset.lang===value);if(active&&skip)skip.href='#'+active.id;}}selector.addEventListener('change',()=>setLang(selector.value));setLang(selector.value);}});window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(detail=>detail.open=true));}})();</script>";
+  const controller = `<script>(function(){{const reports=[...document.querySelectorAll('[data-report-instance]')];reports.forEach(report=>{{const selector=report.querySelector("select[id$='-lang']"),mains=[...report.querySelectorAll('main[data-lang]')],skip=report.querySelector('.skip-link');if(!selector||!mains.length)return;function setLang(value){{document.documentElement.lang=value;mains.forEach(main=>main.hidden=main.dataset.lang!==value);const active=mains.find(main=>main.dataset.lang===value);if(active&&skip)skip.href='#'+active.id;}}selector.addEventListener('change',()=>setLang(selector.value));setLang(selector.value);}});window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(detail=>detail.open=true));}})();</` + "script>";
   return "<!doctype html><html lang='" + language.value + "'><head><meta charset='utf-8'>" + styles + "</head><body>" +
     "<main><h1>AgentReady combined audit</h1>" +
     "<section data-report-instance='geo'><h2>" + translations[language.value].preset_ai_search + "</h2>" + (geo.body ? geo.body.innerHTML : "") + "</section>" +
@@ -965,6 +965,7 @@ async function saveAiTools() {{
   }}
 }}
 let aiPromptLibrary = [];
+let aiPromptEditingId = null;
 async function loadPromptLibrary() {{
   try {{
     const response = await fetch("/ai/prompts?language=" + encodeURIComponent(language.value));
@@ -985,6 +986,8 @@ async function loadPromptLibrary() {{
 function applyPrompt() {{
   const prompt = aiPromptLibrary.find(item => item.id === document.getElementById("ai-prompt-library").value);
   if (!prompt) return;
+  aiPromptEditingId = prompt.id;
+  document.getElementById("ai-prompt-title").value = prompt.title;
   document.getElementById("ai-mode").value = prompt.mode;
   document.getElementById("ai-message").value = prompt.prompt;
   updateAiModeHint();
@@ -995,11 +998,14 @@ async function savePrompt() {{
   const title = document.getElementById("ai-prompt-title").value.trim() || prompt.slice(0, 80);
   if (!prompt || !title) return;
   try {{
-    const response = await fetch("/ai/prompts", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{title,mode:document.getElementById("ai-mode").value,prompt}})}});
+    const response = await fetch("/ai/prompts", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{id:aiPromptEditingId,title,mode:document.getElementById("ai-mode").value,prompt,language:language.value}})}});
     if (!response.ok) throw new Error("HTTP " + response.status);
+    const data = await response.json();
+    aiPromptEditingId = data.prompt && data.prompt.id ? data.prompt.id : aiPromptEditingId;
     await loadPromptLibrary();
   }} catch (error) {{
-    console.warn("Unable to save prompt", {{error:String(error)}});
+    document.getElementById("ai-result").hidden = false;
+    renderAiReport({{error:{{message:translations[language.value].failed + ": " + error.message}}}});
   }}
 }}
 async function loadSavedChats() {{
@@ -1048,6 +1054,8 @@ async function startNewChat() {{
   document.getElementById("ai-result").replaceChildren();
   document.getElementById("ai-result").hidden = true;
   document.getElementById("ai-message").value = "";
+  aiPromptEditingId = null;
+  document.getElementById("ai-prompt-library").value = "";
   document.getElementById("ai-prompt-title").value = "";
 }}
 function exportChat() {{

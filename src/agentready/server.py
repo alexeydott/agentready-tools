@@ -365,8 +365,11 @@ def ai_prompts_get_endpoint(http_request: Request, language: Literal["en", "ru"]
 def ai_prompts_save_endpoint(request: AIPromptRequest, http_request: Request) -> dict:
     _require_loopback(http_request)
     prompt_id = request.id or re.sub(r"[^a-z0-9]+", "-", request.title.lower()).strip("-")[:80] or "custom-prompt"
-    localized = {"en": request.title, "ru": request.title}
-    localized_prompt = {"en": request.prompt, "ru": request.prompt}
+    existing = next((item for item in _load_prompts() if item.get("id") == prompt_id), None)
+    localized = dict(existing.get("title", {}) if existing else {})
+    localized_prompt = dict(existing.get("prompt", {}) if existing else {})
+    localized[request.language] = request.title
+    localized_prompt[request.language] = request.prompt
     return {"prompt": _save_prompt({"id": prompt_id, "title": localized, "mode": request.mode, "prompt": localized_prompt})}
 
 

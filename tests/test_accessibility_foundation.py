@@ -110,6 +110,15 @@ def test_report_component_contracts_are_wired_into_each_localized_copy():
     assert html.count("scope='col'") == 12
 
 
+def test_report_shell_acceptance_preserves_no_js_and_print_fallbacks():
+    html = render_html(_report(), "en")
+
+    assert html.count("<div class='report-filters' hidden>") == 2
+    assert "details:not([open])>*:not(summary){display:block}" in html
+    assert html.count("class='report-nav'") == 2
+    assert html.count("<details class='report-section'>") == 4
+
+
 def test_report_localized_copies_have_unique_ids_and_local_references():
     html = render_html(_report(), "en")
     ids = re.findall(r"\bid='([^']+)'", html)
