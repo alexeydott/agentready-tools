@@ -76,7 +76,17 @@ _TEXT = {
         "ai_run": "Ask AI assistant",
         "ai_run_hint": "Generate a one-time structured AI report from the current audit.",
         "ai_chat": "Chat with AI assistant",
+        "ai_send": "Send",
         "ai_chat_hint": "Send a question and continue a contextual conversation with the selected model.",
+        "ai_welcome": "What would you like to improve today?",
+        "ai_welcome_hint": "Ask about the current SEO/GEO audit or choose a starting point.",
+        "ai_suggestion_seo": "Find the most important SEO issues",
+        "ai_suggestion_geo": "How can I improve AI visibility?",
+        "ai_suggestion_summary": "Summarize this audit",
+        "ai_more": "More actions",
+        "ai_model_chip": "Model",
+        "ai_prompt_footer": "Prompt library",
+        "ai_settings_footer": "AI settings",
         "ai_skills": "Skills",
         "ai_skills_hint": "Optional built-in instructions that shape how the model analyzes the audit.",
         "ai_mcp": "MCP context",
@@ -285,7 +295,17 @@ _TEXT = {
         "ai_run": "Спросить AI-помощника",
         "ai_run_hint": "Сформировать разовый структурированный AI-отчёт по текущему аудиту.",
         "ai_chat": "Открыть чат с AI-помощником",
+        "ai_send": "Отправить",
         "ai_chat_hint": "Отправить вопрос и продолжить контекстный диалог с выбранной моделью.",
+        "ai_welcome": "Что улучшим сегодня?",
+        "ai_welcome_hint": "Спросите о текущем SEO/GEO-аудите или выберите вариант для начала.",
+        "ai_suggestion_seo": "Найди самые важные проблемы SEO",
+        "ai_suggestion_geo": "Как улучшить видимость в AI-поиске?",
+        "ai_suggestion_summary": "Сделай краткое резюме аудита",
+        "ai_more": "Другие действия",
+        "ai_model_chip": "Модель",
+        "ai_prompt_footer": "Библиотека промтов",
+        "ai_settings_footer": "Настройки AI",
         "ai_skills": "Навыки",
         "ai_skills_hint": "Необязательные встроенные инструкции, определяющие анализ аудита моделью.",
         "ai_mcp": "Контекст MCP",
@@ -562,8 +582,14 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-workspace {{ padding:0; overflow:hidden; }}
 .ai-workspace-header {{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 22px; border-bottom:1px solid #efcdb8; }}
 .ai-workspace-header h2 {{ margin:0; }} .ai-workspace-header small {{ color:#765b4d; }}
+.ai-header-title {{ min-width:0; }} .ai-header-meta {{ display:flex; align-items:center; gap:8px; margin-top:6px; }}
+.ai-model-chip {{ display:inline-flex; align-items:center; max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:4px 9px; border-radius:999px; background:#fff0e7; color:#8f3215; font-size:.8rem; font-weight:700; }}
 .ai-drawer-toggle {{ display:none; width:auto; min-height:36px; padding:7px 10px; }}
-.ai-mode-switch {{ display:flex; gap:4px; align-items:center; }} .ai-mode-switch select {{ width:auto; min-width:130px; padding:8px 10px; }}
+.ai-mode-switch {{ display:flex; gap:4px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }}
+.ai-mode-segmented {{ display:flex; gap:3px; padding:3px; border:1px solid #efcdb8; border-radius:11px; background:#fffaf6; }}
+.ai-mode-segmented button {{ width:auto; min-height:32px; padding:5px 9px; border-radius:8px; background:transparent; color:#765b4d; font-size:.85rem; }}
+.ai-mode-segmented button.active {{ background:#ed4308; color:#fff; }}
+.ai-mode-switch > #ai-mode {{ position:absolute !important; width:1px !important; height:1px !important; overflow:hidden !important; clip:rect(0 0 0 0) !important; }}
 .ai-workspace-grid {{ display:grid; grid-template-columns:220px minmax(0,1fr) 260px; min-height:640px; }}
 .ai-history-sidebar,.ai-context-sidebar {{ padding:18px; background:#fffaf6; }}
 .ai-history-sidebar {{ border-right:1px solid #efcdb8; }} .ai-context-sidebar {{ border-left:1px solid #efcdb8; }}
@@ -573,6 +599,12 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 #ai-saved-chats {{ min-height:180px; background:#fff; }} #ai-saved-chats option {{ padding:8px; }}
 .ai-conversation {{ min-width:0; display:flex; flex-direction:column; padding:18px 24px 0; background:#fff; }}
 .ai-conversation-empty {{ color:#765b4d; padding:28px 0 10px; }}
+.ai-welcome {{ max-width:720px; margin:26px auto 12px; text-align:center; }}
+.ai-welcome-icon {{ display:grid; place-items:center; width:48px; height:48px; margin:0 auto 12px; border-radius:15px; background:#fff0e7; color:#ed4308; font-size:1.45rem; font-weight:800; }}
+.ai-welcome h3 {{ margin:0 0 7px; color:#441d0c; font-size:1.35rem; }} .ai-welcome p {{ margin:0; color:#765b4d; }}
+.ai-suggestions {{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:18px; }}
+.ai-suggestion {{ width:auto; min-height:38px; padding:8px 12px; border:1px solid #e5c7b4; border-radius:12px; background:#fffaf6; color:#6f321c; text-align:left; }}
+.ai-suggestion:hover {{ background:#fff0e7; }}
 .ai-chat-history {{ flex:1 1 auto; max-height:380px; min-height:150px; overflow:auto; margin:8px 0 14px; }}
 .ai-chat-message {{ max-width:min(86%,760px); }}
 .ai-composer {{ position:sticky; bottom:0; margin:14px 0 0; padding:14px 0 18px; background:#fff; border-top:1px solid #f3dfd2; }}
@@ -581,15 +613,19 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-composer-tools {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }} .ai-composer-tools input[type=file] {{ display:none; }}
 .ai-composer-tools label,.ai-composer-tools button {{ width:auto; min-height:36px; padding:7px 10px; font-size:.9rem; }}
 .ai-composer-tools label {{ border:1px solid #efcdb8; border-radius:9px; cursor:pointer; font-weight:600; }}
-.ai-composer-primary {{ width:auto; min-width:124px; }} .ai-context-chips {{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }}
+.ai-composer-primary {{ width:auto; min-width:108px; }} .ai-context-chips {{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }}
+.ai-composer-more {{ position:relative; }} .ai-composer-more summary {{ list-style:none; cursor:pointer; border:1px solid #efcdb8; border-radius:9px; padding:7px 10px; color:#9e2f0b; font-weight:700; }} .ai-composer-more summary::-webkit-details-marker {{ display:none; }}
+.ai-composer-more .ai-more-menu {{ position:absolute; bottom:42px; left:0; z-index:20; display:grid; gap:6px; min-width:220px; padding:8px; border:1px solid #efcdb8; border-radius:10px; background:#fff; box-shadow:0 8px 22px #0002; }}
+.ai-composer-more .ai-more-menu button {{ text-align:left; }}
 .ai-context-chip {{ display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border:1px solid #e5c7b4; border-radius:16px; color:#765b4d; font-size:.82rem; background:#fffaf6; }}
 .ai-context-sidebar details {{ border-top:1px solid #efcdb8; padding-top:14px; margin-top:14px; }}
 .ai-context-sidebar details:first-child {{ border-top:0; padding-top:0; margin-top:0; }} .ai-context-sidebar summary {{ margin-bottom:10px; }}
+.ai-sidebar-footer {{ display:grid; gap:8px; margin-top:20px; padding-top:14px; border-top:1px solid #efcdb8; }} .ai-sidebar-footer button {{ width:100%; text-align:left; }}
 .ai-context-sidebar select[multiple] {{ min-height:110px; padding:6px; }} .ai-context-sidebar .form-field {{ margin-top:10px; }}
 .ai-hidden-compatible {{ position:absolute !important; width:1px !important; height:1px !important; overflow:hidden !important; clip:rect(0 0 0 0) !important; white-space:nowrap !important; }}
 @media (max-width:1279px) {{ .ai-drawer-toggle.context-toggle {{ display:inline-flex; }} .ai-workspace-grid {{ grid-template-columns:220px minmax(0,1fr); }} .ai-context-sidebar {{ display:none; }} .ai-workspace.context-open .ai-context-sidebar {{ display:block; position:absolute; right:18px; z-index:25; width:min(320px,calc(100% - 36px)); border:1px solid #efcdb8; border-radius:12px; box-shadow:0 8px 28px #0002; }} .ai-workspace-grid {{ position:relative; }} }}
 @media (max-width:900px) {{ .ai-drawer-toggle.history-toggle {{ display:inline-flex; }} .ai-workspace-grid {{ grid-template-columns:1fr; }} .ai-history-sidebar {{ display:none; }} .ai-workspace.history-open .ai-history-sidebar {{ display:block; position:absolute; left:18px; right:18px; z-index:25; border:1px solid #efcdb8; border-radius:12px; box-shadow:0 8px 28px #0002; }} .ai-conversation {{ padding:16px; }} }}
-@media (max-width:600px) {{ .ai-workspace-header {{ align-items:flex-start; flex-direction:column; }} .ai-mode-switch {{ width:100%; }} .ai-mode-switch select {{ flex:1; }} .ai-composer-toolbar {{ align-items:stretch; flex-direction:column; }} .ai-composer-primary {{ width:100%; }} .ai-chat-message {{ max-width:100%; }} }}
+@media (max-width:600px) {{ .ai-workspace-header {{ align-items:flex-start; flex-direction:column; }} .ai-mode-switch {{ width:100%; justify-content:flex-start; }} .ai-mode-segmented {{ width:100%; }} .ai-mode-segmented button {{ flex:1; }} .ai-composer-toolbar {{ align-items:stretch; flex-direction:column; }} .ai-composer-tools {{ width:100%; }} .ai-composer-tools > * {{ flex:1 1 auto; text-align:center; }} .ai-composer-primary {{ width:100%; }} .ai-chat-message {{ max-width:100%; }} }}
 .dashboard-layout {{ display:grid; grid-template-columns:minmax(0,1fr) 0; gap:20px; align-items:start; }}
 .dashboard-layout.help-open {{ grid-template-columns:minmax(0,1fr) minmax(220px,auto); }}
 .dashboard-main {{ min-width:0; }}
@@ -653,11 +689,11 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div id="v2-inventory" role="region" aria-live="polite">{escape(text["v2_inventory_empty"])}</div>
 </section>
 <section id="ai-assistant-panel" class="panel ai-workspace" hidden aria-labelledby="ai-workspace-title">
-<div class="ai-workspace-header"><div><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><small>{escape(text["ai_hint"])}</small></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
+<div class="ai-workspace-header"><div class="ai-header-title"><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><div class="ai-header-meta"><small>{escape(text["ai_hint"])}</small><span id="ai-model-chip" class="ai-model-chip" title="{escape(text["ai_model_chip"])}">{escape(text["ai_model_chip"])}: —</span></div></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" title="{escape(text["ai_saved_chats"])}" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><div class="ai-mode-segmented" role="group" aria-label="{escape(text["ai_mode"])}"><button type="button" data-ai-mode="both" title="{escape(text["ai_mode_both_hint"])}" onclick="setAiMode('both')">{escape(text["ai_mode_both"])}</button><button type="button" data-ai-mode="seo" title="{escape(text["ai_mode_seo_hint"])}" onclick="setAiMode('seo')">{escape(text["ai_mode_seo"])}</button><button type="button" data-ai-mode="geo" title="{escape(text["ai_mode_geo_hint"])}" onclick="setAiMode('geo')">{escape(text["ai_mode_geo"])}</button></div><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
 <div class="ai-workspace-grid">
-<aside class="ai-history-sidebar" aria-label="{escape(text["ai_saved_chats"])}"><h3 class="ai-sidebar-title">{escape(text["ai_saved_chats"])}<button type="button" class="secondary" onclick="startNewChat()">{escape(text["ai_new_chat"])}</button></h3><input id="ai-chat-search" class="ai-chat-search" type="search" placeholder="{escape(text["ai_saved_chats"])}" aria-label="{escape(text["ai_saved_chats"])}"><label class="sr-only" for="ai-saved-chats">{escape(text["ai_saved_chats"])}</label><select id="ai-saved-chats" size="8"></select><div class="advanced-links"><a href="#" class="text-link" onclick="openAiCredentials(); return false;">{escape(text["ai_provider"])}</a></div></aside>
-<main class="ai-conversation"><div id="ai-chat-history" class="ai-chat-history" aria-live="polite"></div><div id="ai-result" class="ai-report" hidden role="status" aria-live="polite"></div><div class="ai-composer"><div id="ai-context-chips" class="ai-context-chips"></div><label class="sr-only" for="ai-message">{escape(text["ai_message"])}</label><textarea id="ai-message" placeholder="{escape(text["ai_message"])}"></textarea><div class="ai-composer-toolbar"><div class="ai-composer-tools"><label for="ai-attachments">＋ {escape(text["ai_attachments"])}<input id="ai-attachments" type="file" multiple accept=".jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.pdf,.txt,.md,.markdown,.json,.csv,.yaml,.yml,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png"></label><button type="button" class="secondary" onclick="openAiPromptPicker()">{escape(text["ai_prompt_apply"])}</button><button type="button" class="secondary" onclick="exportChat()">{escape(text["ai_chat_export"])}</button><button id="ai-run-button" type="button" class="secondary" title="{escape(text["ai_run_hint"])}" aria-label="{escape(text["ai_run_hint"])}" onclick="runAi('/ai/recommend')">{escape(text["ai_run"])}</button><button id="ai-retry-button" type="button" class="secondary" onclick="runAi('/ai/chat', true)">{escape(text["ai_retry"])}</button></div><button id="ai-chat-button" type="button" class="ai-composer-primary" title="{escape(text["ai_chat_hint"])}" aria-label="{escape(text["ai_chat_hint"])}" onclick="runAi('/ai/chat')">{escape(text["ai_chat"])}</button></div></div></main>
-<aside class="ai-context-sidebar" aria-label="{escape(text["ai_hint"])}"><details open><summary>{escape(text["ai_mcp"])}</summary><label for="ai-mcp-tool" class="sr-only">{escape(text["ai_mcp"])}</label><select id="ai-mcp-tool" multiple size="3"><option value="agentready.seo_findings">AgentReady MCP: SEO findings</option><option value="agentready.remediation_plan">AgentReady MCP: remediation plan</option></select></details><details open><summary>{escape(text["ai_skills"])}</summary><label for="ai-skill" class="sr-only">{escape(text["ai_skills"])}</label><select id="ai-skill" multiple size="4">{skill_options}</select></details><details open><summary>{escape(text["ai_model"])}</summary><label for="ai-chat-provider">{escape(text["ai_provider"])}</label><select id="ai-chat-provider" onchange="selectChatProvider()"></select><label for="ai-model">{escape(text["ai_model"])}</label><select id="ai-model"></select></details><details open><summary>{escape(text["ai_prompt_library"])}</summary><label for="ai-prompt-library">{escape(text["ai_prompt_library"])}</label><select id="ai-prompt-library"></select><input id="ai-prompt-title" class="ai-hidden-compatible" type="text" aria-hidden="true" tabindex="-1"><div class="actions"><button type="button" class="secondary" onclick="savePrompt()">{escape(text["ai_prompt_save"])}</button><button type="button" class="secondary" onclick="saveChat()">{escape(text["ai_chat_save"])}</button></div></details></aside>
+<aside class="ai-history-sidebar" aria-label="{escape(text["ai_saved_chats"])}"><h3 class="ai-sidebar-title">{escape(text["ai_saved_chats"])}<button type="button" class="secondary" title="{escape(text["ai_new_chat"])}" onclick="startNewChat()">{escape(text["ai_new_chat"])}</button></h3><input id="ai-chat-search" class="ai-chat-search" type="search" placeholder="{escape(text["ai_saved_chats"])}" aria-label="{escape(text["ai_saved_chats"])}" title="{escape(text["ai_saved_chats"])}"><label class="sr-only" for="ai-saved-chats">{escape(text["ai_saved_chats"])}</label><select id="ai-saved-chats" size="8"></select><div class="ai-sidebar-footer"><button type="button" class="secondary" title="{escape(text["ai_prompt_library"])}" onclick="openAiPromptPicker()">{escape(text["ai_prompt_footer"])}</button><button type="button" class="secondary" title="{escape(text["ai_credentials_hint"])}" onclick="openAiCredentials()">{escape(text["ai_settings_footer"])}</button></div></aside>
+<main class="ai-conversation"><div id="ai-welcome" class="ai-welcome"><div class="ai-welcome-icon" aria-hidden="true">✦</div><h3>{escape(text["ai_welcome"])}</h3><p>{escape(text["ai_welcome_hint"])}</p><div class="ai-suggestions"><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_seo"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_seo"])}</button><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_geo"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_geo"])}</button><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_summary"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_summary"])}</button></div></div><div id="ai-chat-history" class="ai-chat-history" aria-live="polite"></div><div id="ai-result" class="ai-report" hidden role="status" aria-live="polite"></div><div class="ai-composer"><div id="ai-context-chips" class="ai-context-chips"></div><label class="sr-only" for="ai-message">{escape(text["ai_message"])}</label><textarea id="ai-message" placeholder="{escape(text["ai_message"])}"></textarea><div class="ai-composer-toolbar"><div class="ai-composer-tools"><label for="ai-attachments" title="{escape(text["ai_attach_hint"])}">＋ {escape(text["ai_attachments"])}<input id="ai-attachments" type="file" multiple accept=".jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.pdf,.txt,.md,.markdown,.json,.csv,.yaml,.yml,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png"></label><button type="button" class="secondary" title="{escape(text["ai_prompt_library"])}" onclick="openAiPromptPicker()">{escape(text["ai_prompt_apply"])}</button><details class="ai-composer-more"><summary title="{escape(text["ai_more"])}">⋯ <span class="sr-only">{escape(text["ai_more"])}</span></summary><div class="ai-more-menu"><button type="button" class="secondary" onclick="exportChat()">{escape(text["ai_chat_export"])}</button><button id="ai-run-button" type="button" class="secondary" title="{escape(text["ai_run_hint"])}" aria-label="{escape(text["ai_run_hint"])}" onclick="runAi('/ai/recommend')">{escape(text["ai_run"])}</button><button id="ai-retry-button" type="button" class="secondary" title="{escape(text["ai_retry"])}" onclick="runAi('/ai/chat', true)">{escape(text["ai_retry"])}</button></div></details></div><button id="ai-chat-button" type="button" class="ai-composer-primary" title="{escape(text["ai_chat_hint"])}" aria-label="{escape(text["ai_chat_hint"])}">{escape(text["ai_send"])}</button></div></div></main>
+<aside class="ai-context-sidebar" aria-label="{escape(text["ai_hint"])}"><details open><summary title="{escape(text["ai_mcp_hint"])}">{escape(text["ai_mcp"])}</summary><label for="ai-mcp-tool" class="sr-only">{escape(text["ai_mcp"])}</label><select id="ai-mcp-tool" multiple size="3"><option value="agentready.seo_findings">AgentReady MCP: SEO findings</option><option value="agentready.remediation_plan">AgentReady MCP: remediation plan</option></select></details><details open><summary title="{escape(text["ai_skills_hint"])}">{escape(text["ai_skills"])}</summary><label for="ai-skill" class="sr-only">{escape(text["ai_skills"])}</label><select id="ai-skill" multiple size="4">{skill_options}</select></details><details open><summary>{escape(text["ai_model"])}</summary><label for="ai-chat-provider">{escape(text["ai_provider"])}</label><select id="ai-chat-provider" onchange="selectChatProvider()"></select><label for="ai-model">{escape(text["ai_model"])}</label><select id="ai-model"></select></details><details open><summary title="{escape(text["ai_prompt_library"])}">{escape(text["ai_prompt_library"])}</summary><label for="ai-prompt-library">{escape(text["ai_prompt_library"])}</label><select id="ai-prompt-library"></select><input id="ai-prompt-title" class="ai-hidden-compatible" type="text" aria-hidden="true" tabindex="-1"><div class="actions"><button type="button" class="secondary" title="{escape(text["ai_prompt_save"])}" onclick="savePrompt()">{escape(text["ai_prompt_save"])}</button><button type="button" class="secondary" title="{escape(text["ai_chat_save"])}" onclick="saveChat()">{escape(text["ai_chat_save"])}</button></div></details></aside>
 </div></section>
 </main>
 <aside class="help-sidebar" aria-label="{escape(text["help_title"])}"><section id="help-content" class="panel help-content" hidden tabindex="-1">{faq}</section></aside>
@@ -736,6 +772,23 @@ function updateAiModeHint() {{
   const mode = document.getElementById("ai-mode").value;
   const hint = document.getElementById("ai-mode-hint");
   if (hint) hint.textContent = translations[language.value]["ai_mode_" + mode + "_hint"] || translations[language.value].ai_request_hint;
+  document.querySelectorAll("[data-ai-mode]").forEach(button => button.classList.toggle("active", button.dataset.aiMode === mode));
+}}
+function setAiMode(mode) {{
+  const select = document.getElementById("ai-mode");
+  if (!select || ![...select.options].some(option => option.value === mode)) return;
+  select.value = mode;
+  updateAiModeHint();
+  saveDashboardState();
+  console.info("[AI-UX] Mode selected", {{mode}});
+}}
+function useAiSuggestedPrompt(prompt) {{
+  const message = document.getElementById("ai-message");
+  if (!message) return;
+  message.value = String(prompt || "").trim();
+  message.focus();
+  message.scrollIntoView({{block:"nearest", behavior:"smooth"}});
+  console.info("[AI-UX] Suggested prompt selected");
 }}
 function toggleAiDrawer(kind) {{
   const panel = document.getElementById("ai-assistant-panel");
@@ -1363,6 +1416,12 @@ function renderModelCatalog(models, selected) {{
       : (visibleModels.find(model => (model.capabilities || []).includes("chat")) || visibleModels[0])?.id;
     if (preferred) select.value = preferred;
   }});
+  const chip = document.getElementById("ai-model-chip");
+  if (chip) {{
+    const activeModel = chatSelect.value || selected || "—";
+    chip.textContent = translations[language.value].ai_model_chip + ": " + activeModel;
+    chip.title = activeModel === "—" ? translations[language.value].ai_model_hint : activeModel;
+  }}
   saveDashboardState();
 }}
 function toggleChatOnly() {{
@@ -1493,6 +1552,8 @@ function restoreAiChatState() {{
 }}
 function renderChatHistory() {{
   const history = document.getElementById("ai-chat-history");
+  const welcome = document.getElementById("ai-welcome");
+  if (welcome) welcome.hidden = aiConversationHistory.length > 0;
   history.replaceChildren();
   aiConversationHistory.forEach(item => {{
     const message = document.createElement("div");
