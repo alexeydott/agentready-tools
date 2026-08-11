@@ -116,6 +116,15 @@ class Finding:
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
+    @property
+    def state_hash(self) -> str:
+        payload = {
+            "id": self.id,
+            "status": self.status.value,
+            "evidence": [{"id": item.id, "url": item.url} for item in self.evidence],
+        }
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
@@ -123,6 +132,7 @@ class Finding:
             "status": self.status.value,
             "reason": self.reason,
             "fingerprint": self.fingerprint,
+            "state_hash": self.state_hash,
             "evidence": [item.to_dict() for item in self.evidence],
         }
 
@@ -133,14 +143,27 @@ class Coverage:
     evaluated_rules: int
     applicable_rules: int
     complete_rules: int
+    urls_discovered: int | None = None
+    urls_fetched: int | None = None
+    max_pages_hit: bool | None = None
+    classification: str | None = None
 
-    def to_dict(self) -> dict[str, int]:
-        return {
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "total_rules": self.total_rules,
             "evaluated_rules": self.evaluated_rules,
             "applicable_rules": self.applicable_rules,
             "complete_rules": self.complete_rules,
         }
+        if self.urls_discovered is not None:
+            result["urls_discovered"] = self.urls_discovered
+        if self.urls_fetched is not None:
+            result["urls_fetched"] = self.urls_fetched
+        if self.max_pages_hit is not None:
+            result["limit"] = {"max_pages_hit": self.max_pages_hit}
+        if self.classification is not None:
+            result["classification"] = self.classification
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,9 +173,10 @@ class AuditReport:
     coverage: Coverage
     version: str = REPORT_VERSION
     evidence: tuple[FindingEvidence, ...] = ()
+    run_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "schema": SCHEMA,
             "target": self.target,
             "version": self.version,
@@ -160,6 +184,9 @@ class AuditReport:
             "evidence": [item.to_dict() for item in self.evidence],
             "findings": [item.to_dict() for item in self.findings],
         }
+        if self.run_id is not None:
+            result["run_id"] = self.run_id
+        return result
 
 
 def report_from_checks(target: str, checks: Iterable[Any]) -> AuditReport:
@@ -175,7 +202,10 @@ def report_from_checks(target: str, checks: Iterable[Any]) -> AuditReport:
         status = FindingStatus("unavailable" if raw_status == "error" else raw_status)
         findings.append(Finding(check.id, check.title, status, check.details, check_evidence))
     applicable = sum(item.status not in {FindingStatus.SKIP, FindingStatus.UNAVAILABLE} for item in findings)
-    complete = sum(item.status is FindingStatus.PASS for item in findings)
+    complete = sum(
+        item.status in {FindingStatus.PASS, FindingStatus.FAIL, FindingStatus.WARN}
+        for item in findings
+    )
     return AuditReport(target, tuple(findings), Coverage(len(findings), len(findings), applicable, complete), evidence=tuple(evidence))
 
 
@@ -192,7 +222,17 @@ def report_from_dict(payload: Mapping[str, Any]) -> AuditReport:
         )
         for item in payload.get("findings", ())
     )
-    coverage = Coverage(**payload["coverage"])
+    coverage_payload = payload["coverage"]
+    coverage = Coverage(
+        total_rules=coverage_payload["total_rules"],
+        evaluated_rules=coverage_payload["evaluated_rules"],
+        applicable_rules=coverage_payload["applicable_rules"],
+        complete_rules=coverage_payload["complete_rules"],
+        urls_discovered=coverage_payload.get("urls_discovered"),
+        urls_fetched=coverage_payload.get("urls_fetched"),
+        max_pages_hit=(coverage_payload.get("limit") or {}).get("max_pages_hit"),
+        classification=coverage_payload.get("classification"),
+    )
     return AuditReport(payload["target"], findings, coverage, payload.get("version", REPORT_VERSION))
 
 
@@ -232,19 +272,130 @@ class BaselineDiff:
         }
 
 
+def classify_finding_changes(
+    current: AuditReport,
+    baseline: Mapping[str, Any],
+) -> dict[str, tuple[str, ...]]:
+    """Classify stable finding state changes without localized prose."""
+    old = {
+        item.get("id"): item
+        for item in baseline.get("findings", ())
+        if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+    }
+    new = {item.id: item for item in current.findings}
+    severity = {"pass": 0, "skip": 0, "unavailable": 1, "warn": 2, "fail": 3}
+    added = sorted(set(new) - set(old))
+    removed = sorted(set(old) - set(new))
+    resolved: list[str] = []
+    regressed: list[str] = []
+    changed: list[str] = []
+    unchanged: list[str] = []
+    for finding_id in sorted(set(new) & set(old)):
+        old_item = old[finding_id]
+        current = new[finding_id]
+        old_state_hash = old_item.get("state_hash")
+        old_fingerprint = old_item.get("fingerprint")
+        if old_state_hash is not None and old_state_hash == current.state_hash:
+            unchanged.append(finding_id)
+            continue
+        if old_state_hash is None and old_fingerprint is not None and old_fingerprint == current.fingerprint:
+            unchanged.append(finding_id)
+            continue
+        if old_state_hash is None and old_fingerprint is None:
+            if old_item.get("status") == current.status.value:
+                unchanged.append(finding_id)
+                continue
+        before = severity.get(str(old_item.get("status", "unavailable")), 1)
+        after = severity.get(current.status.value, 1)
+        if after > before:
+            regressed.append(finding_id)
+        elif after < before:
+            resolved.append(finding_id)
+        else:
+            changed.append(finding_id)
+    return {
+        "added": tuple(added),
+        "removed": tuple(removed),
+        "resolved": tuple(resolved),
+        "regressed": tuple(regressed),
+        "changed": tuple(changed),
+        "unchanged": tuple(unchanged),
+    }
+
+
 def diff_reports(current: AuditReport, baseline: Mapping[str, Any]) -> BaselineDiff:
     if baseline.get("schema") != SCHEMA:
         raise ValueError("baseline is not an agentready.audit.v2 report")
     if baseline.get("target") != current.target or baseline.get("version") != current.version:
         raise ValueError("baseline target or report version is not comparable")
-    old = {item.get("id"): item.get("fingerprint") for item in baseline.get("findings", ()) if isinstance(item, Mapping)}
-    new = {item.id: item.fingerprint for item in current.findings}
+    old = {
+        item.get("id"): (
+            "state_hash",
+            item.get("state_hash"),
+        ) if item.get("state_hash") is not None else (
+            "fingerprint",
+            item.get("fingerprint"),
+        )
+        for item in baseline.get("findings", ())
+        if isinstance(item, Mapping)
+    }
+    new = {item.id: item for item in current.findings}
     return BaselineDiff(
         True,
-        tuple(sorted(key for key in new.keys() & old.keys() if new[key] != old[key])),
+        tuple(
+            sorted(
+                key
+                for key in new.keys() & old.keys()
+                if (
+                    old[key][0] == "state_hash"
+                    and old[key][1] != new[key].state_hash
+                )
+                or (
+                    old[key][0] == "fingerprint"
+                    and old[key][1] != new[key].fingerprint
+                )
+            )
+        ),
         tuple(sorted(new.keys() - old.keys())),
         tuple(sorted(old.keys() - new.keys())),
     )
+
+
+def diff_inventory(
+    current: Mapping[str, Iterable[Mapping[str, Any]]],
+    baseline: Mapping[str, Iterable[Mapping[str, Any]]],
+) -> dict[str, dict[str, tuple[str, ...]]]:
+    """Compare bounded technical/link/indexability/metric projections by stable state."""
+    result: dict[str, dict[str, tuple[str, ...]]] = {}
+    for category in sorted(set(current) | set(baseline)):
+        old = {_inventory_key(row): _inventory_state(row) for row in baseline.get(category, ())}
+        new = {_inventory_key(row): _inventory_state(row) for row in current.get(category, ())}
+        result[category] = {
+            "added": tuple(sorted(set(new) - set(old))),
+            "removed": tuple(sorted(set(old) - set(new))),
+            "changed": tuple(sorted(key for key in set(new) & set(old) if new[key] != old[key])),
+            "unchanged": tuple(sorted(key for key in set(new) & set(old) if new[key] == old[key])),
+        }
+    return result
+
+
+def _inventory_key(row: Mapping[str, Any]) -> str:
+    for field_name in ("id", "url", "url_key", "source_key", "name"):
+        value = row.get(field_name)
+        if isinstance(value, str) and value:
+            return value
+    return hashlib.sha256(
+        json.dumps(dict(row), sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+
+
+def _inventory_state(row: Mapping[str, Any]) -> str:
+    state = row.get("state_hash")
+    if isinstance(state, str) and state:
+        return state
+    return hashlib.sha256(
+        json.dumps(dict(row), sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
 
 
 def paginate_inventory(items: Iterable[Mapping[str, Any]], *, page: int = 1, page_size: int = 50) -> dict[str, Any]:

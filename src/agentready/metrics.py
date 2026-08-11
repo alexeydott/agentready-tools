@@ -13,7 +13,10 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Protocol
+
+from .audit_core.store import MetricRecord
+from .query_service import QueryService, RunUrlQuery
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +74,20 @@ class ExternalMetric:
             "kind": self.kind.value,
         }
 
+    def to_record(self, run_id: str, *, url_key: str | None = None) -> MetricRecord:
+        return MetricRecord(
+            run_id=run_id,
+            url_key=url_key,
+            provider=self.provider,
+            name=self.name,
+            value=self.value,
+            unit=self.unit,
+            source=self.source,
+            version=self.version,
+            observed_at=self.observed_at,
+            kind=self.kind.value,
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class ProviderResult:
@@ -90,6 +107,22 @@ class ProviderResult:
             "from_cache": self.from_cache,
             "metrics": [metric.to_dict() for metric in self.metrics],
         }
+
+
+class ExternalMetricProvider(Protocol):
+    """Normalized provider contract for opt-in external enrichment."""
+
+    provider: str
+    version: str
+    config: ProviderConfig
+
+    def run(
+        self,
+        operation: Callable[[str | None], tuple[ExternalMetric, ...]],
+        *,
+        cached: tuple[ExternalMetric, ...] | None = None,
+    ) -> ProviderResult:
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +173,117 @@ class ProviderAdapter:
             int((time.monotonic() - started) * 1000),
         )
         return ProviderResult(self.provider, status, metrics, quota_remaining=max(0, self.config.quota - 1))
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderJob:
+    adapter: ProviderAdapter
+    operation: Callable[[str | None], tuple[ExternalMetric, ...]]
+
+
+@dataclass(frozen=True, slots=True)
+class CrossFactResult:
+    """Deterministic result produced by joining local and provider facts."""
+
+    id: str
+    url: str
+    status: str
+    reason: str
+
+
+def evaluate_cross_facts(
+    records: Mapping[str, Mapping[str, Any]],
+    *,
+    limit: int = 100_000,
+) -> tuple[CrossFactResult, ...]:
+    """Evaluate bounded local-indexability, traffic, and provider mismatches."""
+    if limit <= 0 or limit > 100_000:
+        raise ValueError("cross-fact limit must be between 1 and 100000")
+    findings: list[CrossFactResult] = []
+    for url in sorted(records)[:limit]:
+        facts = records[url]
+        if facts.get("locally_indexable") is True and facts.get("provider_indexed") is False:
+            findings.append(CrossFactResult(
+                "indexability-provider-mismatch",
+                url,
+                "warn",
+                "local signals allow indexing but the provider reports the URL as not indexed",
+            ))
+        if facts.get("noindex") is True and float(facts.get("traffic", 0) or 0) > 0:
+            findings.append(CrossFactResult(
+                "noindex-with-traffic",
+                url,
+                "warn",
+                "the URL has a noindex signal while observed traffic is non-zero",
+            ))
+        if float(facts.get("impressions", 0) or 0) > 0 and float(facts.get("clicks", 0) or 0) == 0:
+            findings.append(CrossFactResult(
+                "impressions-without-clicks",
+                url,
+                "info",
+                "the provider reports impressions but no clicks",
+            ))
+        if facts.get("sitemap_present") is True and facts.get("provider_indexed") is False:
+            findings.append(CrossFactResult(
+                "sitemap-provider-mismatch",
+                url,
+                "warn",
+                "the URL is present in the sitemap but absent from the provider index",
+            ))
+    return tuple(findings)
+
+
+class ProviderScheduler:
+    """Run explicitly requested provider jobs outside crawler workers."""
+
+    def __init__(self, *, max_workers: int = 2) -> None:
+        if max_workers <= 0 or max_workers > 16:
+            raise ValueError("provider scheduler workers must be between 1 and 16")
+        self.max_workers = max_workers
+
+    def run(self, jobs: tuple[ProviderJob, ...] | list[ProviderJob]) -> tuple[ProviderResult, ...]:
+        with ThreadPoolExecutor(max_workers=min(self.max_workers, max(1, len(jobs)))) as pool:
+            futures = [pool.submit(job.adapter.run, job.operation) for job in jobs]
+            return tuple(future.result() for future in futures)
+
+    def run_for_urls(
+        self,
+        run_id: str,
+        adapter: ProviderAdapter,
+        operation: Callable[[str, str | None], tuple[ExternalMetric, ...]],
+        *,
+        query_service: QueryService,
+        store: Any,
+    ) -> tuple[ProviderResult, ...]:
+        """Select bounded URLs through QueryService and persist provider metrics."""
+        cursor: str | None = None
+        urls: list[str] = []
+        while True:
+            page = query_service.run_urls(RunUrlQuery(run_id, cursor=cursor, limit=1000))
+            urls.extend(item.url_key for item in page.items)
+            if page.next_cursor is None:
+                break
+            cursor = page.next_cursor
+        jobs = [
+            ProviderJob(adapter, lambda credential, url=url: operation(url, credential))
+            for url in urls
+        ]
+        results = self.run(jobs)
+        for url, result in zip(urls, results):
+            for metric in result.metrics:
+                store.put_metric(metric.to_record(run_id, url_key=url))
+            store.put_evidence(
+                run_id,
+                f"provider:{result.provider}:{url}",
+                {
+                    "provider": result.provider,
+                    "status": result.status.value,
+                    "quota_remaining": result.quota_remaining,
+                    "from_cache": result.from_cache,
+                    "detail": result.detail,
+                },
+            )
+        return results
 
 
 def _adapter(provider: str, version: str, config: ProviderConfig) -> ProviderAdapter:

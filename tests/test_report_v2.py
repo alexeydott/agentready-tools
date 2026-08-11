@@ -6,11 +6,14 @@ from agentready.report_v2 import (
     AuditReport,
     Coverage,
     Finding,
+    FindingEvidence,
     FindingStatus,
     diff_reports,
+    classify_finding_changes,
     export_inventory,
     adapt_legacy_baseline,
     paginate_inventory,
+    diff_inventory,
 )
 
 
@@ -41,6 +44,101 @@ def test_report_fingerprint_and_diff_are_stable():
     }
 
 
+def test_finding_state_hash_ignores_localized_prose():
+    first = Finding("rule", "Title EN", FindingStatus.FAIL, "Reason EN", (FindingEvidence("evidence", "EN", "https://example.test"),))
+    second = Finding("rule", "Title RU", FindingStatus.FAIL, "Причина", (FindingEvidence("evidence", "RU", "https://example.test"),))
+    assert first.state_hash == second.state_hash
+
+
+def test_classify_finding_changes_uses_state_hash_and_status_direction():
+    current = AuditReport(
+        "https://example.com",
+        (
+            Finding("stable", "Localized", FindingStatus.PASS, "different prose"),
+            Finding("regress", "Localized", FindingStatus.FAIL, "different prose"),
+        ),
+        Coverage(2, 2, 2, 2),
+    )
+    baseline = {
+        "schema": "agentready.audit.v2",
+        "target": "https://example.com",
+        "version": "v2",
+        "findings": [
+            {"id": "stable", "status": "pass", "state_hash": current.findings[0].state_hash},
+            {"id": "regress", "status": "pass", "state_hash": "old-regress"},
+        ],
+    }
+    changes = classify_finding_changes(current, baseline)
+    assert changes["regressed"] == ("regress",)
+
+
+def test_legacy_baseline_without_state_hash_uses_fingerprint_compatibility():
+    current = _report()
+    baseline = {
+        "schema": "agentready.audit.v2",
+        "target": current.target,
+        "version": "v2",
+        "findings": [
+            {
+                "id": "robots",
+                "status": "pass",
+                "fingerprint": current.findings[0].fingerprint,
+            }
+        ],
+    }
+
+    assert classify_finding_changes(current, baseline)["unchanged"] == ("robots",)
+    assert diff_reports(current, baseline).changed == ()
+
+
+def test_same_status_evidence_change_is_changed_not_resolved():
+    current = AuditReport(
+        "https://example.com",
+        (Finding("robots", "Robots", FindingStatus.WARN, "new evidence"),),
+        Coverage(1, 1, 1, 1),
+    )
+    baseline = {
+        "findings": [
+            {
+                "id": "robots",
+                "status": "warn",
+                "state_hash": "old-state",
+            }
+        ]
+    }
+
+    changes = classify_finding_changes(current, baseline)
+
+    assert changes["resolved"] == ()
+    assert changes["changed"] == ("robots",)
+
+
+def test_classify_finding_changes_reports_resolved_added_removed_and_unchanged():
+    current = AuditReport(
+        "https://example.com",
+        (
+            Finding("resolved", "Resolved", FindingStatus.PASS, "ok"),
+            Finding("new", "New", FindingStatus.WARN, "new"),
+            Finding("stable", "Stable", FindingStatus.PASS, "same"),
+        ),
+        Coverage(3, 3, 3, 3),
+    )
+    baseline = {
+        "findings": [
+            {"id": "resolved", "status": "fail", "state_hash": "old"},
+            {"id": "removed", "status": "warn", "state_hash": "removed"},
+            {"id": "stable", "status": "pass", "state_hash": current.findings[2].state_hash},
+        ]
+    }
+
+    changes = classify_finding_changes(current, baseline)
+
+    assert changes["resolved"] == ("resolved",)
+    assert changes["added"] == ("new",)
+    assert changes["removed"] == ("removed",)
+    assert changes["unchanged"] == ("stable",)
+
+
 def test_config_precedence_and_legacy_adapter():
     config = AuditConfig.from_sources(
         target="https://example.com",
@@ -59,6 +157,28 @@ def test_inventory_pagination_and_exports():
     assert paginate_inventory(items, page=2, page_size=2)["items"] == [{"id": "2"}]
     assert export_inventory(items).count("\n") == 3
     assert "id" in export_inventory(items, format="csv")
+
+
+def test_inventory_diff_classifies_three_changed_rows_in_large_projection():
+    baseline = {
+        "technical": [
+            {"url": f"https://example.test/{index}", "state_hash": f"v1-{index}"}
+            for index in range(1000)
+        ]
+    }
+    current = {
+        "technical": [
+            {"url": f"https://example.test/{index}", "state_hash": f"v2-{index}" if index < 3 else f"v1-{index}"}
+            for index in range(1000)
+        ]
+    }
+
+    diff = diff_inventory(current, baseline)
+
+    assert diff["technical"]["changed"] == tuple(
+        f"https://example.test/{index}" for index in range(3)
+    )
+    assert len(diff["technical"]["unchanged"]) == 997
 
 
 def test_job_manager_completes_work():
