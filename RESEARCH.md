@@ -2,7 +2,7 @@
 
 Date: 2026-08-07
 
-## 0.8.2 implementation review (2026-08-11)
+## 0.9.0 implementation review (2026-08-11)
 
 The dashboard integration review and headed browser acceptance confirmed the
 following implementation decisions:

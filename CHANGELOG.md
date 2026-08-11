@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.9.0 — 2026-08-12
+
+- Added the AuditService-backed v2 dashboard profile and bounded typed run
+  inventory endpoints, with scheduler protection for page limits and invalid
+  non-HTTP links.
+- Exposed the vNext crawl profile, page limit, and browser rendering in the
+  dashboard's advanced panel instead of hard-coded request values, and added
+  the missing localized vNext profile hint.
+- Bounded the in-process v2 run registry by retained inventory records in
+  addition to run count, so deep crawls cannot pin unbounded memory; evicted
+  runs now return `404` from inventory endpoints.
+- Recorded URLs drained by the max-pages stop in coverage and run inventory so
+  a bounded run leaves no stale `queued` rows.
+- Restored the combined-report hover/focus hint check in the headed dashboard
+  acceptance runner as a hard assertion with an explicit iframe wait.
+- Documented the `/v2/runs/{run_id}/inventory/{kind}` route, the `urls` alias,
+  and registry eviction behavior.
+- Rebuilt the portable executable and extended the regression gate to 361 tests.
+
 ## 0.8.2 — 2026-08-11
 
 - Hardened dashboard AI prompt editing so stable prompt IDs and independent
@@ -10,9 +29,6 @@
 - Added the `python -m agentready.cli` entrypoint and synchronized package,
   compatibility, report, and Windows portable version metadata.
 - Added a full-extra GitHub Actions gate for MCP and Chromium-backed tests.
-- Added the AuditService-backed v2 dashboard profile and bounded typed run
-  inventory endpoints, with scheduler protection for page limits and invalid
-  non-HTTP links.
 - Rebuilt the portable executable and retained the 357-test regression gate.
 
 ## 0.8.1 — 2026-08-10

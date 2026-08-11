@@ -2,7 +2,7 @@
 
 # Development
 
-The current release is **0.8.2**. The package version, compatibility manifest,
+The current release is **0.9.0**. The package version, compatibility manifest,
 report defaults, and Win64 file metadata are synchronized from the same release
 change.
 
@@ -163,7 +163,7 @@ python -m agentready.cli audit https://example.com --profile quick --max-pages 1
   metadata.
 - 0.8.1 preserved that v1-compatible surface and fixed combined dashboard
   report composition, including report-local tooltip styles.
-- 0.8.2 hardens dashboard AI prompt localization/editing, browser persistence
+- 0.9.0 hardens dashboard AI prompt localization/editing, browser persistence
   checks, module CLI execution, and synchronized release metadata.
 
 ## See Also

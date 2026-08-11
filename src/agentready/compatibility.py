@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-RELEASE_VERSION = "0.8.2"
+RELEASE_VERSION = "0.9.0"
 RELEASE_CHANNEL = "stable"
 V1_FACADES = ("scan", "seo audit", "mobile audit", "/scan", "/seo/audit", "/mobile/audit")
 V2_SCHEMAS = ("agentready.audit.v2", "agentready.findings.v1", "agentready.remediation-plan.v1")
