@@ -18,6 +18,7 @@ _TEXT = {
         "preset_content": "Content site",
         "preset_api": "API / application",
         "preset_ai_search": "AI Search / GEO",
+        "preset_v2": "vNext bounded audit",
         "preset_seo": "SEO audit",
         "preset_mobile": "Mobile-friendliness",
         "preset_hint_label": "What the selected audit profile checks",
@@ -211,6 +212,7 @@ _TEXT = {
         "preset_content": "Контентный сайт",
         "preset_api": "API / приложение",
         "preset_ai_search": "AI-поиск / GEO",
+        "preset_v2": "Ограниченный аудит vNext",
         "preset_seo": "SEO-аудит",
         "preset_mobile": "Мобильная дружественность",
         "preset_hint_label": "Что проверяет выбранный профиль аудита",
@@ -550,7 +552,7 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <section class="panel">
 <div class="form-grid">
 <div><label for="url">{escape(text["url"])} {_hint(text, "url_hint")}</label><input id="url" type="url" placeholder="https://example.com"></div>
-<div><label for="preset">{escape(text["preset"])} {_hint(text, "preset_hint_label")}</label><select id="preset"><option value="all">{escape(text["preset_all"])}</option><option value="content">{escape(text["preset_content"])}</option><option value="api">{escape(text["preset_api"])}</option><option value="ai-search">{escape(text["preset_ai_search"])}</option><option value="seo">{escape(text["preset_seo"])}</option><option value="mobile">{escape(text["preset_mobile"])}</option></select></div>
+<div><label for="preset">{escape(text["preset"])} {_hint(text, "preset_hint_label")}</label><select id="preset"><option value="all">{escape(text["preset_all"])}</option><option value="content">{escape(text["preset_content"])}</option><option value="api">{escape(text["preset_api"])}</option><option value="ai-search">{escape(text["preset_ai_search"])}</option><option value="v2">{escape(text["preset_v2"])}</option><option value="seo">{escape(text["preset_seo"])}</option><option value="mobile">{escape(text["preset_mobile"])}</option></select></div>
 <div style="display:flex;align-items:flex-end;gap:8px"><button onclick="runScan()">{escape(text["scan"])}</button>{_hint(text, "run_hint")}</div>
 </div>
 <details><summary>{escape(text["advanced"])} <h2 class="sr-only">{escape(text["advanced"])}</h2> {_hint(text, "advanced_hint")}</summary>
@@ -644,7 +646,7 @@ const result = document.getElementById("result");
 const resultPanel = document.getElementById("result-panel");
 const aiPanel = document.getElementById("ai-assistant-panel");
 let auditCompleted = false;
-const presetLabels = {{all:translations[language.value].preset_all, content:translations[language.value].preset_content, api:translations[language.value].preset_api, "ai-search":translations[language.value].preset_ai_search, seo:translations[language.value].preset_seo, mobile:translations[language.value].preset_mobile}};
+const presetLabels = {{all:translations[language.value].preset_all, content:translations[language.value].preset_content, api:translations[language.value].preset_api, "ai-search":translations[language.value].preset_ai_search, v2:translations[language.value].preset_v2, seo:translations[language.value].preset_seo, mobile:translations[language.value].preset_mobile}};
 const profileHints = {{all:translations[language.value].profile_all, content:translations[language.value].profile_content, api:translations[language.value].profile_api, "ai-search":translations[language.value].profile_ai_search, seo:translations[language.value].profile_seo, mobile:translations[language.value].profile_mobile}};
 const progress = document.getElementById("progress"); const progressBar = document.getElementById("progress-bar");
 function debugMode() {{ return document.getElementById("debug").checked; }}
@@ -776,7 +778,18 @@ async function runScan() {{
   if (preset === "all") {{ await runAll(); return; }}
   if (preset === "seo") {{ await runSeo(); return; }}
   if (preset === "mobile") {{ await runMobile(); return; }}
+  if (preset === "v2") {{ await runV2(); return; }}
   try {{ await request("/scan/dashboard","POST",scanPayload(),true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
+}}
+async function runV2() {{
+  if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
+  window.agentreadyV2Report = null;
+  try {{
+    await request("/v2/audit/dashboard","POST",{{url:document.getElementById("url").value,preset:"all",profile:"quick",max_pages:3,timeout:Number(document.getElementById("timeout").value),language:language.value}},true);
+    setAiAvailability(true);
+  }} catch (error) {{
+    setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message;
+  }}
 }}
 function combinedReportDocument(geoText, seoText) {{
   const geo = new DOMParser().parseFromString(geoText, "text/html");

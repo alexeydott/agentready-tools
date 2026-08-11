@@ -10,7 +10,10 @@
 - Added the `python -m agentready.cli` entrypoint and synchronized package,
   compatibility, report, and Windows portable version metadata.
 - Added a full-extra GitHub Actions gate for MCP and Chromium-backed tests.
-- Rebuilt the portable executable and retained the 352-test regression gate.
+- Added the AuditService-backed v2 dashboard profile and bounded typed run
+  inventory endpoints, with scheduler protection for page limits and invalid
+  non-HTTP links.
+- Rebuilt the portable executable and retained the 357-test regression gate.
 
 ## 0.8.1 — 2026-08-10
 

@@ -47,6 +47,27 @@ def test_audit_service_applies_exact_max_pages_and_reports_partial_coverage():
     assert result.run.completed_at is not None
 
 
+def test_audit_service_ignores_non_http_links_without_aborting_crawl():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            content=b'<a href="tel:+10000000000">call</a><a href="mailto:test@example.test">mail</a>',
+        )
+
+    result = AuditService().run(
+        AuditRequest(
+            target="https://example.test/",
+            max_pages=1,
+            allow_private=True,
+            transport=httpx.MockTransport(handler),
+        )
+    )
+
+    assert result.crawl.coverage.fetched == 1
+    assert result.crawl.coverage.failed == 0
+
+
 def test_audit_service_profile_selection_changes_config_identity_deterministically():
     requests = (
         AuditRequest(

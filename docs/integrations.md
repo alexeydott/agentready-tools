@@ -41,6 +41,9 @@ Existing v1 endpoints remain supported:
 curl -X POST http://127.0.0.1:8765/v2/audit \
   -H 'content-type: application/json' \
   -d '{"url":"https://example.com","preset":"all","max_pages":25}'
+curl -X POST http://127.0.0.1:8765/v2/audit/dashboard \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://example.com","profile":"quick","max_pages":3}'
 curl -X POST http://127.0.0.1:8765/v2/jobs \
   -H 'content-type: application/json' \
   -d '{"url":"https://example.com"}'
@@ -53,6 +56,13 @@ comparable-baseline, and bounded JSONL/CSV inventory operations. Request
 limits are enforced server-side; incompatible baselines are rejected rather
 than silently compared. The canonical CLI equivalent is
 `agentready audit https://example.com --fail-on-checks`.
+
+The `/dashboard` v2 preset uses `POST /v2/audit/dashboard` and renders the
+canonical `AuditService` result in an escaped HTML projection. Completed v2
+runs are retained in a bounded in-process registry for typed inventory reads:
+`/v2/runs/{run_id}/pages`, `run-urls`, `links`, `resources`, `redirects`,
+`findings`, and `metrics`. Each endpoint accepts bounded `limit`/`cursor`
+parameters and returns typed records; arbitrary queries are not accepted.
 
 For a selective child rescan, send `rescan_of` together with `selected_urls`.
 The crawler validates those URLs against the target origin and does not expand

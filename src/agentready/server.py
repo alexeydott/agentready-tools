@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import json
+import html
 import logging
 import re
 import sys
+import threading
+from collections import OrderedDict
+from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
 try:
-    from fastapi import FastAPI, HTTPException, Request
+    from fastapi import FastAPI, HTTPException, Query, Request
     from fastapi.responses import HTMLResponse
     from pydantic import BaseModel, Field
 except ImportError as exc:  # pragma: no cover
@@ -34,6 +38,18 @@ from .compatibility import COMPATIBILITY
 from .jobs_v2 import AuditJobManager
 from .report_v2 import diff_reports, export_inventory, report_from_checks, report_from_dict
 from .audit_service import AuditRequest, AuditService
+from .audit_core.store import MemorySiteStore, RunUrlState
+from .query_service import (
+    FindingQuery,
+    LinkQuery,
+    MetricQuery,
+    PageQuery,
+    QueryPage,
+    QueryService,
+    RedirectQuery,
+    ResourceQuery,
+    RunUrlQuery,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +64,35 @@ def default_data_dir() -> Path:
 _SERVER_DATA_DIR = default_data_dir()
 _V2_JOBS = AuditJobManager(max_jobs=8)
 _AUDIT_SERVICE = AuditService()
+
+
+class _V2RunRegistry:
+    """Bounded in-process access to completed v2 audit stores."""
+
+    def __init__(self, *, max_runs: int = 32) -> None:
+        self._max_runs = max_runs
+        self._runs: OrderedDict[str, MemorySiteStore] = OrderedDict()
+        self._lock = threading.RLock()
+
+    def put(self, run_id: str, store: MemorySiteStore) -> None:
+        with self._lock:
+            self._runs.pop(run_id, None)
+            self._runs[run_id] = store
+            while len(self._runs) > self._max_runs:
+                _, evicted = self._runs.popitem(last=False)
+                evicted.close()
+        logger.debug("v2 run inventory stored run_id=%s size=%d", run_id, len(self._runs))
+
+    def get(self, run_id: str) -> MemorySiteStore:
+        with self._lock:
+            store = self._runs.get(run_id)
+            if store is None:
+                raise KeyError(run_id)
+            self._runs.move_to_end(run_id)
+            return store
+
+
+_V2_RUNS = _V2RunRegistry()
 
 
 def configure_data_dir(path: str | Path | None = None) -> Path:
@@ -647,6 +692,7 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None) -
         max_pages = int(request.limits["max_pages"])
     if not 1 <= max_pages <= 100:
         raise ValueError("max_pages must be between 1 and 100")
+    store = MemorySiteStore()
     result = _AUDIT_SERVICE.run(
         AuditRequest(
             target=request.url,
@@ -662,9 +708,58 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None) -
             language=request.language,
             parent_run_id=parent_run_id if parent_run_id is not None else request.rescan_of,
             selected_urls=tuple(request.selected_urls),
+            store=store,
         )
     )
+    run = getattr(result, "run", None)
+    run_id = getattr(getattr(run, "context", None), "run_id", None)
+    if run_id is not None:
+        report = getattr(result, "report", None)
+        for finding in getattr(report, "findings", ()):
+            store.put_finding(run_id, finding.id, finding.to_dict())
+        coverage = getattr(report, "coverage", None)
+        if coverage is not None:
+            store.put_coverage(run_id, coverage.to_dict())
+        _V2_RUNS.put(run_id, store)
     return result.to_dict()
+
+
+def _render_v2_dashboard(payload: dict) -> str:
+    """Render a bounded HTML projection of the canonical v2 report."""
+    findings = payload.get("findings", [])
+    coverage = payload.get("coverage", {})
+    rows = "".join(
+        "<tr><td>"
+        + html.escape(str(item.get("id", "")))
+        + "</td><td>"
+        + html.escape(str(item.get("status", "")))
+        + "</td><td>"
+        + html.escape(str(item.get("summary", item.get("title", ""))))
+        + "</td></tr>"
+        for item in findings
+        if isinstance(item, dict)
+    )
+    report_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+    return (
+        "<!doctype html><html lang='"
+        + html.escape(str(payload.get("request", {}).get("language", "en")))
+        + "'><head><meta charset='utf-8'><title>AgentReady v2 audit</title>"
+        + "<style>body{font:16px system-ui,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem}"
+        + "table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccd;padding:.5rem;text-align:left}"
+        + "code{background:#f3f4f6;padding:.1rem .25rem}</style></head><body>"
+        + "<main id='report-content'><h1>AgentReady v2 audit</h1>"
+        + "<p>Target: <code>"
+        + html.escape(str(payload.get("target", "")))
+        + "</code></p><p>Coverage: "
+        + html.escape(str(coverage.get("classification", "unknown")))
+        + ", fetched "
+        + html.escape(str(coverage.get("urls_fetched", 0)))
+        + " URL(s).</p><table><thead><tr><th>Finding</th><th>Status</th><th>Summary</th></tr></thead><tbody>"
+        + rows
+        + "</tbody></table></main><script id='agentready-v2-report' type='application/json'>"
+        + report_json
+        + "</script></body></html>"
+    )
 
 
 @app.post("/v2/audit")
@@ -672,6 +767,15 @@ def audit_v2_endpoint(request: V2AuditRequest) -> dict:
     """Run the additive canonical v2 report without changing the v1 endpoint."""
     try:
         return _run_v2_scan(request)
+    except (TargetError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/v2/audit/dashboard", response_class=HTMLResponse)
+def audit_v2_dashboard_endpoint(request: V2AuditRequest) -> HTMLResponse:
+    """Render the canonical AuditService result for dashboard projections."""
+    try:
+        return HTMLResponse(_render_v2_dashboard(_run_v2_scan(request)))
     except (TargetError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -731,6 +835,147 @@ def audit_v2_export_endpoint(payload: dict) -> dict:
         return {"format": format_name, "content": export_inventory(payload.get("items", []), format=format_name)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _inventory_item(item: object) -> dict:
+    """Serialize one allowlisted store record without exposing store internals."""
+    if is_dataclass(item):
+        value = asdict(item)
+    elif isinstance(item, dict):
+        value = dict(item)
+    else:
+        raise TypeError(f"unsupported inventory record: {type(item).__name__}")
+    return _json_safe(value)
+
+
+def _json_safe(value: object) -> object:
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if hasattr(value, "value") and isinstance(getattr(value, "value"), str):
+        return getattr(value, "value")
+    return value
+
+
+def _inventory_response(run_id: str, query: object) -> dict:
+    try:
+        store = _V2_RUNS.get(run_id)
+        page = QueryService(store).execute(query)  # type: ignore[arg-type]
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    assert isinstance(page, QueryPage)
+    return {
+        "run_id": run_id,
+        "items": [_inventory_item(item) for item in page.items],
+        "next_cursor": page.next_cursor,
+        "total": page.total,
+    }
+
+
+@app.get("/v2/runs/{run_id}/pages")
+def audit_v2_pages_endpoint(
+    run_id: str,
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    status_code: int | None = Query(default=None, ge=100, le=599),
+) -> dict:
+    return _inventory_response(run_id, PageQuery(run_id, status_code=status_code, cursor=cursor, limit=limit))
+
+
+@app.get("/v2/runs/{run_id}/run-urls")
+@app.get("/v2/runs/{run_id}/urls")
+def audit_v2_run_urls_endpoint(
+    run_id: str,
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    state: RunUrlState | None = None,
+) -> dict:
+    return _inventory_response(run_id, RunUrlQuery(run_id, state=state, cursor=cursor, limit=limit))
+
+
+@app.get("/v2/runs/{run_id}/inventory/{kind}")
+def audit_v2_inventory_endpoint(
+    run_id: str,
+    kind: Literal["pages", "run-urls", "links", "resources", "redirects", "findings", "metrics"],
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+) -> dict:
+    """Dispatch only to the fixed, typed inventory projections."""
+    queries = {
+        "pages": PageQuery(run_id, cursor=cursor, limit=limit),
+        "run-urls": RunUrlQuery(run_id, cursor=cursor, limit=limit),
+        "links": LinkQuery(run_id, cursor=cursor, limit=limit),
+        "resources": ResourceQuery(run_id, cursor=cursor, limit=limit),
+        "redirects": RedirectQuery(run_id, cursor=cursor, limit=limit),
+        "findings": FindingQuery(run_id, cursor=cursor, limit=limit),
+        "metrics": MetricQuery(run_id, cursor=cursor, limit=limit),
+    }
+    return _inventory_response(run_id, queries[kind])
+
+
+@app.get("/v2/runs/{run_id}/links")
+def audit_v2_links_endpoint(
+    run_id: str,
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    source_key: str | None = None,
+) -> dict:
+    return _inventory_response(run_id, LinkQuery(run_id, source_key=source_key, cursor=cursor, limit=limit))
+
+
+@app.get("/v2/runs/{run_id}/resources")
+def audit_v2_resources_endpoint(
+    run_id: str,
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    page_key: str | None = None,
+) -> dict:
+    return _inventory_response(run_id, ResourceQuery(run_id, page_key=page_key, cursor=cursor, limit=limit))
+
+
+@app.get("/v2/runs/{run_id}/redirects")
+def audit_v2_redirects_endpoint(
+    run_id: str,
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    from_url: str | None = None,
+    status_code: int | None = Query(default=None, ge=300, le=399),
+) -> dict:
+    return _inventory_response(
+        run_id,
+        RedirectQuery(run_id, from_url=from_url, status_code=status_code, cursor=cursor, limit=limit),
+    )
+
+
+@app.get("/v2/runs/{run_id}/findings")
+def audit_v2_findings_endpoint(
+    run_id: str,
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    finding_id: str | None = None,
+    status: Literal["pass", "fail", "warn", "skip", "unavailable"] | None = None,
+) -> dict:
+    return _inventory_response(
+        run_id,
+        FindingQuery(run_id, finding_id=finding_id, status=status, cursor=cursor, limit=limit),
+    )
+
+
+@app.get("/v2/runs/{run_id}/metrics")
+def audit_v2_metrics_endpoint(
+    run_id: str,
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    provider: str | None = None,
+    name: str | None = None,
+) -> dict:
+    return _inventory_response(
+        run_id,
+        MetricQuery(run_id, provider=provider, name=name, cursor=cursor, limit=limit),
+    )
 
 
 @app.post("/scan/dashboard", response_class=HTMLResponse)

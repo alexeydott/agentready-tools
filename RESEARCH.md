@@ -24,6 +24,14 @@ Validation evidence for this pass: 352 tests passed, compile and diff checks
 passed, headed Playwright/DevTools runs covered `gossnab.ru` and `mappl.ru`,
 and the Win64 portable executable was rebuilt after source and version changes.
 
+The follow-up vNext boundary review added a canonical v2 dashboard execution
+path through `AuditService` and a bounded in-process run registry. Inventory
+reads are typed `QueryService` projections for pages, run URLs, links,
+resources, redirects, findings, and metrics. The crawler now stops scheduling
+queued work at `max_pages` and ignores non-HTTP links such as `mailto:` and
+`tel:` without aborting a live-site audit; this keeps the browser acceptance
+path bounded while preserving the same-origin safety boundary.
+
 ## Sources reviewed
 
 ### Cloudflare

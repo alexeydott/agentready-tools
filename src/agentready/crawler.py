@@ -287,9 +287,14 @@ class AsyncCrawler:
         result_lock = asyncio.Lock()
         reserved_fetches = 0
         active_items = 0
+        stop_scheduling = asyncio.Event()
 
         async def refill() -> None:
+            if stop_scheduling.is_set():
+                return
             async with queue_lock:
+                if stop_scheduling.is_set():
+                    return
                 while queue.qsize() < self.config.concurrency and frontier.queued:
                     item = frontier.pop()
                     if item is not None:
@@ -392,7 +397,17 @@ class AsyncCrawler:
                         occurrences = parsed.facts.links if parsed.facts is not None else ()
                         for occurrence in occurrences:
                             link = occurrence.raw_href
-                            child = _normalize(urljoin(response.url, link))
+                            try:
+                                child = _normalize(urljoin(response.url, link))
+                            except ValueError:
+                                logger.warning(
+                                    "crawl link ignored because it is not an absolute HTTP(S) URL "
+                                    "run_id=%s source=%s href=%r",
+                                    run_id,
+                                    _safe_log_url(item.url),
+                                    link[:200],
+                                )
+                                continue
                             if self.store is not None:
                                 self.store.put_link(
                                     run_id,
@@ -482,9 +497,15 @@ class AsyncCrawler:
                             break
                         await asyncio.sleep(0)
                         await refill()
+                    async with queue_lock:
+                        stop_scheduling.set()
+                        while not queue.empty():
+                            queued_item = queue.get_nowait()
+                            if queued_item is not None:
+                                frontier.set_state(queued_item.url, CrawlItemState.SKIPPED_POLICY)
+                            queue.task_done()
                     for _ in workers:
                         await queue.put(None)
-                    await queue.join()
                     for task in workers:
                         await task
                 finally:

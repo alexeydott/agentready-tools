@@ -3,6 +3,14 @@ from types import SimpleNamespace
 
 import agentready.server as server_module
 from agentready.ai_provider import ProviderModel
+from agentready.audit_core.store import (
+    MemorySiteStore,
+    MetricRecord,
+    PageRecord,
+    RedirectFact,
+    RunUrlRecord,
+    RunUrlState,
+)
 from agentready.server import app
 
 
@@ -21,6 +29,7 @@ def test_server_exposes_all_read_only_audit_modes():
         "/seo/checks",
         "/scan",
         "/scan/dashboard",
+        "/v2/audit/dashboard",
         "/seo/audit",
         "/seo/audit/dashboard",
     } <= paths
@@ -81,6 +90,91 @@ def test_v2_endpoint_propagates_all_supported_profiles(monkeypatch):
 
     assert [request.profile for request in captured] == ["quick", "standard", "deep", "custom"]
     assert captured[-1].limits == {"max_depth": 2}
+
+
+def test_v2_inventory_endpoints_paginate_typed_store_records():
+    run_id = "server-pagination"
+    store = MemorySiteStore()
+    for index in range(3):
+        store.put_page(PageRecord(run_id, f"https://example.com/{index}", f"https://example.com/{index}"))
+        store.put_run_url(RunUrlRecord(run_id, f"https://example.com/{index}", RunUrlState.FETCHED))
+    store.put_link(run_id, "https://example.com/0", "/one", ordinal=0)
+    store.put_link(run_id, "https://example.com/0", "/two", ordinal=1)
+    store.put_resource(run_id, "https://example.com/0", "/asset.js", "script", ordinal=0)
+    store.put_redirect(RedirectFact(run_id, "https://example.com/old", "https://example.com/new", 301, "/new"))
+    store.put_metric(MetricRecord(run_id, "https://example.com/0", "test", "bytes", 10, "B", "test", "1", "now"))
+    store.put_finding(run_id, "finding-1", {"status": "warn", "reason": "bounded"})
+    server_module._V2_RUNS.put(run_id, store)
+    client = TestClient(app)
+
+    first = client.get(f"/v2/runs/{run_id}/pages", params={"limit": 2})
+    assert first.status_code == 200
+    assert len(first.json()["items"]) == 2
+    assert first.json()["next_cursor"]
+    second = client.get(
+        f"/v2/runs/{run_id}/pages",
+        params={"limit": 2, "cursor": first.json()["next_cursor"]},
+    )
+    assert [item["url_key"] for item in second.json()["items"]] == ["https://example.com/2"]
+    assert client.get(f"/v2/runs/{run_id}/run-urls").json()["total"] == 3
+    assert client.get(f"/v2/runs/{run_id}/links").json()["total"] == 2
+    assert client.get(f"/v2/runs/{run_id}/resources").json()["total"] == 1
+    assert client.get(f"/v2/runs/{run_id}/redirects").json()["total"] == 1
+    assert client.get(f"/v2/runs/{run_id}/findings").json()["total"] == 1
+    assert client.get(f"/v2/runs/{run_id}/metrics").json()["total"] == 1
+    assert client.get(f"/v2/runs/{run_id}/inventory/pages", params={"limit": 1}).json()["next_cursor"]
+
+
+def test_v2_inventory_rejects_invalid_kind_limits_and_unknown_runs():
+    client = TestClient(app)
+    assert client.get("/v2/runs/missing/pages").status_code == 404
+    assert client.get("/v2/runs/missing/not-an-allowlisted-kind").status_code == 404
+    assert client.get("/v2/runs/missing/inventory/not-an-allowlisted-kind").status_code == 422
+    assert client.get("/v2/runs/missing/pages", params={"limit": 0}).status_code == 422
+    assert client.get("/v2/runs/missing/pages", params={"limit": 1001}).status_code == 422
+
+
+def test_v2_inventory_routes_use_typed_queries_not_arbitrary_sql(monkeypatch):
+    run_id = "typed-query"
+    store = MemorySiteStore()
+    store.put_page(PageRecord(run_id, "https://example.com/", "https://example.com/"))
+    server_module._V2_RUNS.put(run_id, store)
+    captured = []
+    original = server_module.QueryService.execute
+
+    def execute(self, query):
+        captured.append(type(query).__name__)
+        return original(self, query)
+
+    monkeypatch.setattr(server_module.QueryService, "execute", execute)
+    response = TestClient(app).get(f"/v2/runs/{run_id}/pages")
+    assert response.status_code == 200
+    assert captured == ["PageQuery"]
+
+
+def test_v2_dashboard_projection_uses_shared_service_and_escapes_html(monkeypatch):
+    payload = {
+        "target": "https://example.com/?q=<script>",
+        "request": {"language": "ru"},
+        "coverage": {"classification": "complete_within_scope", "urls_fetched": 1},
+        "findings": [{"id": "f-1", "status": "warn", "summary": "safe <summary>"}],
+    }
+    captured = {}
+
+    def fake_scan(request):
+        captured["request"] = request
+        return payload
+
+    monkeypatch.setattr(server_module, "_run_v2_scan", fake_scan)
+    response = server_module.audit_v2_dashboard_endpoint(
+        server_module.V2AuditRequest(url="https://example.com", profile="quick", language="ru")
+    )
+
+    assert response.status_code == 200
+    assert "&lt;script&gt;" in response.body.decode()
+    assert "safe &lt;summary&gt;" in response.body.decode()
+    assert '"id":"f-1"' in response.body.decode()
+    assert captured["request"].profile == "quick"
 
 
 def test_ai_tools_exposes_localized_builtin_skills(monkeypatch, tmp_path):
@@ -188,6 +282,8 @@ def test_dashboard_is_localized_and_describes_each_operation():
     assert "/ai/providers" in response.text
     assert "function activateAiProvider()" in response.text
     assert 'id="ai-provider-chat-only"' in response.text
+    assert 'value="v2"' in response.text
+    assert '/v2/audit/dashboard' in response.text
     assert "function toggleChatOnly()" in response.text
     assert "chat_only:document.getElementById(\"ai-provider-chat-only\").checked" in response.text
     assert 'id="ai-model"' in response.text

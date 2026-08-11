@@ -122,6 +122,9 @@ configuration and chat history may be restored from browser `localStorage`, but
 credential values are restored only as redacted OS-vault status metadata.
 Localized prompt edits carry a stable prompt ID and update only the selected
 language variant.
+The v2 dashboard preset is an `AuditService`-backed projection; completed
+v2 runs expose bounded typed inventory through the `/v2/runs/{run_id}/...`
+endpoints rather than arbitrary query parameters.
 
 ## Agent Rules
 - Split shell workflows into explicit sequential commands instead of a single chained command when clarity or recovery matters.

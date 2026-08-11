@@ -104,6 +104,7 @@ line application icon.
 - **Separate AI Search/GEO score** (`ai_search_score`) so GEO quality does not overwrite core protocol readiness.
 - **CI gating support** via minimum score/level thresholds and optional strict fail-on-checks behavior.
 - **Additive v2 audit contract** with bounded evidence, coverage accounting, deterministic finding fingerprints, baseline diff, rescan, inventory pagination, JSONL/CSV export, and bounded asynchronous jobs.
+- **AuditService-backed v2 dashboard profile** with escaped report projection and bounded server-side run inventory APIs for pages, URLs, links, resources, redirects, findings, and metrics.
 - **Bounded v2 crawler foundation** with deterministic frontier/scope accounting, shared fetch and egress policy, robots/sitemap reconciliation, protocol profiles, and optional browser rendering.
 - **Prioritized recommendations** ranked by impact and effort.
 - **Multiple output formats**: console, JSON, Markdown, HTML dashboard (with EN/RU localization).
