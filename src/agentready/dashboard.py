@@ -1850,6 +1850,7 @@ document.getElementById("ai-message").addEventListener("keydown", event => {{
     runAi("/ai/chat");
   }}
 }});
+document.getElementById("ai-chat-button").addEventListener("click", () => runAi("/ai/chat"));
 document.getElementById("ai-message").addEventListener("paste", event => {{
   const files = event.clipboardData && event.clipboardData.files;
   if (files && files.length) {{
