@@ -616,7 +616,9 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <label for="v2-inventory-filter">Filter</label>
 <input id="v2-inventory-filter" type="search" placeholder="Find in loaded rows" oninput="filterV2Inventory()">
 <button id="v2-inventory-next" type="button" class="secondary" onclick="loadNextV2Inventory()" hidden>Next page</button>
+<button type="button" class="secondary" onclick="saveV2InventoryView()">Save view</button>
 </div>
+<div id="v2-inventory-status" role="status" aria-live="polite"></div>
 <div id="v2-inventory" role="region" aria-live="polite">{escape(text["v2_inventory_empty"])}</div>
 </section>
 <details id="ai-assistant-panel" class="panel" hidden><summary>{escape(text["ai_title"])} <h2 class="sr-only">{escape(text["ai_title"])}</h2> {_hint(text, "ai_hint")}</summary>
@@ -880,6 +882,20 @@ function filterV2Inventory() {{
   document.querySelectorAll("[data-v2-inventory-row]").forEach(row => {{
     row.hidden = query && !row.textContent.toLowerCase().includes(query);
   }});
+}}
+async function saveV2InventoryView() {{
+  const report = window.agentreadyV2Report;
+  const runId = report && report.run ? report.run.id : null;
+  const status = document.getElementById("v2-inventory-status");
+  if (!runId) {{ status.textContent = translations[language.value].v2_inventory_empty; return; }}
+  const viewId = "dashboard-" + v2InventoryKind + "-" + runId.slice(0, 12);
+  try {{
+    const response = await fetch("/v2/saved-views", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{id:viewId,name:"Dashboard " + v2InventoryKind,run_id:runId,kind:v2InventoryKind,limit:Number(document.getElementById("v2-inventory-limit").value)||100}})}});
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    status.textContent = "Saved view: " + viewId;
+  }} catch (error) {{
+    status.textContent = translations[language.value].v2_inventory_error + ": " + error.message;
+  }}
 }}
 function escapeHtml(value) {{
   return String(value).replace(/[&<>"']/g, character => ({{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}}[character]));

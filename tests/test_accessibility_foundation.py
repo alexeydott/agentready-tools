@@ -65,6 +65,7 @@ def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
         assert 'id="v2-inventory-limit"' in html
         assert 'loadNextV2Inventory' in html
         assert 'filterV2Inventory' in html
+        assert 'saveV2InventoryView' in html
 
 
 def test_dashboard_noscript_guidance_is_localized():
