@@ -139,3 +139,13 @@ def test_dashboard_report_actions_are_shared_by_single_and_combined_exports():
     assert "function createReportActions(reportText, frame)" in html
     assert html.count("createReportActions(reportText, frame)") == 2
     assert "createReportActions(combined, frame)" in html
+
+
+def test_combined_report_acceptance_contract_rewrites_internal_references():
+    html = render_dashboard("en")
+
+    assert '["for", "aria-controls", "aria-labelledby", "aria-describedby"]' in html
+    assert "ids.get(item) || item" in html
+    assert 'link.setAttribute("href", "#" + ids.get(target))' in html
+    assert "data-report-instance='seo'" in html
+    assert 'body.querySelectorAll("script").forEach(script => script.remove())' in html
