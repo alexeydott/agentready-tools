@@ -131,3 +131,11 @@ def test_dashboard_combined_reports_namespace_ids_and_set_document_language():
     assert "document.documentElement.lang=value;mains.forEach" in html
     assert "window.addEventListener('beforeprint'" in html
     assert "<!doctype html><html lang='" in html
+
+
+def test_dashboard_report_actions_are_shared_by_single_and_combined_exports():
+    html = render_dashboard("en")
+
+    assert "function createReportActions(reportText, frame)" in html
+    assert html.count("createReportActions(reportText, frame)") == 2
+    assert "createReportActions(combined, frame)" in html

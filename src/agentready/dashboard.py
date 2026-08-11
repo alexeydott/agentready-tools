@@ -738,6 +738,13 @@ function reportFilename(site) {{
   }} catch (error) {{ console.info("Using fallback report filename", {{site}}); }}
   return "agentready-report-" + slug + ".html";
 }}
+function createReportActions(reportText, frame) {{
+  const actions = document.createElement("div"); actions.className = "report-actions";
+  const download = document.createElement("a"); download.href = URL.createObjectURL(new Blob([reportText], {{type:"text/html;charset=utf-8"}})); download.download = reportFilename(document.getElementById("url").value); download.textContent = translations[language.value].download_report; download.onclick = () => console.info("Downloading audit report", {{language:language.value, filename:download.download}});
+  const print = document.createElement("a"); print.href = "#"; print.textContent = translations[language.value].print_report; print.onclick = (event) => {{ event.preventDefault(); console.info("Printing audit report", {{language:language.value}}); frame.contentWindow.print(); }};
+  actions.append(download, hintIcon(translations[language.value].download_hint), print, hintIcon(translations[language.value].print_hint));
+  return actions;
+}}
 async function request(path, method="GET", body=null, html=false, showOutput=true, statusMessage="") {{
   if (showOutput) setProgress(8, translations[language.value].progress_start);
   const options = {{method, headers:{{"Content-Type":"application/json"}}}}; if (body) options.body = JSON.stringify(body);
@@ -755,10 +762,7 @@ async function request(path, method="GET", body=null, html=false, showOutput=tru
       if (start >= 0 && end > start) window.agentreadyV2Report = JSON.parse(reportText.slice(start + v2Marker.length, end));
     }} catch (error) {{ console.warn("Ignoring unavailable embedded v2 report", {{error: String(error)}}); }}
     const frame = document.createElement("iframe"); frame.id = "report-frame"; frame.title = translations[language.value].result; frame.srcdoc = reportText;
-    const actions = document.createElement("div"); actions.className = "report-actions";
-    const download = document.createElement("a"); download.href = URL.createObjectURL(new Blob([reportText], {{type:"text/html;charset=utf-8"}})); download.download = reportFilename(document.getElementById("url").value); download.textContent = translations[language.value].download_report; download.onclick = () => console.info("Downloading audit report", {{language:language.value, filename:download.download}});
-    const print = document.createElement("a"); print.href = "#"; print.textContent = translations[language.value].print_report; print.onclick = (event) => {{ event.preventDefault(); console.info("Printing audit report", {{language:language.value}}); frame.contentWindow.print(); }};
-    actions.append(download, hintIcon(translations[language.value].download_hint), print, hintIcon(translations[language.value].print_hint));
+    const actions = createReportActions(reportText, frame);
     result.replaceChildren(actions, frame); finishProgress(true); return frame;
   }}
   const data = await response.json();
@@ -818,10 +822,7 @@ async function runAll() {{
     const seoFrame = await request("/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,language:language.value,checks:null,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true);
     const combined = combinedReportDocument(geoText, seoFrame.srcdoc);
     const frame = document.createElement("iframe"); frame.id = "report-frame"; frame.title = translations[language.value].result; frame.srcdoc = combined;
-    const actions = document.createElement("div"); actions.className = "report-actions";
-    const download = document.createElement("a"); download.href = URL.createObjectURL(new Blob([combined], {{type:"text/html;charset=utf-8"}})); download.download = reportFilename(document.getElementById("url").value); download.textContent = translations[language.value].download_report;
-    const print = document.createElement("a"); print.href = "#"; print.textContent = translations[language.value].print_report; print.onclick = event => {{ event.preventDefault(); frame.contentWindow.print(); }};
-    actions.append(download, hintIcon(translations[language.value].download_hint), print, hintIcon(translations[language.value].print_hint));
+    const actions = createReportActions(combined, frame);
     result.replaceChildren(actions, frame); finishProgress(true); setAiAvailability(true);
   }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
