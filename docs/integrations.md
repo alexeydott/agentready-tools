@@ -97,7 +97,7 @@ scope, normalized URL identity, bounded frontier, explicit item states, and
 coverage accounting. Protocol profiles audit passive documents and expose
 evidence through the same report and agent/MCP projection boundaries.
 
-Release `0.9.0` freezes the compatibility manifest: v1 CLI/API facades stay
+Release `0.10.0` freezes the compatibility manifest: v1 CLI/API facades stay
 supported, while v2 schemas and protocol manifests are additive. Migration
 status is intentionally `v1-preserved-v2-additive`; no v1 endpoint is removed
 by this stable release.

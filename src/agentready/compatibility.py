@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-RELEASE_VERSION = "0.9.0"
+RELEASE_VERSION = "0.10.0"
 RELEASE_CHANNEL = "stable"
 V1_FACADES = (
     "scan",

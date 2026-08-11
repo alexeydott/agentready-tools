@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.10.0 — 2026-08-12
+
+- Refined the SEO/GEO AI assistant workspace to match the planned chat-first
+  layout, including in-chat Skills and MCP context pickers with explanatory
+  tooltips and compact context chips.
+- Moved the prompt library into the composer as a dropdown with prompt use,
+  save-as, user-prompt editing, and a modal editor with full-width title and
+  multiline prompt fields.
+- Aligned composer actions with the UX design: attachment, save-as-prompt,
+  and send controls sit beside the textarea; secondary chat actions are
+  tooltip links; AI settings are available from the model panel.
+- Preserved prompt IDs, localized variants, user-prompt modes, existing AI
+  API contracts, report persistence, and dashboard chat interactions.
+
 ## 0.9.0 — 2026-08-12
 
 - Added the AuditService-backed v2 dashboard profile and bounded typed run
