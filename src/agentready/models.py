@@ -4,6 +4,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
+from . import __version__
+
 Status = Literal["pass", "fail", "warn", "skip", "error"]
 Impact = Literal["high", "medium", "low"]
 Effort = Literal["low", "medium", "high"]
@@ -101,7 +103,7 @@ class ScanReport:
     language: str = "en"
     ai_search_score: int | None = None
     ai_search_applicable: int = 0
-    tool_version: str = "0.8.0"
+    tool_version: str = __version__
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

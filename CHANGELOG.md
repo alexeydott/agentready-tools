@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.2 — 2026-08-11
+
+- Hardened dashboard AI prompt editing so stable prompt IDs and independent
+  English/Russian variants are preserved, with visible save failures.
+- Added headed browser regression coverage for `/dashboard`, local session/chat
+  restoration, credential redaction, optional-provider skips, and browser
+  diagnostics on `gossnab.ru` and `mappl.ru`.
+- Added the `python -m agentready.cli` entrypoint and synchronized package,
+  compatibility, report, and Windows portable version metadata.
+- Added a full-extra GitHub Actions gate for MCP and Chromium-backed tests.
+- Rebuilt the portable executable and retained the 352-test regression gate.
+
 ## 0.8.1 — 2026-08-10
 
 - Fixed the combined “All checks” dashboard report so GEO and SEO sections

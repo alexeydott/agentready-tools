@@ -2,6 +2,28 @@
 
 Date: 2026-08-07
 
+## 0.8.2 implementation review (2026-08-11)
+
+The dashboard integration review and headed browser acceptance confirmed the
+following implementation decisions:
+
+- Dashboard browser tests use `/dashboard` explicitly, while legacy `/` and
+  v1 scan endpoints remain compatibility surfaces.
+- Browser-local state restores bounded dashboard fields and AI chat history.
+  Credential restoration is intentionally redacted: raw API keys are not
+  placed in `localStorage` or password inputs.
+- Prompt editing carries a stable server-side ID and updates only the selected
+  language map, preserving the other localized variant.
+- Optional AI chat/provider absence is reported as an explicit acceptance skip,
+  not a false product failure.
+- Inline combined-report controllers must split the closing `</script>` token
+  when embedded in a script string, otherwise the browser terminates the outer
+  script early.
+
+Validation evidence for this pass: 352 tests passed, compile and diff checks
+passed, headed Playwright/DevTools runs covered `gossnab.ru` and `mappl.ru`,
+and the Win64 portable executable was rebuilt after source and version changes.
+
 ## Sources reviewed
 
 ### Cloudflare
@@ -233,4 +255,3 @@ The implementation deliberately does not treat `llms.txt` or Schema.org markup a
 - the same fixture passed robots/sitemap, Markdown negotiation, AI bot policy, Content Signals, live crawler diagnostics, canonical/indexability, connected JSON-LD, FAQ, dates, and citation heuristic;
 - generated Russian JSON and bilingual HTML GEO reports were inspected by assertions;
 - IndexNow/Git utilities are covered by isolated tests and do not contact IndexNow unless explicit submission is requested.
-

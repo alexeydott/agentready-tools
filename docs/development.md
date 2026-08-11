@@ -2,6 +2,10 @@
 
 # Development
 
+The current release is **0.8.2**. The package version, compatibility manifest,
+report defaults, and Win64 file metadata are synchronized from the same release
+change.
+
 ## Project Layout
 
 ```text
@@ -89,6 +93,10 @@ Without the `mcp` extra, MCP-specific tests are reported as skipped. Without
 the Chromium binary, browser-backed tests and `--render` audits cannot run;
 the portable build itself does not require that binary.
 
+The `full-extra` GitHub Actions workflow installs MCP, Playwright, and Chromium
+and runs the suite as a no-optional-skips release gate. Local development may
+still use the smaller dependency set when browser/MCP work is not in scope.
+
 ## Portable Windows Build
 
 Build the standalone executable with:
@@ -129,6 +137,17 @@ python scripts\dashboard-interactive.py `
   --headed
 ```
 
+The runner uses `/dashboard` as the product route and verifies dashboard and
+chat `localStorage` restoration without restoring raw API keys into browser
+storage or password fields. It also treats unavailable optional AI chat
+providers as explicit skips rather than product failures. The direct module
+entrypoint is available for CLI smoke checks:
+
+```powershell
+python -m agentready.cli --help
+python -m agentready.cli audit https://example.com --profile quick --max-pages 1
+```
+
 ## Localization Notes
 
 - Built-in locales: `en`, `ru`
@@ -142,8 +161,10 @@ python scripts\dashboard-interactive.py `
 - 0.8.0 introduced the v2 contract, bounded crawler, protocol profiles,
   independent SEO/mobile domains, jobs, diffs, exports, and compatibility
   metadata.
-- 0.8.1 preserves that v1-compatible surface and fixes combined dashboard
+- 0.8.1 preserved that v1-compatible surface and fixed combined dashboard
   report composition, including report-local tooltip styles.
+- 0.8.2 hardens dashboard AI prompt localization/editing, browser persistence
+  checks, module CLI execution, and synchronized release metadata.
 
 ## See Also
 

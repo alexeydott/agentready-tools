@@ -70,10 +70,16 @@ scope, normalized URL identity, bounded frontier, explicit item states, and
 coverage accounting. Protocol profiles audit passive documents and expose
 evidence through the same report and agent/MCP projection boundaries.
 
-Release `0.8.1` freezes the compatibility manifest: v1 CLI/API facades stay
+Release `0.8.2` freezes the compatibility manifest: v1 CLI/API facades stay
 supported, while v2 schemas and protocol manifests are additive. Migration
 status is intentionally `v1-preserved-v2-additive`; no v1 endpoint is removed
-by this release candidate.
+by this stable release.
+
+The dashboard is available at `/dashboard` and preserves bounded form/chat
+state in browser `localStorage`. Credential status is restored only as
+redacted provider metadata; raw API keys remain in the OS credential vault and
+are never written to browser storage. Existing prompts retain independent
+English and Russian title/body variants when edited.
 
 Get localized HTML dashboard:
 

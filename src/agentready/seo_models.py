@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
+from . import __version__
+
 from .models import Evidence, Remediation
 
 SeoStatus = Literal["pass", "fail", "warn", "skip", "error"]
@@ -58,7 +60,7 @@ class SeoReport:
     started_at: str
     finished_at: str
     language: str = "en"
-    tool_version: str = "0.8.0"
+    tool_version: str = __version__
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

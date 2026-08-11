@@ -1,4 +1,4 @@
-# AgentReady Tools 0.8.1
+# AgentReady Tools 0.8.2
 
 > Audit public websites for AI-agent protocol readiness and AI Search/GEO readiness.
 
@@ -114,6 +114,7 @@ line application icon.
 - **Explicit indexing publishers**: global/Yandex IndexNow and eligible-content Google Indexing API workflows.
 - **Opt-in SEO/GEO AI assistant** using an OpenAI-compatible API, bounded audit context, OS-vault credentials, and EN/RU CLI/API/MCP flows.
 - **Serve-mode AI chat** for asking follow-up questions about the completed audit, with bounded conversation history, text-file attachments, selectable skills, and AgentReady MCP findings/remediation context.
+- **Restorable dashboard sessions** with browser-local audit/chat state, redacted OS-vault credential status, stable localized prompt editing, and explicit failure rendering.
 - **Portable serve state** stored under `.cache` beside the executable by default (or `serve --data-dir <path>`), created automatically at startup.
 - **Prompt library and chat archive** for reusable SEO/GEO questions and JSON conversation files in the serve cache.
 
