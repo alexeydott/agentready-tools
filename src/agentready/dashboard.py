@@ -609,7 +609,14 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div id="result" hidden role="status" aria-live="polite">{escape(text["ready"])}</div></section>
 <section id="v2-inventory-panel" class="panel" hidden aria-labelledby="v2-inventory-title">
 <h2 id="v2-inventory-title">{escape(text["v2_inventory"])} {_hint(text, "v2_inventory_hint")}</h2>
-<div class="actions"><button type="button" class="secondary" onclick="loadV2Inventory()">{escape(text["v2_inventory_load"])}</button></div>
+<div class="actions">
+<button type="button" class="secondary" onclick="loadV2Inventory()">{escape(text["v2_inventory_load"])}</button>
+<label for="v2-inventory-limit">Rows</label>
+<select id="v2-inventory-limit" onchange="loadV2Inventory()"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option></select>
+<label for="v2-inventory-filter">Filter</label>
+<input id="v2-inventory-filter" type="search" placeholder="Find in loaded rows" oninput="filterV2Inventory()">
+<button id="v2-inventory-next" type="button" class="secondary" onclick="loadNextV2Inventory()" hidden>Next page</button>
+</div>
 <div id="v2-inventory" role="region" aria-live="polite">{escape(text["v2_inventory_empty"])}</div>
 </section>
 <details id="ai-assistant-panel" class="panel" hidden><summary>{escape(text["ai_title"])} <h2 class="sr-only">{escape(text["ai_title"])}</h2> {_hint(text, "ai_hint")}</summary>
@@ -831,7 +838,11 @@ async function runV2() {{
     setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message;
   }}
 }}
-async function loadV2Inventory(kind="pages") {{
+let v2InventoryKind = "pages";
+let v2InventoryCursor = null;
+let v2InventoryItems = [];
+let v2InventoryCounts = {{}};
+async function loadV2Inventory(kind=null, cursor=null) {{
   const report = window.agentreadyV2Report;
   const runId = report && report.run ? report.run.id : null;
   const panel = document.getElementById("v2-inventory-panel");
@@ -840,16 +851,35 @@ async function loadV2Inventory(kind="pages") {{
   panel.hidden = false;
   try {{
     const overview = await (await fetch("/v2/runs/" + encodeURIComponent(runId) + "/overview")).json();
-    const inventory = overview.inventory || {{}};
-    const counts = Object.entries(inventory).map(([name, count]) => `<button type="button" class="secondary" onclick="loadV2Inventory('${{name.replace('_','-')}}')">${{name}} (${{count}})</button>`).join(" ");
-    const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/inventory/" + encodeURIComponent(kind));
+    v2InventoryCounts = overview.inventory || {{}};
+    if (kind) {{ v2InventoryKind = kind; v2InventoryCursor = null; }}
+    if (cursor !== null) v2InventoryCursor = cursor;
+    const limit = Number(document.getElementById("v2-inventory-limit").value) || 100;
+    const query = new URLSearchParams({{limit:String(limit)}});
+    if (v2InventoryCursor) query.set("cursor", v2InventoryCursor);
+    const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/inventory/" + encodeURIComponent(v2InventoryKind) + "?" + query);
     if (!response.ok) throw new Error("HTTP " + response.status);
     const page = await response.json();
-    const rows = (page.items || []).slice(0, 100).map(item => `<tr><td><code>${{escapeHtml(JSON.stringify(item))}}</code></td></tr>`).join("");
-    container.innerHTML = `<p>${{counts}}</p><table><thead><tr><th>${{kind}}</th></tr></thead><tbody>${{rows}}</tbody></table>`;
+    v2InventoryItems = page.items || [];
+    const counts = Object.entries(v2InventoryCounts).map(([name, count]) => `<button type="button" class="secondary" onclick="loadV2Inventory('${{name.replace('_','-')}}')">${{name}} (${{count}})</button>`).join(" ");
+    container.innerHTML = `<p>${{counts}}</p><table><thead><tr><th>${{v2InventoryKind}}</th></tr></thead><tbody>${{v2InventoryItems.map((item, index) => `<tr data-v2-inventory-row="${{index}}"><td><code>${{escapeHtml(JSON.stringify(item))}}</code></td></tr>`).join("")}}</tbody></table>`;
+    const next = document.getElementById("v2-inventory-next");
+    next.hidden = !page.next_cursor;
+    next.dataset.cursor = page.next_cursor || "";
+    document.getElementById("v2-inventory-filter").value = "";
   }} catch (error) {{
     container.textContent = translations[language.value].v2_inventory_error + ": " + error.message;
   }}
+}}
+function loadNextV2Inventory() {{
+  const cursor = document.getElementById("v2-inventory-next").dataset.cursor;
+  if (cursor) loadV2Inventory(null, cursor);
+}}
+function filterV2Inventory() {{
+  const query = document.getElementById("v2-inventory-filter").value.trim().toLowerCase();
+  document.querySelectorAll("[data-v2-inventory-row]").forEach(row => {{
+    row.hidden = query && !row.textContent.toLowerCase().includes(query);
+  }});
 }}
 function escapeHtml(value) {{
   return String(value).replace(/[&<>"']/g, character => ({{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}}[character]));

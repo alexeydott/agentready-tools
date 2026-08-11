@@ -62,6 +62,9 @@ def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
         assert 'id="v2-inventory-panel"' in html
         assert 'async function loadV2Inventory' in html
         assert '/v2/runs/" + encodeURIComponent(runId) + "/overview' in html
+        assert 'id="v2-inventory-limit"' in html
+        assert 'loadNextV2Inventory' in html
+        assert 'filterV2Inventory' in html
 
 
 def test_dashboard_noscript_guidance_is_localized():
