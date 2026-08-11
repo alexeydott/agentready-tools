@@ -176,7 +176,27 @@ def test_dashboard_report_actions_are_shared_by_single_and_combined_exports():
     assert html.count("createReportActions(reportText, frame)") == 2
     assert "renderReport(combined)" in html
     assert "dashboardReportKey = \"agentready.dashboard.report.v1\"" in html
+    assert "boundedV2ReportForStorage" in html
+    assert "window.agentreadyV2Report = state.v2Report || null" in html
+    assert "state.preset !== \"v2\" || Boolean(window.agentreadyV2Report)" in html
     assert "restoreReportState();" in html
+
+
+def test_dashboard_ai_workspace_has_history_conversation_and_context_zones():
+    html = render_dashboard("en")
+
+    assert 'class="ai-workspace-grid"' in html
+    assert 'class="ai-history-sidebar"' in html
+    assert 'class="ai-conversation"' in html
+    assert 'class="ai-context-sidebar"' in html
+    assert 'class="ai-composer"' in html
+    assert 'id="ai-context-chips"' in html
+    assert 'id="ai-chat-search"' in html
+    assert 'id="ai-chat-button"' in html
+    assert 'event.key === "Enter" && !event.shiftKey' in html
+    assert 'onclick="openAiPromptPicker()"' in html
+    assert 'function openAiPromptPicker()' in html
+    assert 'function toggleAiDrawer(kind)' in html
 
 
 def test_dashboard_report_navigation_stays_inside_frame():

@@ -335,7 +335,7 @@ def test_dashboard_is_localized_and_describes_each_operation():
     assert 'id="ai-result" class="ai-report" hidden' in response.text
     assert response.text.count('id="ai-assistant-panel"') == 1
     assert response.text.index('id="result-panel"') < response.text.index('id="ai-assistant-panel"')
-    assert 'id="ai-assistant-panel" class="panel" hidden' in response.text
+    assert 'id="ai-assistant-panel" class="panel ai-workspace" hidden' in response.text
     assert "function renderAiReport(data)" in response.text
     assert "Приоритетные рекомендации" in response.text
     assert "Данные аудита" in response.text
@@ -462,7 +462,7 @@ def test_dashboard_refreshes_provider_models_and_clears_new_provider_catalog():
     assert "let aiPromptEditingId = null" in response.text
     assert "id:aiPromptEditingId" in response.text
     assert "language:language.value" in response.text
-    assert '<textarea id="ai-message">' in response.text
+    assert '<textarea id="ai-message" placeholder=' in response.text
     assert 'id="ai-retry-button"' in response.text
     assert "function exportChat()" in response.text
     assert "function startNewChat()" in response.text
