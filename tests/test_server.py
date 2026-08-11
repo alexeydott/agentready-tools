@@ -125,6 +125,10 @@ def test_v2_inventory_endpoints_paginate_typed_store_records():
     assert client.get(f"/v2/runs/{run_id}/findings").json()["total"] == 1
     assert client.get(f"/v2/runs/{run_id}/metrics").json()["total"] == 1
     assert client.get(f"/v2/runs/{run_id}/inventory/pages", params={"limit": 1}).json()["next_cursor"]
+    overview = client.get(f"/v2/runs/{run_id}/overview")
+    assert overview.status_code == 200
+    assert overview.json()["inventory"]["pages"] == 3
+    assert overview.json()["inventory"]["links"] == 2
 
 
 def test_v2_run_registry_evicts_by_run_count_and_record_budget():
@@ -171,6 +175,62 @@ def test_v2_inventory_rejects_invalid_kind_limits_and_unknown_runs():
     assert client.get("/v2/runs/missing/inventory/not-an-allowlisted-kind").status_code == 422
     assert client.get("/v2/runs/missing/pages", params={"limit": 0}).status_code == 422
     assert client.get("/v2/runs/missing/pages", params={"limit": 1001}).status_code == 422
+
+
+def test_v2_saved_views_execute_and_export_the_same_typed_query():
+    run_id = "saved-view-server"
+    store = MemorySiteStore()
+    for index in range(2):
+        store.put_page(PageRecord(run_id, f"https://example.com/{index}", f"https://example.com/{index}"))
+    server_module._V2_RUNS.put(run_id, store)
+    client = TestClient(app)
+
+    created = client.post(
+        "/v2/saved-views",
+        json={
+            "id": "saved-pages",
+            "name": "Saved pages",
+            "run_id": run_id,
+            "kind": "pages",
+            "limit": 1,
+        },
+    )
+    assert created.status_code == 200
+    assert created.json()["query"] == "PageQuery"
+    executed = client.get("/v2/saved-views/saved-pages", params={"limit": 1})
+    assert executed.status_code == 200
+    assert executed.json()["total"] == 2
+    exported = client.get("/v2/saved-views/saved-pages/export", params={"format": "csv"})
+    assert exported.status_code == 200
+    assert "url_key" in exported.json()["content"]
+
+
+def test_v2_dashboard_inventory_reads_do_not_start_a_second_crawl(monkeypatch):
+    run_id = "single-crawl"
+    store = MemorySiteStore()
+    store.put_page(PageRecord(run_id, "https://example.com/", "https://example.com/"))
+    server_module._V2_RUNS.put(run_id, store)
+    calls = []
+
+    def fake_run(request, *, parent_run_id=None):
+        calls.append(request)
+        return {
+            "schema": "agentready.audit.v2",
+            "run": {"id": run_id},
+            "request": {"language": "en"},
+        }
+
+    monkeypatch.setattr(server_module, "_run_v2_scan", fake_run)
+    monkeypatch.setattr(server_module, "_render_v2_dashboard", lambda payload: "<html>ok</html>")
+    client = TestClient(app)
+    response = client.post(
+        "/v2/audit/dashboard",
+        json={"url": "https://example.com", "profile": "quick", "max_pages": 1},
+    )
+    assert response.status_code == 200
+    assert client.get(f"/v2/runs/{run_id}/overview").status_code == 200
+    assert client.get(f"/v2/runs/{run_id}/inventory/pages").status_code == 200
+    assert len(calls) == 1
 
 
 def test_v2_inventory_routes_use_typed_queries_not_arbitrary_sql(monkeypatch):

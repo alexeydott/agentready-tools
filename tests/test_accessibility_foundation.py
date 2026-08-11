@@ -59,6 +59,9 @@ def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
         assert 'profile:document.getElementById("v2-profile").value' in html
         assert 'max_pages:Number(document.getElementById("v2-max-pages").value)' in html
         assert 'render:document.getElementById("v2-render").checked' in html
+        assert 'id="v2-inventory-panel"' in html
+        assert 'async function loadV2Inventory' in html
+        assert '/v2/runs/" + encodeURIComponent(runId) + "/overview' in html
 
 
 def test_dashboard_noscript_guidance_is_localized():

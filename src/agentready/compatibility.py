@@ -6,7 +6,17 @@ from dataclasses import dataclass
 
 RELEASE_VERSION = "0.9.0"
 RELEASE_CHANNEL = "stable"
-V1_FACADES = ("scan", "seo audit", "mobile audit", "/scan", "/seo/audit", "/mobile/audit")
+V1_FACADES = (
+    "scan",
+    "seo audit",
+    "mobile audit",
+    "/scan",
+    "/seo/audit",
+    "/mobile/audit",
+    "mcp.scan_site",
+    "mcp.seo_audit",
+    "mcp.mobile_audit",
+)
 V2_SCHEMAS = ("agentready.audit.v2", "agentready.findings.v1", "agentready.remediation-plan.v1")
 PROTOCOL_MANIFEST_VERSION = "v1"
 

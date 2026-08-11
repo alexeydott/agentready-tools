@@ -190,6 +190,11 @@ _TEXT = {
         "print_report": "Print report",
         "result": "Operation result",
         "ready": "Configure an audit and choose an operation.",
+        "v2_inventory": "Run inventory",
+        "v2_inventory_hint": "Browse bounded server-side inventory for the latest vNext run.",
+        "v2_inventory_load": "Load inventory",
+        "v2_inventory_empty": "Run the vNext audit to load inventory.",
+        "v2_inventory_error": "Unable to load inventory",
         "loading": "Loading...",
         "progress_title": "Audit in progress",
         "progress_start": "Preparing audit request",
@@ -394,6 +399,11 @@ _TEXT = {
         "print_report": "Распечатать отчёт",
         "result": "Результат операции",
         "ready": "Настройте аудит и выберите операцию.",
+        "v2_inventory": "Инвентарь запуска",
+        "v2_inventory_hint": "Просмотр ограниченного серверного инвентаря последнего запуска vNext.",
+        "v2_inventory_load": "Загрузить инвентарь",
+        "v2_inventory_empty": "Запустите аудит vNext, чтобы загрузить инвентарь.",
+        "v2_inventory_error": "Не удалось загрузить инвентарь",
         "loading": "Загрузка...",
         "progress_title": "Аудит выполняется",
         "progress_start": "Подготовка запроса аудита",
@@ -597,6 +607,11 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <section id="result-panel" class="panel" hidden><h2>{escape(text["result"])}</h2>
 <div id="progress" hidden role="status" aria-live="polite"><strong>{escape(text["progress_title"])}</strong><div class="progress-track"><span id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="{escape(text["progress_start"])}"></span></div><div id="progress-steps"><span>{escape(text["progress_start"])}</span><span>{escape(text["progress_fetch"])}</span><span>{escape(text["progress_render"])}</span></div></div>
 <div id="result" hidden role="status" aria-live="polite">{escape(text["ready"])}</div></section>
+<section id="v2-inventory-panel" class="panel" hidden aria-labelledby="v2-inventory-title">
+<h2 id="v2-inventory-title">{escape(text["v2_inventory"])} {_hint(text, "v2_inventory_hint")}</h2>
+<div class="actions"><button type="button" class="secondary" onclick="loadV2Inventory()">{escape(text["v2_inventory_load"])}</button></div>
+<div id="v2-inventory" role="region" aria-live="polite">{escape(text["v2_inventory_empty"])}</div>
+</section>
 <details id="ai-assistant-panel" class="panel" hidden><summary>{escape(text["ai_title"])} <h2 class="sr-only">{escape(text["ai_title"])}</h2> {_hint(text, "ai_hint")}</summary>
 <div class="form-grid three"><div><label for="ai-mode">{escape(text["ai_mode"])} {_hint(text, "ai_request_hint")}</label><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div><div><label for="ai-chat-provider">{escape(text["ai_provider"])}</label><select id="ai-chat-provider" onchange="selectChatProvider()"></select></div><div><label for="ai-model">{escape(text["ai_model"])}</label><select id="ai-model"></select></div></div><h3>{escape(text["ai_chat_history"])} {_hint(text, "ai_chat_history_hint")}</h3><div id="ai-chat-history" class="ai-chat-history" aria-live="polite"></div><label for="ai-message">{escape(text["ai_message"])}</label><textarea id="ai-message"></textarea>
 <div class="form-grid three"><div><label for="ai-skill">{escape(text["ai_skills"])} {_hint(text, "ai_skills_hint")}</label><select id="ai-skill" multiple size="4">{skill_options}</select></div><div><label for="ai-mcp-tool">{escape(text["ai_mcp"])} {_hint(text, "ai_mcp_hint")}</label><select id="ai-mcp-tool" multiple size="3"><option value="agentready.seo_findings">AgentReady MCP: SEO findings</option><option value="agentready.remediation_plan">AgentReady MCP: remediation plan</option></select></div><div><label for="ai-attachments">{escape(text["ai_attachments"])} {_hint(text, "ai_attach_hint")}</label><input id="ai-attachments" type="file" multiple accept=".jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.pdf,.txt,.md,.markdown,.json,.csv,.yaml,.yml,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png"></div></div>
@@ -810,10 +825,34 @@ async function runV2() {{
   window.agentreadyV2Report = null;
   try {{
     await request("/v2/audit/dashboard","POST",{{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:Number(document.getElementById("v2-max-pages").value)||3,render:document.getElementById("v2-render").checked,timeout:Number(document.getElementById("timeout").value),language:language.value}},true);
+    await loadV2Inventory();
     setAiAvailability(true);
   }} catch (error) {{
     setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message;
   }}
+}}
+async function loadV2Inventory(kind="pages") {{
+  const report = window.agentreadyV2Report;
+  const runId = report && report.run ? report.run.id : null;
+  const panel = document.getElementById("v2-inventory-panel");
+  const container = document.getElementById("v2-inventory");
+  if (!runId) {{ panel.hidden = false; container.textContent = translations[language.value].v2_inventory_empty; return; }}
+  panel.hidden = false;
+  try {{
+    const overview = await (await fetch("/v2/runs/" + encodeURIComponent(runId) + "/overview")).json();
+    const inventory = overview.inventory || {{}};
+    const counts = Object.entries(inventory).map(([name, count]) => `<button type="button" class="secondary" onclick="loadV2Inventory('${{name.replace('_','-')}}')">${{name}} (${{count}})</button>`).join(" ");
+    const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/inventory/" + encodeURIComponent(kind));
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const page = await response.json();
+    const rows = (page.items || []).slice(0, 100).map(item => `<tr><td><code>${{escapeHtml(JSON.stringify(item))}}</code></td></tr>`).join("");
+    container.innerHTML = `<p>${{counts}}</p><table><thead><tr><th>${{kind}}</th></tr></thead><tbody>${{rows}}</tbody></table>`;
+  }} catch (error) {{
+    container.textContent = translations[language.value].v2_inventory_error + ": " + error.message;
+  }}
+}}
+function escapeHtml(value) {{
+  return String(value).replace(/[&<>"']/g, character => ({{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}}[character]));
 }}
 function combinedReportDocument(geoText, seoText) {{
   const geo = new DOMParser().parseFromString(geoText, "text/html");

@@ -7,7 +7,7 @@ import re
 import sys
 import threading
 from collections import OrderedDict
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, is_dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -50,6 +50,8 @@ from .query_service import (
     ResourceQuery,
     RunUrlQuery,
 )
+from .saved_views import SavedView, SavedViewRegistry
+from .exports import export_query
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +130,7 @@ class _V2RunRegistry:
 
 
 _V2_RUNS = _V2RunRegistry()
+_V2_SAVED_VIEWS = SavedViewRegistry()
 
 
 def configure_data_dir(path: str | Path | None = None) -> Path:
@@ -910,6 +913,91 @@ def _inventory_response(run_id: str, query: object) -> dict:
     }
 
 
+def _build_inventory_query(run_id: str, kind: str, payload: dict) -> object:
+    """Build one allowlisted QuerySpec from a bounded saved-view payload."""
+    common = {
+        "cursor": payload.get("cursor"),
+        "limit": int(payload.get("limit", 100)),
+    }
+    if kind == "pages":
+        return PageQuery(run_id, status_code=payload.get("status_code"), **common)
+    if kind in {"run-urls", "urls"}:
+        state = payload.get("state")
+        return RunUrlQuery(run_id, state=RunUrlState(state) if state else None, **common)
+    if kind == "links":
+        return LinkQuery(run_id, source_key=payload.get("source_key"), **common)
+    if kind == "resources":
+        return ResourceQuery(run_id, page_key=payload.get("page_key"), **common)
+    if kind == "redirects":
+        return RedirectQuery(
+            run_id,
+            from_url=payload.get("from_url"),
+            status_code=payload.get("status_code"),
+            **common,
+        )
+    if kind == "findings":
+        return FindingQuery(
+            run_id,
+            finding_id=payload.get("finding_id"),
+            status=payload.get("status"),
+            **common,
+        )
+    if kind == "metrics":
+        return MetricQuery(
+            run_id,
+            provider=payload.get("provider"),
+            name=payload.get("name"),
+            **common,
+        )
+    raise ValueError(f"unsupported inventory kind: {kind}")
+
+
+@app.post("/v2/saved-views")
+def create_v2_saved_view(payload: dict) -> dict:
+    try:
+        view_id = str(payload["id"])
+        name = str(payload["name"])
+        run_id = str(payload["run_id"])
+        query = _build_inventory_query(run_id, str(payload["kind"]), payload)
+        view = _V2_SAVED_VIEWS.save(SavedView(view_id, name, query))
+        return {"id": view.id, "name": view.name, "query": type(view.query).__name__}
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/saved-views")
+def list_v2_saved_views() -> list[dict]:
+    return [
+        {"id": view.id, "name": view.name, "query": type(view.query).__name__}
+        for view in _V2_SAVED_VIEWS.list()
+    ]
+
+
+@app.get("/v2/saved-views/{view_id}")
+def execute_v2_saved_view(view_id: str, limit: int = Query(default=100, ge=1, le=1000)) -> dict:
+    try:
+        view = _V2_SAVED_VIEWS.get(view_id)
+        query = replace(view.query, limit=limit)
+        return _inventory_response(query.run_id, query)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="saved view not found") from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/saved-views/{view_id}/export")
+def export_v2_saved_view(view_id: str, format: str = Query(default="json")) -> dict:
+    try:
+        view = _V2_SAVED_VIEWS.get(view_id)
+        store = _V2_RUNS.get(view.query.run_id)
+        content = export_query(QueryService(store), view.query, format=format)
+        return {"id": view.id, "format": format, "content": content}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="saved view or run not found") from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.get("/v2/runs/{run_id}/pages")
 def audit_v2_pages_endpoint(
     run_id: str,
@@ -918,6 +1006,29 @@ def audit_v2_pages_endpoint(
     status_code: int | None = Query(default=None, ge=100, le=599),
 ) -> dict:
     return _inventory_response(run_id, PageQuery(run_id, status_code=status_code, cursor=cursor, limit=limit))
+
+
+@app.get("/v2/runs/{run_id}/overview")
+def audit_v2_overview_endpoint(run_id: str) -> dict:
+    """Return bounded run metadata and counts for the dashboard inventory view."""
+    try:
+        store = _V2_RUNS.get(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    service = QueryService(store)
+    queries = {
+        "pages": PageQuery(run_id, limit=1),
+        "run_urls": RunUrlQuery(run_id, limit=1),
+        "links": LinkQuery(run_id, limit=1),
+        "resources": ResourceQuery(run_id, limit=1),
+        "redirects": RedirectQuery(run_id, limit=1),
+        "findings": FindingQuery(run_id, limit=1),
+        "metrics": MetricQuery(run_id, limit=1),
+    }
+    return {
+        "run_id": run_id,
+        "inventory": {name: service.count(query) for name, query in queries.items()},
+    }
 
 
 @app.get("/v2/runs/{run_id}/run-urls")

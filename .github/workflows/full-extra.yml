@@ -24,8 +24,8 @@ jobs:
       - name: Run full suite without optional skips
         shell: bash
         run: |
-          python -m pytest -q -ra
-          if python -m pytest --collect-only -q | grep -q "skipped"; then
-            echo "Unexpected skipped tests in full-extra collection"
+          python -m pytest -q -ra 2>&1 | tee pytest-output.txt
+          if grep -qE "^[0-9]+ skipped" pytest-output.txt || grep -q "^SKIPPED" pytest-output.txt; then
+            echo "Unexpected skipped tests in full-extra run"
             exit 1
           fi

@@ -63,7 +63,7 @@ advanced panel exposes the vNext crawl profile (`quick`, `standard`, `deep`),
 the page limit, and optional browser rendering; server-side hard caps still
 apply to every submitted value. Completed v2 runs are retained in a bounded
 in-process registry for typed inventory reads:
-`/v2/runs/{run_id}/pages`, `run-urls` (alias `urls`), `links`, `resources`,
+`/v2/runs/{run_id}/overview`, `/pages`, `run-urls` (alias `urls`), `links`, `resources`,
 `redirects`, `findings`, and `metrics`. The same records are reachable through
 the generic `/v2/runs/{run_id}/inventory/{kind}` route, where `kind` is one of
 those names; an unknown `kind` is rejected with `422`. Each endpoint accepts
@@ -74,6 +74,12 @@ The registry is bounded by both the number of retained runs and the total
 number of retained inventory records, so deep crawls cannot pin unbounded
 memory. Once a run is evicted, its inventory endpoints return `404`; re-run the
 audit to repopulate it.
+
+Typed saved views are available at `/v2/saved-views`. Create a view with a
+run ID, an allowlisted inventory `kind`, and its typed filter fields; execute it
+with `GET /v2/saved-views/{view_id}` or export the exact same QuerySpec through
+`/v2/saved-views/{view_id}/export?format=csv` (also `json`, `jsonl`, `markdown`,
+and `html`). Saved views never accept SQL or executable filter expressions.
 
 For a selective child rescan, send `rescan_of` together with `selected_urls`.
 The crawler validates those URLs against the target origin and does not expand
