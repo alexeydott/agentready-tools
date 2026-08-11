@@ -191,6 +191,12 @@ def test_dashboard_ai_workspace_has_history_conversation_and_context_zones():
     assert 'class="ai-context-sidebar"' in html
     assert 'class="ai-composer"' in html
     assert 'id="ai-context-chips"' in html
+    assert 'id="ai-skills-picker"' in html
+    assert 'id="ai-context-picker"' in html
+    assert 'id="ai-skills-trigger"' in html
+    assert 'id="ai-context-trigger"' in html
+    assert 'function toggleAiToolPicker(kind)' in html
+    assert 'Optional built-in instructions that shape how the model analyzes the audit.' in html
     assert 'id="ai-chat-search"' in html
     assert 'id="ai-chat-button"' in html
     assert 'event.key === "Enter" && !event.shiftKey' in html

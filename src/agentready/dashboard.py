@@ -88,6 +88,9 @@ _TEXT = {
         "ai_prompt_footer": "Prompt library",
         "ai_settings_footer": "AI settings",
         "ai_skills": "Skills",
+        "ai_skills_selected": "Skills: none",
+        "ai_context_selected": "Context: none",
+        "ai_picker_hint": "Select one or more items to add them to the next AI request.",
         "ai_skills_hint": "Optional built-in instructions that shape how the model analyzes the audit.",
         "ai_mcp": "MCP context",
         "ai_mcp_hint": "Optional AgentReady MCP projections added as evidence for the model.",
@@ -309,6 +312,9 @@ _TEXT = {
         "ai_prompt_footer": "Библиотека промтов",
         "ai_settings_footer": "Настройки AI",
         "ai_skills": "Навыки",
+        "ai_skills_selected": "Навыки: нет",
+        "ai_context_selected": "Контекст: нет",
+        "ai_picker_hint": "Выберите один или несколько элементов для добавления в следующий запрос AI.",
         "ai_skills_hint": "Необязательные встроенные инструкции, определяющие анализ аудита моделью.",
         "ai_mcp": "Контекст MCP",
         "ai_mcp_hint": "Необязательные проекции AgentReady MCP, добавляемые в доказательства для модели.",
@@ -524,7 +530,7 @@ def render_dashboard(language: str = "en") -> str:
     faq = _FAQ[lang]
     translations = json.dumps(_TEXT, ensure_ascii=False).replace("</", "<\\/")
     skill_options = "".join(
-        f'<option value="{escape(item["id"])}">{escape(item["title"])} — {escape(item["description"])}</option>'
+        f'<option value="{escape(item["id"])}" title="{escape(item["description"])}" data-label="{escape(item["title"])}">{escape(item["title"])} — {escape(item["description"])}</option>'
         for item in ai_skill_catalog(lang)
     )
     return f"""<!doctype html>
@@ -619,6 +625,12 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-composer-tools {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }} .ai-composer-tools input[type=file] {{ display:none; }}
 .ai-composer-tools label,.ai-composer-tools button {{ width:auto; min-height:36px; padding:7px 10px; font-size:.9rem; }}
 .ai-composer-tools label {{ border:1px solid #efcdb8; border-radius:9px; cursor:pointer; font-weight:600; }}
+.ai-tool-picker {{ position:relative; }} .ai-tool-picker > button {{ max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
+.ai-tool-picker-panel {{ position:absolute; bottom:44px; left:0; z-index:30; display:none; width:min(320px,calc(100vw - 36px)); max-height:300px; overflow:auto; padding:10px; border:1px solid #efcdb8; border-radius:12px; background:#fff; box-shadow:0 10px 28px #0002; }}
+.ai-tool-picker.open .ai-tool-picker-panel {{ display:grid; gap:4px; }}
+.ai-tool-picker-panel > p {{ margin:0 0 6px; color:#765b4d; font-size:.82rem; line-height:1.35; }}
+.ai-tool-option {{ display:flex; align-items:flex-start; gap:8px; padding:8px; border-radius:8px; cursor:pointer; }} .ai-tool-option:hover {{ background:#fff0e7; }}
+.ai-tool-option input {{ width:auto; margin-top:3px; flex:0 0 auto; }} .ai-tool-option span {{ line-height:1.3; }}
 .ai-composer-primary {{ width:auto; min-width:108px; }} .ai-context-chips {{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }}
 .ai-composer-more {{ position:relative; }} .ai-composer-more summary {{ list-style:none; cursor:pointer; border:1px solid #efcdb8; border-radius:9px; padding:7px 10px; color:#9e2f0b; font-weight:700; }} .ai-composer-more summary::-webkit-details-marker {{ display:none; }}
 .ai-composer-more .ai-more-menu {{ position:absolute; bottom:42px; left:0; z-index:20; display:grid; gap:6px; min-width:220px; padding:8px; border:1px solid #efcdb8; border-radius:10px; background:#fff; box-shadow:0 8px 22px #0002; }}
@@ -628,6 +640,7 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-context-sidebar details:first-child {{ border-top:0; padding-top:0; margin-top:0; }} .ai-context-sidebar summary {{ margin-bottom:10px; }}
 .ai-sidebar-footer {{ display:grid; gap:8px; margin-top:20px; padding-top:14px; border-top:1px solid #efcdb8; }} .ai-sidebar-footer button {{ width:100%; text-align:left; }}
 .ai-context-sidebar select[multiple] {{ min-height:110px; padding:6px; }} .ai-context-sidebar .form-field {{ margin-top:10px; }}
+.ai-prompt-library-panel {{ min-height:360px; }} .ai-prompt-library-panel select {{ min-height:230px; }}
 .ai-hidden-compatible {{ position:absolute !important; width:1px !important; height:1px !important; overflow:hidden !important; clip:rect(0 0 0 0) !important; white-space:nowrap !important; }}
 @media (max-width:1279px) {{ .ai-drawer-toggle.context-toggle {{ display:inline-flex; }} .ai-workspace-grid {{ grid-template-columns:220px minmax(0,1fr); }} .ai-context-sidebar {{ display:none; }} .ai-workspace.context-open .ai-context-sidebar {{ display:block; position:absolute; right:18px; z-index:25; width:min(320px,calc(100% - 36px)); border:1px solid #efcdb8; border-radius:12px; box-shadow:0 8px 28px #0002; }} .ai-workspace-grid {{ position:relative; }} }}
 @media (max-width:900px) {{ .ai-drawer-toggle.history-toggle {{ display:inline-flex; }} .ai-workspace-grid {{ grid-template-columns:1fr; }} .ai-history-sidebar {{ display:none; }} .ai-workspace.history-open .ai-history-sidebar {{ display:block; position:absolute; left:18px; right:18px; z-index:25; border:1px solid #efcdb8; border-radius:12px; box-shadow:0 8px 28px #0002; }} .ai-conversation {{ padding:16px; }} }}
@@ -698,8 +711,8 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div class="ai-workspace-header"><div class="ai-header-title"><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><div class="ai-header-meta"><small>{escape(text["ai_hint"])}</small><span id="ai-model-chip" class="ai-model-chip" title="{escape(text["ai_model_chip"])}">{escape(text["ai_model_chip"])}: —</span></div></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" title="{escape(text["ai_saved_chats"])}" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><div class="ai-mode-segmented" role="group" aria-label="{escape(text["ai_mode"])}"><button type="button" data-ai-mode="both" title="{escape(text["ai_mode_both_hint"])}" onclick="setAiMode('both')">{escape(text["ai_mode_both"])}</button><button type="button" data-ai-mode="seo" title="{escape(text["ai_mode_seo_hint"])}" onclick="setAiMode('seo')">{escape(text["ai_mode_seo"])}</button><button type="button" data-ai-mode="geo" title="{escape(text["ai_mode_geo_hint"])}" onclick="setAiMode('geo')">{escape(text["ai_mode_geo"])}</button></div><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
 <div class="ai-workspace-grid">
 <aside class="ai-history-sidebar" aria-label="{escape(text["ai_saved_chats"])}"><h3 class="ai-sidebar-title">{escape(text["ai_saved_chats"])}<button type="button" class="secondary" title="{escape(text["ai_new_chat"])}" onclick="startNewChat()">{escape(text["ai_new_chat"])}</button></h3><input id="ai-chat-search" class="ai-chat-search" type="search" placeholder="{escape(text["ai_saved_chats"])}" aria-label="{escape(text["ai_saved_chats"])}" title="{escape(text["ai_saved_chats"])}"><label class="sr-only" for="ai-saved-chats">{escape(text["ai_saved_chats"])}</label><select id="ai-saved-chats" size="8"></select><div class="ai-sidebar-footer"><button type="button" class="secondary" title="{escape(text["ai_prompt_library"])}" onclick="openAiPromptPicker()">{escape(text["ai_prompt_footer"])}</button><button type="button" class="secondary" title="{escape(text["ai_credentials_hint"])}" onclick="openAiCredentials()">{escape(text["ai_settings_footer"])}</button></div></aside>
-<main class="ai-conversation"><div id="ai-welcome" class="ai-welcome"><div class="ai-welcome-icon" aria-hidden="true">✦</div><h3>{escape(text["ai_welcome"])}</h3><p>{escape(text["ai_welcome_hint"])}</p><div class="ai-suggestions"><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_seo"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_seo"])}</button><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_geo"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_geo"])}</button><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_summary"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_summary"])}</button></div></div><div id="ai-chat-history" class="ai-chat-history" aria-live="polite"></div><div id="ai-result" class="ai-report" hidden role="status" aria-live="polite"></div><div class="ai-composer"><div id="ai-context-chips" class="ai-context-chips"></div><label class="sr-only" for="ai-message">{escape(text["ai_message"])}</label><textarea id="ai-message" placeholder="{escape(text["ai_message"])}"></textarea><div class="ai-composer-toolbar"><div class="ai-composer-tools"><label for="ai-attachments" title="{escape(text["ai_attach_hint"])}">＋ {escape(text["ai_attachments"])}<input id="ai-attachments" type="file" multiple accept=".jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.pdf,.txt,.md,.markdown,.json,.csv,.yaml,.yml,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png"></label><button type="button" class="secondary" title="{escape(text["ai_prompt_library"])}" onclick="openAiPromptPicker()">{escape(text["ai_prompt_apply"])}</button><details class="ai-composer-more"><summary title="{escape(text["ai_more"])}">⋯ <span class="sr-only">{escape(text["ai_more"])}</span></summary><div class="ai-more-menu"><button type="button" class="secondary" onclick="exportChat()">{escape(text["ai_chat_export"])}</button><button id="ai-run-button" type="button" class="secondary" title="{escape(text["ai_run_hint"])}" aria-label="{escape(text["ai_run_hint"])}" onclick="runAi('/ai/recommend')">{escape(text["ai_run"])}</button><button id="ai-retry-button" type="button" class="secondary" title="{escape(text["ai_retry"])}" onclick="runAi('/ai/chat', true)">{escape(text["ai_retry"])}</button></div></details></div><button id="ai-chat-button" type="button" class="ai-composer-primary" title="{escape(text["ai_chat_hint"])}" aria-label="{escape(text["ai_chat_hint"])}">{escape(text["ai_send"])}</button></div></div></main>
-<aside class="ai-context-sidebar" aria-label="{escape(text["ai_hint"])}"><details open><summary title="{escape(text["ai_mcp_hint"])}">{escape(text["ai_mcp"])}</summary><label for="ai-mcp-tool" class="sr-only">{escape(text["ai_mcp"])}</label><select id="ai-mcp-tool" multiple size="3"><option value="agentready.seo_findings">AgentReady MCP: SEO findings</option><option value="agentready.remediation_plan">AgentReady MCP: remediation plan</option></select></details><details open><summary title="{escape(text["ai_skills_hint"])}">{escape(text["ai_skills"])}</summary><label for="ai-skill" class="sr-only">{escape(text["ai_skills"])}</label><select id="ai-skill" multiple size="4">{skill_options}</select></details><details open><summary>{escape(text["ai_model"])}</summary><label for="ai-chat-provider">{escape(text["ai_provider"])}</label><select id="ai-chat-provider" onchange="selectChatProvider()"></select><label for="ai-model">{escape(text["ai_model"])}</label><select id="ai-model"></select></details><details open><summary title="{escape(text["ai_prompt_library"])}">{escape(text["ai_prompt_library"])}</summary><label for="ai-prompt-library">{escape(text["ai_prompt_library"])}</label><select id="ai-prompt-library"></select><input id="ai-prompt-title" class="ai-hidden-compatible" type="text" aria-hidden="true" tabindex="-1"><div class="actions"><button type="button" class="secondary" title="{escape(text["ai_prompt_save"])}" onclick="savePrompt()">{escape(text["ai_prompt_save"])}</button><button type="button" class="secondary" title="{escape(text["ai_chat_save"])}" onclick="saveChat()">{escape(text["ai_chat_save"])}</button></div></details></aside>
+<main class="ai-conversation"><div id="ai-welcome" class="ai-welcome"><div class="ai-welcome-icon" aria-hidden="true">✦</div><h3>{escape(text["ai_welcome"])}</h3><p>{escape(text["ai_welcome_hint"])}</p><div class="ai-suggestions"><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_seo"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_seo"])}</button><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_geo"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_geo"])}</button><button type="button" class="ai-suggestion" title="{escape(text["ai_suggestion_summary"])}" onclick="useAiSuggestedPrompt(this.textContent)">{escape(text["ai_suggestion_summary"])}</button></div></div><div id="ai-chat-history" class="ai-chat-history" aria-live="polite"></div><div id="ai-result" class="ai-report" hidden role="status" aria-live="polite"></div><div class="ai-composer"><div id="ai-context-chips" class="ai-context-chips"></div><label class="sr-only" for="ai-message">{escape(text["ai_message"])}</label><textarea id="ai-message" placeholder="{escape(text["ai_message"])}"></textarea><div class="ai-composer-toolbar"><div class="ai-composer-tools"><label for="ai-attachments" title="{escape(text["ai_attach_hint"])}">＋ {escape(text["ai_attachments"])}<input id="ai-attachments" type="file" multiple accept=".jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.pdf,.txt,.md,.markdown,.json,.csv,.yaml,.yml,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png"></label><div id="ai-skills-picker" class="ai-tool-picker"><button type="button" class="secondary" id="ai-skills-trigger" title="{escape(text["ai_skills_hint"])}" onclick="toggleAiToolPicker('skills')">{escape(text["ai_skills_selected"])}</button><div class="ai-tool-picker-panel" role="group" aria-label="{escape(text["ai_skills"])}"><p>{escape(text["ai_picker_hint"])}</p><div id="ai-skills-options"></div></div></div><div id="ai-context-picker" class="ai-tool-picker"><button type="button" class="secondary" id="ai-context-trigger" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiToolPicker('context')">{escape(text["ai_context_selected"])}</button><div class="ai-tool-picker-panel" role="group" aria-label="{escape(text["ai_mcp"])}"><p>{escape(text["ai_picker_hint"])}</p><div id="ai-context-options"></div></div></div><button type="button" class="secondary" title="{escape(text["ai_prompt_library"])}" onclick="openAiPromptPicker()">{escape(text["ai_prompt_apply"])}</button><details class="ai-composer-more"><summary title="{escape(text["ai_more"])}">⋯ <span class="sr-only">{escape(text["ai_more"])}</span></summary><div class="ai-more-menu"><button type="button" class="secondary" onclick="exportChat()">{escape(text["ai_chat_export"])}</button><button id="ai-run-button" type="button" class="secondary" title="{escape(text["ai_run_hint"])}" aria-label="{escape(text["ai_run_hint"])}" onclick="runAi('/ai/recommend')">{escape(text["ai_run"])}</button><button id="ai-retry-button" type="button" class="secondary" title="{escape(text["ai_retry"])}" onclick="runAi('/ai/chat', true)">{escape(text["ai_retry"])}</button></div></details></div><button id="ai-chat-button" type="button" class="ai-composer-primary" title="{escape(text["ai_chat_hint"])}" aria-label="{escape(text["ai_chat_hint"])}">{escape(text["ai_send"])}</button></div></div></main>
+<aside class="ai-context-sidebar" aria-label="{escape(text["ai_hint"])}"><details class="ai-hidden-compatible" open><summary title="{escape(text["ai_mcp_hint"])}">{escape(text["ai_mcp"])}</summary><label for="ai-mcp-tool" class="sr-only">{escape(text["ai_mcp"])}</label><select id="ai-mcp-tool" multiple size="3"><option value="agentready.seo_findings" title="Найденные проблемы SEO и связанные доказательства">AgentReady MCP: SEO findings</option><option value="agentready.remediation_plan" title="План исправлений, сформированный по результатам аудита">AgentReady MCP: remediation plan</option></select></details><details class="ai-hidden-compatible" open><summary title="{escape(text["ai_skills_hint"])}">{escape(text["ai_skills"])}</summary><label for="ai-skill" class="sr-only">{escape(text["ai_skills"])}</label><select id="ai-skill" multiple size="4">{skill_options}</select></details><details open><summary>{escape(text["ai_model"])}</summary><label for="ai-chat-provider">{escape(text["ai_provider"])}</label><select id="ai-chat-provider" onchange="selectChatProvider()"></select><label for="ai-model">{escape(text["ai_model"])}</label><select id="ai-model"></select></details><details class="ai-prompt-library-panel" open><summary title="{escape(text["ai_prompt_library"])}">{escape(text["ai_prompt_library"])}</summary><label for="ai-prompt-library">{escape(text["ai_prompt_library"])}</label><select id="ai-prompt-library"></select><input id="ai-prompt-title" class="ai-hidden-compatible" type="text" aria-hidden="true" tabindex="-1"><div class="actions"><button type="button" class="secondary" title="{escape(text["ai_prompt_save"])}" onclick="savePrompt()">{escape(text["ai_prompt_save"])}</button><button type="button" class="secondary" title="{escape(text["ai_chat_save"])}" onclick="saveChat()">{escape(text["ai_chat_save"])}</button></div></details></aside>
 </div></section>
 </main>
 <aside class="help-sidebar" aria-label="{escape(text["help_title"])}"><section id="help-content" class="panel help-content" hidden tabindex="-1">{faq}</section></aside>
@@ -1252,6 +1265,7 @@ async function loadAiTools() {{
       const selected = id === "ai-skill" ? data.skills : data.mcp_tools;
       [...document.getElementById(id).options].forEach(option => option.selected = selected.includes(option.value));
     }});
+    updateAiContextChips();
   }} catch (error) {{
     console.warn("Unable to load AI tools settings", {{error:String(error)}});
   }}
@@ -1598,9 +1612,62 @@ async function restoreSavedChat() {{
 function selectedValues(id) {{
   return [...document.getElementById(id).selectedOptions].map(option => option.value);
 }}
+function aiToolPickerConfig(kind) {{
+  return kind === "skills"
+    ? {{selectId:"ai-skill", pickerId:"ai-skills-picker", optionsId:"ai-skills-options", triggerId:"ai-skills-trigger", labelKey:"ai_skills_selected", emptyKey:"ai_skills_selected"}}
+    : {{selectId:"ai-mcp-tool", pickerId:"ai-context-picker", optionsId:"ai-context-options", triggerId:"ai-context-trigger", labelKey:"ai_context_selected", emptyKey:"ai_context_selected"}};
+}}
+function renderAiToolPicker(kind) {{
+  const config = aiToolPickerConfig(kind);
+  const select = document.getElementById(config.selectId);
+  const container = document.getElementById(config.optionsId);
+  if (!select || !container || container.dataset.ready === "true") return;
+  container.replaceChildren(...[...select.options].map(option => {{
+    const label = document.createElement("label");
+    label.className = "ai-tool-option";
+    label.title = option.title || option.textContent;
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = option.value;
+    checkbox.checked = option.selected;
+    checkbox.setAttribute("aria-label", option.dataset.label || option.textContent);
+    checkbox.addEventListener("change", () => {{
+      option.selected = checkbox.checked;
+      select.dispatchEvent(new Event("change", {{bubbles:true}}));
+    }});
+    const text = document.createElement("span");
+    text.textContent = option.dataset.label || option.textContent.split(" — ")[0];
+    label.append(checkbox, text);
+    return label;
+  }}));
+  container.dataset.ready = "true";
+}}
+function syncAiToolPicker(kind) {{
+  const config = aiToolPickerConfig(kind);
+  renderAiToolPicker(kind);
+  const selected = new Set(selectedValues(config.selectId));
+  document.querySelectorAll("#" + config.optionsId + " input").forEach(input => input.checked = selected.has(input.value));
+}}
+function toggleAiToolPicker(kind) {{
+  const config = aiToolPickerConfig(kind);
+  renderAiToolPicker(kind);
+  document.querySelectorAll(".ai-tool-picker").forEach(picker => {{
+    if (picker.id !== config.pickerId) picker.classList.remove("open");
+  }});
+  document.getElementById(config.pickerId).classList.toggle("open");
+  console.info("[AI-UX] Tool picker toggled", {{kind, open:document.getElementById(config.pickerId).classList.contains("open")}});
+}}
 function updateAiContextChips() {{
   const container = document.getElementById("ai-context-chips");
   if (!container) return;
+  syncAiToolPicker("skills");
+  syncAiToolPicker("context");
+  const skillSelect = document.getElementById("ai-skill");
+  const contextSelect = document.getElementById("ai-mcp-tool");
+  const skillNames = [...skillSelect.selectedOptions].map(option => option.dataset.label || option.textContent.split(" — ")[0]);
+  const contextNames = [...contextSelect.selectedOptions].map(option => option.dataset.label || option.textContent.split(" — ")[0]);
+  document.getElementById("ai-skills-trigger").textContent = skillNames.length ? translations[language.value].ai_skills + ": " + skillNames.join(", ") : translations[language.value].ai_skills_selected;
+  document.getElementById("ai-context-trigger").textContent = contextNames.length ? translations[language.value].ai_mcp + ": " + contextNames.join(", ") : translations[language.value].ai_context_selected;
   const values = [
     ["MCP", selectedValues("ai-mcp-tool").length],
     ["Skills", selectedValues("ai-skill").length],
@@ -1897,6 +1964,9 @@ document.getElementById("ai-skill").addEventListener("change", saveAiTools);
 document.getElementById("ai-mcp-tool").addEventListener("change", saveAiTools);
 document.getElementById("ai-skill").addEventListener("change", updateAiContextChips);
 document.getElementById("ai-mcp-tool").addEventListener("change", updateAiContextChips);
+document.addEventListener("click", event => {{
+  if (!event.target.closest(".ai-tool-picker")) document.querySelectorAll(".ai-tool-picker").forEach(picker => picker.classList.remove("open"));
+}});
 document.getElementById("ai-chat-search").addEventListener("input", event => {{
   const needle = event.target.value.trim().toLowerCase();
   [...document.getElementById("ai-saved-chats").options].forEach(option => {{ option.hidden = Boolean(needle && !option.textContent.toLowerCase().includes(needle)); }});
