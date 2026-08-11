@@ -642,8 +642,10 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-prompt-composer {{ margin-top:8px; padding:10px; border:1px solid #efcdb8; border-radius:12px; background:#fffaf6; }}
 .ai-message-row {{ display:grid; grid-template-columns:minmax(0,1fr) 150px; gap:8px; align-items:stretch; }}
 .ai-message-row textarea,.ai-message-row #ai-message {{ min-height:260px; height:100%; }}
-.ai-side-actions {{ display:flex; flex-direction:column; gap:8px; }}
-.ai-side-actions > * {{ width:100%; min-height:58px; box-sizing:border-box; }}
+.ai-side-actions {{ display:flex; flex-direction:column; justify-content:space-between; gap:8px; height:100%; }}
+.ai-side-actions > * {{ width:100%; min-height:68px; box-sizing:border-box; }}
+.ai-side-actions input[type=file] {{ display:none; }}
+.ai-side-actions #ai-chat-button {{ min-height:88px; font-size:1.15rem; }}
 .ai-side-actions label,.ai-side-actions button {{ display:flex; align-items:center; justify-content:center; padding:8px; text-align:center; }}
 .ai-side-actions label {{ border:1px solid #efcdb8; border-radius:9px; cursor:pointer; font-weight:600; }}
 .ai-prompt-composer {{ margin-top:14px; padding:0; border:0; background:transparent; }}
@@ -655,7 +657,7 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-prompt-edit-dialog {{ width:min(620px,calc(100vw - 32px)); border:1px solid #efcdb8; border-radius:16px; padding:22px; color:#441d0c; box-shadow:0 16px 50px #0003; }}
 .ai-prompt-edit-dialog::backdrop {{ background:#24130d66; }} .ai-prompt-edit-dialog h2 {{ margin-top:0; }}
 .ai-prompt-edit-dialog textarea {{ min-height:180px; resize:vertical; }} .ai-prompt-edit-dialog .actions {{ justify-content:flex-end; }}
-.ai-composer-links {{ margin-top:12px; color:#765b4d; line-height:1.6; }} .ai-composer-links .text-link {{ margin-right:4px; }} .ai-composer-links .text-link + .text-link::before {{ content:", "; color:#765b4d; text-decoration:none; display:inline-block; margin-right:4px; }}
+.ai-composer-links {{ margin-top:12px; color:#765b4d; line-height:1.6; }} .ai-composer-links .text-link {{ margin-right:4px; font-weight:400; }} .ai-composer-links .text-link + .text-link::before {{ content:", "; color:#765b4d; text-decoration:none; display:inline-block; margin-right:4px; }}
 .ai-composer-links .text-link.is-disabled {{ opacity:.5; pointer-events:none; }}
 .ai-composer-toolbar {{ display:none; }}
 .ai-composer-toolbar[hidden] {{ display:none !important; }}
