@@ -97,6 +97,21 @@ The `full-extra` GitHub Actions workflow installs MCP, Playwright, and Chromium
 and runs the suite as a no-optional-skips release gate. Local development may
 still use the smaller dependency set when browser/MCP work is not in scope.
 
+### L0-L4 acceptance matrix
+
+`tests/test_acceptance_matrix.py` keeps the release boundary explicit:
+
+| Level | Coverage | Execution |
+| --- | --- | --- |
+| L0 | Typed request and contract unit checks | Every test run |
+| L1 | Deterministic local dashboard/fixture behavior | Every test run |
+| L2 | CLI, FastAPI, and MCP request-field parity | Every test run |
+| L3 | Dashboard accessibility and inventory controls | Full-extra suite and headed acceptance |
+| L4 | Opt-in live-site smoke | `workflow_dispatch` only; never a blocking default gate |
+
+L4 must use bounded targets and explicit operator consent. It is not a
+replacement for deterministic fixture coverage.
+
 ## Portable Windows Build
 
 Build the standalone executable with:
