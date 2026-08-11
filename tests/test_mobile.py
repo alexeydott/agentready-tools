@@ -99,6 +99,8 @@ def test_mobile_report_renders_all_formats():
     html_output = render_mobile_html(report, "ru")
     assert "Отчёт о мобильной дружественности" in html_output
     assert "viewport-meta" in html_output
+    assert "check-table check-table--compact" in html_output
+    assert "status-badge status-fail" in html_output
     assert '<h1>Отчёт о мобильной дружественности</h1>\n<p class="report-generated"><small>' in html_output
     assert ".report-generated{margin:.25rem 0 1rem;color:#6b7280;font-size:.85rem}" in html_output
 

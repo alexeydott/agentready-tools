@@ -8,6 +8,7 @@ from datetime import datetime
 from .i18n import normalize_language
 from .mobile_i18n import mobile_detail, mobile_summary
 from .mobile_models import MobileReport
+from .report_components import render_category_card, render_check_cell, render_report_table, render_status_cell
 from .report_styles import BASE_REPORT_CSS
 
 _LABELS = {
@@ -150,13 +151,22 @@ def render_mobile_html(report: MobileReport, lang: str | None = None) -> str:
         for check in page.checks:
             title, category, hint = _localized_check(check.id, check.title, check.category, active)
             rows += (
-                f"<tr><td class='{html.escape(check.status)}'>{html.escape(labels.get(check.status, check.status))}</td>"
-                f"<td>{html.escape(category)}</td><td class='check-cell'><span class='check-name'>{html.escape(title)}</span> "
-                f"<span class='check-help' tabindex='0' role='img' aria-label='{html.escape(hint)}' data-tooltip='{html.escape(hint)}'>?</span>"
-                f"<small><code>{html.escape(check.id)}</code></small></td>"
+                f"<tr>{render_status_cell(check.status, labels.get(check.status, check.status))}"
+                f"<td>{html.escape(category)}</td>{render_check_cell(title, check.id, hint)}"
                 f"<td>{html.escape(mobile_detail(check.details, active))}</td></tr>"
             )
-        pages_html += f"<h2>{html.escape(page.url)} <small>({mode})</small></h2><p><strong>{labels['score']}: {page.score}/100</strong></p><div class='table-wrap'><table><caption>{html.escape(labels['checks'])}: {html.escape(page.url)}</caption><thead><tr><th scope='col'>{labels['status']}</th><th scope='col'>{labels['category']}</th><th scope='col'>{labels['check']}</th><th scope='col'>{labels['result']}</th></tr></thead><tbody>{rows}</tbody></table></div>"
+        table_caption = f"{labels['checks']}: {page.url}"
+        checks_table = render_report_table(
+            "mobile-checks",
+            table_caption,
+            (labels["status"], labels["category"], labels["check"], labels["result"]),
+            rows,
+            table_class="check-table check-table--compact",
+        )
+        pages_html += (
+            f"<h2>{html.escape(page.url)} <small>({mode})</small></h2>"
+            f"<p><strong>{labels['score']}: {page.score}/100</strong></p>{checks_table}"
+        )
     recommendations = "".join(
         f"<li><strong>{html.escape(_localized_check(item.check_id, item.title, '', active)[0])}</strong>: {html.escape(mobile_summary(item.check_id, item.action, active))}</li>"
         for item in report.recommendations
@@ -164,12 +174,8 @@ def render_mobile_html(report: MobileReport, lang: str | None = None) -> str:
     category_cards = []
     for item in report.categories:
         category, hint = _localized_category(item.category, active)
-        score = "-" if item.score is None else f"{item.score}/100"
-        category_cards.append(
-            f"<div class='card'><strong>{html.escape(category)} "
-            f"<span class='category-help check-help' tabindex='0' role='img' aria-label='{html.escape(hint)}' data-tooltip='{html.escape(hint)}'>?</span></strong>"
-            f"<div class='score'>{html.escape(score)}</div><small>{item.passed}/{item.applicable}</small></div>"
-        )
+        score = "-" if item.score is None else f"{item.score}%"
+        category_cards.append(render_category_card(category, hint, f"{score} · {item.passed}/{item.applicable}", item.score))
     remediation_items = []
     for page in report.pages:
         for check in page.checks:

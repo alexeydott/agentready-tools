@@ -8,9 +8,12 @@ from agentready.report_components import (
     render_report_toolbar,
     render_report_table,
     render_score_meter,
+    render_check_cell,
     render_section,
+    render_status_cell,
     render_status_badge,
 )
+from agentready.report_styles import BASE_REPORT_CSS
 
 
 def test_status_badge_escapes_label_and_keeps_textual_semantics():
@@ -19,6 +22,24 @@ def test_status_badge_escapes_label_and_keeps_textual_semantics():
     assert "status-warn" in output
     assert "aria-hidden='true'>!</span>" in output
     assert "&lt;Review&gt;" in output
+
+
+def test_check_table_cells_share_status_and_check_patterns():
+    status = render_status_cell("warn", "<Review>")
+    check = render_check_cell("<Check>", "check-id", "<Hint>")
+
+    assert "status-cell warn" in status
+    assert "status-badge status-warn" in status
+    assert "&lt;Review&gt;" in status
+    assert "class='check-cell'" in check
+    assert "&lt;Check&gt;" in check
+    assert "&lt;Hint&gt;" in check
+    assert "<code>check-id</code>" in check
+
+
+def test_status_cells_wrap_long_labels_without_overlapping_adjacent_columns():
+    assert ".status-cell{font-weight:600;min-width:0;white-space:normal" in BASE_REPORT_CSS
+    assert ".status-badge{display:inline-flex;align-items:center;gap:4px;max-width:100%;white-space:normal" in BASE_REPORT_CSS
 
 
 def test_score_and_progress_components_bound_values_and_escape_labels():
@@ -58,6 +79,7 @@ def test_report_table_component_escapes_headers_and_preserves_row_semantics():
     assert "<caption>&lt;Checks&gt;</caption>" in output
     assert "<th scope='col'>&lt;Status&gt;</th>" in output
     assert "<tr><td>pass</td></tr>" in output
+    assert "class='check-table'" in output
 
 
 def test_recommendation_list_component_preserves_order_and_escapes_empty_state():

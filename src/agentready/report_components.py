@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import html
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 _STATUS_MARKERS = {
@@ -22,6 +26,25 @@ def render_status_badge(status: str, label: str) -> str:
         f"<span class='status-badge status-{safe_status}'>"
         f"<span class='status-marker' aria-hidden='true'>{marker}</span>"
         f"<span class='status-label'>{html.escape(label)}</span></span>"
+    )
+
+
+def render_status_cell(status: str, label: str) -> str:
+    """Render a shared status table cell with a textual and symbolic badge."""
+    safe_status = html.escape(status, quote=True)
+    return f"<td class='status-cell {safe_status}'>{render_status_badge(status, label)}</td>"
+
+
+def render_check_cell(title: str, check_id: str, hint: str) -> str:
+    """Render the shared check-name cell used by every report profile."""
+    safe_title = html.escape(title)
+    safe_id = html.escape(check_id)
+    safe_hint = html.escape(hint, quote=True)
+    return (
+        "<td class='check-cell'><span class='check-name'>"
+        f"{safe_title}</span> <span class='check-help' tabindex='0' role='img' "
+        f"aria-label='{safe_hint}' data-tooltip='{safe_hint}'>?</span>"
+        f"<small><code>{safe_id}</code></small></td>"
     )
 
 
@@ -75,14 +98,25 @@ def render_report_table(
     caption: str,
     headers: tuple[str, ...],
     rendered_rows: str,
+    *,
+    table_class: str = "check-table",
 ) -> str:
     """Render a responsive table; row markup is trusted renderer output."""
+    logger.debug(
+        "[FIX:report-ui] Rendering report table: id=%s class=%s columns=%d",
+        table_id,
+        table_class,
+        len(headers),
+    )
     safe_id = html.escape(table_id, quote=True)
+    safe_class = html.escape(table_class, quote=True)
     header_cells = "".join(f"<th scope='col'>{html.escape(header)}</th>" for header in headers)
-    return (
-        f"<div class='table-wrap'><table id='{safe_id}'><caption>{html.escape(caption)}</caption>"
+    rendered = (
+        f"<div class='table-wrap'><table id='{safe_id}' class='{safe_class}'><caption>{html.escape(caption)}</caption>"
         f"<thead><tr>{header_cells}</tr></thead><tbody>{rendered_rows}</tbody></table></div>"
     )
+    logger.debug("[FIX:report-ui] Report table rendered successfully: id=%s", table_id)
+    return rendered
 
 
 def render_recommendation_list(rendered_items: str, empty_label: str) -> str:

@@ -52,7 +52,9 @@ def test_seo_html_localizes_check_name_and_adds_hover_help():
     assert "Title, description и заголовки" in output
     assert "class='check-help'" in output
     assert "Проверяет title, meta description и заголовок H1" in output
-    assert '<th scope="col">Проверка</th>' in output
+    assert "<th scope='col'>Проверка</th>" in output
+    assert "check-table check-table--compact" in output
+    assert "status-badge status-fail" in output
     assert "Оценки по категориям" in output
     assert "<h1>Отчёт по SEO-оптимизации</h1>\n<p class=\"report-generated\"><small>" in output
     assert ".report-generated{margin:.25rem 0 1rem;color:#6b7280;font-size:.85rem}" in output

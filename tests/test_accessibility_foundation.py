@@ -80,7 +80,7 @@ def test_report_accessibility_foundation_has_landmark_table_semantics_and_respon
 
     assert "class='skip-link' href='#report-content'" in html
     assert "id='report-content'" in html
-    assert "<div class='table-wrap'><table id='report-checks-table'><caption>Checks</caption>" in html
+    assert "<div class='table-wrap'><table id='report-checks-table' class='check-table check-table--full'><caption>Checks</caption>" in html
     assert "scope='col'" in html
     assert "<summary id='report-recommendations'><h3>Prioritized recommendations</h3></summary>" in html
     assert ".table-wrap{width:100%;overflow-x:auto}" in html
@@ -171,8 +171,29 @@ def test_dashboard_report_actions_are_shared_by_single_and_combined_exports():
     html = render_dashboard("en")
 
     assert "function createReportActions(reportText, frame)" in html
+    assert "function createReportFrame(reportText)" in html
+    assert "function renderReport(reportText, persist=true)" in html
     assert html.count("createReportActions(reportText, frame)") == 2
-    assert "createReportActions(combined, frame)" in html
+    assert "renderReport(combined)" in html
+    assert "dashboardReportKey = \"agentready.dashboard.report.v1\"" in html
+    assert "restoreReportState();" in html
+
+
+def test_dashboard_report_navigation_stays_inside_frame():
+    html = render_dashboard("en")
+
+    assert "reportDocument.addEventListener(\"click\"" in html
+    assert "event.preventDefault();" in html
+    assert "target.scrollIntoView({block:\"start\"})" in html
+    assert "[FIX:dashboard-report] Local report navigation" in html
+
+
+def test_dashboard_background_catalog_load_does_not_clear_restored_report():
+    html = render_dashboard("en")
+
+    assert "if (showOutput) {" in html
+    assert "result.textContent = debugMode()" in html
+    assert "loadChecks(false)" in html
 
 
 def test_combined_report_acceptance_contract_rewrites_internal_references():

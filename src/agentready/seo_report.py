@@ -10,6 +10,7 @@ from .seo_checks import SEO_CHECK_METADATA
 from .seo_crawler import CRAWL_CHECK_METADATA
 from .seo_i18n import seo_detail, seo_summary
 from .seo_models import SeoReport
+from .report_components import render_category_card, render_check_cell, render_report_table, render_status_cell
 from .report_styles import BASE_REPORT_CSS
 
 logger = logging.getLogger(__name__)
@@ -308,10 +309,8 @@ def render_seo_html(report: SeoReport, lang: str | None = None) -> str:
     for item in report.checks:
         title, category, hint = _localized_check(item.id, item.title, item.category, active)
         rows += (
-            f"<tr><td class='{html.escape(item.status)}'>{html.escape(labels.get(item.status, item.status))}</td>"
-            f"<td>{html.escape(category)}</td><td class='check-cell'><span class='check-name'>{html.escape(title)}</span> "
-            f"<span class='check-help' tabindex='0' role='img' aria-label='{html.escape(hint)}' data-tooltip='{html.escape(hint)}'>?</span>"
-            f"<small><code>{html.escape(item.id)}</code></small></td>"
+            f"<tr>{render_status_cell(item.status, labels.get(item.status, item.status))}"
+            f"<td>{html.escape(category)}</td>{render_check_cell(title, item.id, hint)}"
             f"<td>{html.escape(seo_detail(item.details, active))}{_affected_pages_html(item, labels)}"
             f"{_additional_details_html(item, labels)}</td></tr>"
         )
@@ -322,12 +321,8 @@ def render_seo_html(report: SeoReport, lang: str | None = None) -> str:
     category_cards = []
     for item in report.categories:
         category, hint = _localized_category(item.category, active)
-        score = "-" if item.score is None else f"{item.score}/100"
-        category_cards.append(
-            f"<div class='card'><strong>{html.escape(category)} "
-            f"<span class='category-help check-help' tabindex='0' role='img' aria-label='{html.escape(hint)}' data-tooltip='{html.escape(hint)}'>?</span></strong>"
-            f"<div class='score'>{html.escape(score)}</div><small>{item.passed}/{item.applicable}</small></div>"
-        )
+        score = "-" if item.score is None else f"{item.score}%"
+        category_cards.append(render_category_card(category, hint, f"{score} · {item.passed}/{item.applicable}", item.score))
     remediation_items = []
     for item in report.checks:
         if item.remediation:
@@ -346,7 +341,7 @@ def render_seo_html(report: SeoReport, lang: str | None = None) -> str:
 <p>{html.escape(labels['target'])}: <code>{html.escape(report.target)}</code></p>
 <p><strong>{html.escape(labels['score'])}: {report.score}/100</strong></p>
 <h2>{html.escape(labels['categories'])}</h2><div class="grid">{''.join(category_cards) or f"<p>{html.escape(labels['no_items'])}</p>"}</div>
-<h2>{html.escape(labels['checks'])}</h2><div class="table-wrap"><table><caption>{html.escape(labels['checks'])}</caption><thead><tr><th scope="col">{html.escape(labels['status'])}</th><th scope="col">{html.escape(labels['category'])}</th><th scope="col">{html.escape(labels['check'])}</th><th scope="col">{html.escape(labels['result'])}</th></tr></thead><tbody>{rows}</tbody></table></div>
+<h2>{html.escape(labels['checks'])}</h2>{render_report_table("seo-checks", labels["checks"], (labels["status"], labels["category"], labels["check"], labels["result"]), rows, table_class="check-table check-table--compact")}
 <details><summary><h3>{html.escape(labels['recommendations'])}</h3></summary><ol>{recommendations}</ol></details>
 <details><summary><h3>{html.escape(labels['remediation'])}</h3></summary>{remediation}</details>
 <script>window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));</script>

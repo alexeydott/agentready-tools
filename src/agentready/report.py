@@ -33,7 +33,8 @@ from .report_components import (
     render_report_table,
     render_report_toolbar,
     render_score_meter,
-    render_status_badge,
+    render_status_cell,
+    render_check_cell,
     render_section,
 )
 from .report_styles import BASE_REPORT_CSS
@@ -206,11 +207,9 @@ def _render_html_body(report: ScanReport, lang: str, generated: str, *, instance
         )
         rows.append(
             f"<tr data-status='{html.escape(r.status)}' data-search='{html.escape(search_text, quote=True)}'>"
-            f"<td class='status-cell {html.escape(r.status)}'>{render_status_badge(r.status, status_label(r.status, lang))}</td>"
+            f"{render_status_cell(r.status, status_label(r.status, lang))}"
             f"<td>{html.escape(category_name(r.category, lang))}</td>"
-            f"<td class='check-cell'><span class='check-name'>{html.escape(title)}</span>"
-            f" <span class='check-help' tabindex='0' role='img' aria-label='{html.escape(hint)}' data-tooltip='{html.escape(hint)}'>?</span>"
-            f"<small><code>{html.escape(r.id)}</code></small></td>"
+            f"{render_check_cell(title, r.id, hint)}"
             f"<td>{html.escape(tr(lang, 'yes') if r.scored else tr(lang, 'no'))}</td>"
             f"<td>{html.escape(_kind(r, lang))}</td>"
             f"<td>{html.escape(str(loc['details']))}</td>"
@@ -219,7 +218,8 @@ def _render_html_body(report: ScanReport, lang: str, generated: str, *, instance
     category_cards: list[str] = []
     for cat in report.categories:
         pct = cat.score or 0
-        label = tr(lang, "n_a") if cat.score is None else f"{cat.score}%"
+        score_label = tr(lang, "n_a") if cat.score is None else f"{cat.score}%"
+        label = f"{score_label} · {cat.passed}/{cat.applicable}"
         name = category_name(cat.category, lang)
         hint = category_hint(cat.category, lang)
         category_cards.append(render_category_card(name, hint, label, cat.score))
@@ -282,6 +282,7 @@ def _render_html_body(report: ScanReport, lang: str, generated: str, *, instance
                 tr(lang, "result"),
             ),
             "".join(rows),
+            table_class="check-table check-table--full",
         )
     )
     return (

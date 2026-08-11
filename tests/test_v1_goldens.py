@@ -39,11 +39,11 @@ def test_v1_json_and_html_goldens_are_stable():
 
     expected = {
         "scan_json": "bfe6fc89546282bad76aee47ab41885c46f5128e93bbacdffe5608112e8850d9",
-        "scan_html": "cc1e1dde205624fea451e102e609fac14e792027aaa6eb91d8ca493ce001af08",
+            "scan_html": "78b17793a030d012614b6f00a2da4c46853a077053bb767d344adde0aa0c5ec7",
         "seo_json": "115bfe175a81a77cae5d9aa687620221c38fc7b2753a05c0e20456cff44decf0",
-        "seo_html": "2a4f466e2f19e4a966c8278491ebe2c2746909881a14a848b65fc4c8cc5dcf64",
+            "seo_html": "0045892e2bca0babfbe3a847de9fc45cba66257fce0ae56230a8380dca3b3431",
         "mobile_json": "f9f0e69032b5c6037c2d5fb668440c5e90a2f26c341cecefcd813d1dd7ad3d20",
-        "mobile_html": "d9591087b5e9714dff68f51b4d5a83219aba18d25ddbda1d4d42f3da3580a3e6",
+            "mobile_html": "718b0d7c5ec428496564495c6a96c487fcf02b81f7f2b3c27d10265ae2966543",
         "findings_json": "7e451dffabe160b5891b4694adefc30bde2477624de5af6fe81c5ad4fdf3dcf2",
         "remediation_json": "91cf4d48acf171e19bc567173e4f8a4f5ece267dfb8bd130d0784bb02948d6b3",
     }

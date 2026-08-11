@@ -648,6 +648,7 @@ helpToggle.onclick = () => {{
   console.info("Dashboard help toggled", {{visible, language:language.value}});
 }};
 const dashboardStateKey = "agentready.dashboard.state.v1";
+const dashboardReportKey = "agentready.dashboard.report.v1";
 const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","verify","debug","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only"];
 function readDashboardState() {{
   try {{
@@ -795,6 +796,62 @@ function createReportActions(reportText, frame) {{
   actions.append(download, hintIcon(translations[language.value].download_hint), print, hintIcon(translations[language.value].print_hint));
   return actions;
 }}
+function createReportFrame(reportText) {{
+  const frame = document.createElement("iframe");
+  frame.id = "report-frame";
+  frame.title = translations[language.value].result;
+  frame.srcdoc = reportText;
+  frame.addEventListener("load", () => {{
+    const reportDocument = frame.contentDocument;
+    if (!reportDocument) {{
+      console.warn("[FIX:dashboard-report] Report frame document unavailable");
+      return;
+    }}
+    reportDocument.addEventListener("click", event => {{
+      const link = event.target.closest("a[href^='#']");
+      if (!link) return;
+      const targetId = decodeURIComponent(link.getAttribute("href").slice(1));
+      const target = targetId ? reportDocument.getElementById(targetId) : null;
+      if (!target) return;
+      event.preventDefault();
+      target.scrollIntoView({{block:"start"}});
+      console.info("[FIX:dashboard-report] Local report navigation", {{target:targetId}});
+    }});
+  }});
+  return frame;
+}}
+function saveReportState(reportText) {{
+  try {{
+    localStorage.setItem(dashboardReportKey, JSON.stringify({{html:reportText, url:document.getElementById("url").value, preset:document.getElementById("preset").value, language:language.value}}));
+    console.info("[FIX:dashboard-report] Report persisted", {{preset:document.getElementById("preset").value, language:language.value}});
+  }} catch (error) {{
+    console.warn("[FIX:dashboard-report] Unable to persist report", {{error:String(error)}});
+  }}
+}}
+function renderReport(reportText, persist=true) {{
+  const frame = createReportFrame(reportText);
+  const actions = createReportActions(reportText, frame);
+  result.replaceChildren(actions, frame);
+  showResult();
+  finishProgress(true);
+  if (persist) saveReportState(reportText);
+  return frame;
+}}
+function restoreReportState() {{
+  try {{
+    const raw = localStorage.getItem(dashboardReportKey);
+    if (!raw) return false;
+    const state = JSON.parse(raw);
+    if (!state || typeof state.html !== "string" || !state.html.includes("<html")) return false;
+    renderReport(state.html, false);
+    setAiAvailability(Boolean(state.url && document.getElementById("url").value.trim()));
+    console.info("[FIX:dashboard-report] Report restored", {{preset:state.preset || "unknown", language:state.language || "unknown"}});
+    return true;
+  }} catch (error) {{
+    console.warn("[FIX:dashboard-report] Unable to restore report", {{error:String(error)}});
+    return false;
+  }}
+}}
 async function request(path, method="GET", body=null, html=false, showOutput=true, statusMessage="") {{
   if (showOutput) setProgress(8, translations[language.value].progress_start);
   const options = {{method, headers:{{"Content-Type":"application/json"}}}}; if (body) options.body = JSON.stringify(body);
@@ -811,13 +868,14 @@ async function request(path, method="GET", body=null, html=false, showOutput=tru
       const end = reportText.indexOf("<" + "/script>", start);
       if (start >= 0 && end > start) window.agentreadyV2Report = JSON.parse(reportText.slice(start + v2Marker.length, end));
     }} catch (error) {{ console.warn("Ignoring unavailable embedded v2 report", {{error: String(error)}}); }}
-    const frame = document.createElement("iframe"); frame.id = "report-frame"; frame.title = translations[language.value].result; frame.srcdoc = reportText;
-    const actions = createReportActions(reportText, frame);
-    result.replaceChildren(actions, frame); finishProgress(true); return frame;
+    return renderReport(reportText);
   }}
   const data = await response.json();
-  result.textContent = debugMode() ? JSON.stringify(data, null, 2) : (statusMessage || translations[language.value].progress_done);
-  finishProgress(true); return data;
+  if (showOutput) {{
+    result.textContent = debugMode() ? JSON.stringify(data, null, 2) : (statusMessage || translations[language.value].progress_done);
+    finishProgress(true);
+  }}
+  return data;
 }}
 async function runScan() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
@@ -943,9 +1001,7 @@ async function runAll() {{
     const geoText = geoFrame.srcdoc;
     const seoFrame = await request("/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,language:language.value,checks:null,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true);
     const combined = combinedReportDocument(geoText, seoFrame.srcdoc);
-    const frame = document.createElement("iframe"); frame.id = "report-frame"; frame.title = translations[language.value].result; frame.srcdoc = combined;
-    const actions = createReportActions(combined, frame);
-    result.replaceChildren(actions, frame); finishProgress(true); setAiAvailability(true);
+    renderReport(combined); setAiAvailability(true);
   }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
 async function runSeo() {{
@@ -1661,6 +1717,7 @@ document.getElementById("ai-skill").addEventListener("change", saveAiTools);
 document.getElementById("ai-mcp-tool").addEventListener("change", saveAiTools);
 document.getElementById("preset").onchange = () => {{ setAiAvailability(false); updatePresetHint(); loadChecks(); }};
 updatePresetHint(); updateAiModeHint(); setAiAvailability(false); loadChecks(false);
+restoreReportState();
 refreshAiProviders().catch(error => console.warn("Unable to initialize AI providers", {{error:String(error)}}));
 loadAiTools();
 loadPromptLibrary();
