@@ -18,6 +18,7 @@ V1_FACADES = (
     "mcp.mobile_audit",
 )
 V2_SCHEMAS = ("agentready.audit.v2", "agentready.findings.v1", "agentready.remediation-plan.v1")
+V2_SURFACES = ("cli.audit", "/v2/audit", "/v2/audit/dashboard", "mcp.audit_v2")
 PROTOCOL_MANIFEST_VERSION = "v1"
 
 
@@ -27,6 +28,7 @@ class CompatibilityManifest:
     channel: str = RELEASE_CHANNEL
     v1_facades: tuple[str, ...] = V1_FACADES
     v2_schemas: tuple[str, ...] = V2_SCHEMAS
+    v2_surfaces: tuple[str, ...] = V2_SURFACES
     protocol_manifest: str = PROTOCOL_MANIFEST_VERSION
     migration_status: str = "v1-preserved-v2-additive"
 
@@ -36,6 +38,7 @@ class CompatibilityManifest:
             "channel": self.channel,
             "v1_facades": list(self.v1_facades),
             "v2_schemas": list(self.v2_schemas),
+            "v2_surfaces": list(self.v2_surfaces),
             "protocol_manifest": self.protocol_manifest,
             "migration_status": self.migration_status,
         }
