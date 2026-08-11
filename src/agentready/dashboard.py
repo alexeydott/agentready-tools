@@ -621,6 +621,11 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-chat-message {{ max-width:min(86%,760px); }}
 .ai-composer {{ position:sticky; bottom:0; margin:14px 0 0; padding:14px 0 18px; background:#fff; border-top:1px solid #f3dfd2; }}
 .ai-composer textarea {{ min-height:92px; border-color:#d9b9a5; border-radius:14px; padding:14px; }}
+.ai-prompt-composer {{ margin-top:8px; padding:10px; border:1px solid #efcdb8; border-radius:12px; background:#fffaf6; }}
+.ai-prompt-composer-row {{ display:flex; align-items:stretch; gap:8px; }}
+.ai-prompt-composer-row select {{ flex:1 1 auto; min-width:0; min-height:86px; padding:8px 10px; border-color:#d9b9a5; border-radius:10px; background:#fff; }}
+.ai-prompt-composer-row button {{ flex:0 0 auto; align-self:stretch; min-width:150px; }}
+.ai-prompt-management {{ display:flex; gap:8px; align-items:center; margin-top:8px; }} .ai-prompt-management input {{ flex:1 1 auto; min-width:0; min-height:34px; }} .ai-prompt-management button {{ width:auto; min-height:34px; padding:6px 10px; }}
 .ai-composer-toolbar {{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; }}
 .ai-composer-tools {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }} .ai-composer-tools input[type=file] {{ display:none; }}
 .ai-composer-tools label,.ai-composer-tools button {{ width:auto; min-height:36px; padding:7px 10px; font-size:.9rem; }}
@@ -1310,6 +1315,53 @@ function applyPrompt() {{
   updateAiModeHint();
   saveDashboardState();
 }}
+function setupPromptComposer() {{
+  const select = document.getElementById("ai-prompt-library");
+  const title = document.getElementById("ai-prompt-title");
+  const toolbar = document.querySelector(".ai-composer-toolbar");
+  const libraryPanel = document.querySelector(".ai-prompt-library-panel");
+  if (!select || !title || !toolbar || document.querySelector(".ai-prompt-composer")) return;
+  const composer = document.createElement("div");
+  composer.className = "ai-prompt-composer";
+  const row = document.createElement("div");
+  row.className = "ai-prompt-composer-row";
+  select.size = 3;
+  select.title = translations[language.value].ai_prompt_library;
+  select.setAttribute("aria-label", translations[language.value].ai_prompt_library);
+  row.append(select);
+  const apply = document.createElement("button");
+  apply.type = "button";
+  apply.className = "secondary";
+  apply.textContent = translations[language.value].ai_prompt_apply;
+  apply.title = translations[language.value].ai_prompt_apply;
+  apply.addEventListener("click", applyPrompt);
+  row.append(apply);
+  const management = document.createElement("div");
+  management.className = "ai-prompt-management";
+  title.classList.remove("ai-hidden-compatible");
+  title.type = "text";
+  title.placeholder = translations[language.value].ai_prompt_title;
+  title.title = translations[language.value].ai_prompt_title;
+  title.setAttribute("aria-label", translations[language.value].ai_prompt_title);
+  management.append(title);
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "secondary";
+  save.textContent = translations[language.value].ai_prompt_save;
+  save.title = translations[language.value].ai_prompt_save;
+  save.addEventListener("click", savePrompt);
+  management.append(save);
+  const saveChatButton = document.createElement("button");
+  saveChatButton.type = "button";
+  saveChatButton.className = "secondary";
+  saveChatButton.textContent = translations[language.value].ai_chat_save;
+  saveChatButton.title = translations[language.value].ai_chat_save;
+  saveChatButton.addEventListener("click", saveChat);
+  management.append(saveChatButton);
+  composer.append(row, management);
+  toolbar.parentNode.insertBefore(composer, toolbar);
+  if (libraryPanel) libraryPanel.hidden = true;
+}}
 async function savePrompt() {{
   const prompt = document.getElementById("ai-message").value.trim();
   const title = document.getElementById("ai-prompt-title").value.trim() || prompt.slice(0, 80);
@@ -1993,6 +2045,7 @@ restoreReportState();
 refreshAiProviders().catch(error => console.warn("Unable to initialize AI providers", {{error:String(error)}}));
 loadAiTools();
 updateAiContextChips();
+setupPromptComposer();
 loadPromptLibrary();
 loadSavedChats();
 restoreAiChatState();
