@@ -13,6 +13,8 @@
   tooltip links; AI settings are available from the model panel.
 - Preserved prompt IDs, localized variants, user-prompt modes, existing AI
   API contracts, report persistence, and dashboard chat interactions.
+- Documented the current runtime architecture and v1/v2 compatibility
+  boundaries, and exposed the source-package command in the main documentation.
 
 ## 0.9.0 — 2026-08-12
 

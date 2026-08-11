@@ -180,9 +180,14 @@ python -m agentready.cli audit https://example.com --profile quick --max-pages 1
   report composition, including report-local tooltip styles.
 - 0.9.0 hardens dashboard AI prompt localization/editing, browser persistence
   checks, module CLI execution, and synchronized release metadata.
+- 0.10.0 aligns the AI assistant workspace, prompt library, composer actions,
+  settings/model controls, and browser tooltip behavior while preserving v1/v2
+  contracts. The user-facing architecture is documented in
+  [Architecture](architecture.md).
 
 ## See Also
 
 - [Getting Started](getting-started.md) — install and first scan
 - [Reporting](reporting.md) — outputs and baselines
+- [Architecture](architecture.md) — runtime layers and compatibility boundaries
 - [Configuration & CI](configuration-and-ci.md) — test gates and thresholds

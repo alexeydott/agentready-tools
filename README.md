@@ -62,6 +62,13 @@ py -3.12 -m venv .venv
 .\dist\portable\agentready.exe --help
 ```
 
+To create the source distribution ZIP (without AI context, caches, reports,
+or previous build output), run:
+
+```powershell
+.\scripts\package-source.ps1
+```
+
 Python 3.11 or newer is supported by the package; use 64-bit Python 3.12 for
 the reproducible Win64 portable build. Browser binaries are not required to
 build the executable. Install Playwright browsers separately only when using
@@ -143,6 +150,7 @@ agentready scan https://example.com \
 | [Reporting](docs/reporting.md) | JSON/Markdown/HTML outputs, baselines |
 | [Integrations](docs/integrations.md) | HTTP API and MCP usage |
 | [Safety](docs/safety.md) | Network, crawler, commerce safety boundaries |
+| [Architecture](docs/architecture.md) | Runtime layers and v1/v2 boundaries |
 | [Development](docs/development.md) | Project layout and validation |
 | [Dashboard FAQ (RU)](docs/dashbord_faq_ru.md) | Beginner dashboard guide in Russian |
 | [Dashboard FAQ (EN)](docs/dashbor_faq_en.md) | Beginner dashboard guide in English |
