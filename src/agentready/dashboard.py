@@ -105,6 +105,9 @@ _TEXT = {
         "ai_prompt_apply": "Use prompt",
         "ai_prompt_edit": "Edit prompt",
         "ai_prompt_edit_hint": "Show the prompt title field so this template can be edited and saved.",
+        "ai_prompt_edit_dialog": "Edit prompt",
+        "ai_prompt_edit_dialog_hint": "Change the prompt title and template text before saving it to the library.",
+        "ai_prompt_cancel": "Cancel",
         "ai_prompt_save": "Save prompt",
         "ai_prompt_save_as": "Save as prompt",
         "ai_prompt_title": "Prompt title",
@@ -335,6 +338,9 @@ _TEXT = {
         "ai_prompt_apply": "Использовать промт",
         "ai_prompt_edit": "Изменить промт",
         "ai_prompt_edit_hint": "Показать поле названия промта для редактирования и сохранения шаблона.",
+        "ai_prompt_edit_dialog": "Изменить промт",
+        "ai_prompt_edit_dialog_hint": "Измените название и текст шаблона перед сохранением в библиотеку.",
+        "ai_prompt_cancel": "Отмена",
         "ai_prompt_save": "Сохранить промт",
         "ai_prompt_save_as": "Сохранить как промт",
         "ai_prompt_title": "Название промта",
@@ -646,6 +652,9 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-prompt-composer-row button {{ flex:0 0 145px; align-self:stretch; }}
 .ai-prompt-management {{ display:flex; gap:8px; align-items:center; margin-top:8px; }} .ai-prompt-management input {{ flex:1 1 auto; min-width:0; min-height:34px; }} .ai-prompt-management button {{ width:auto; min-height:34px; padding:6px 10px; }}
 .ai-prompt-edit-field {{ display:none; }} .ai-prompt-edit-field.open {{ display:block; }}
+.ai-prompt-edit-dialog {{ width:min(620px,calc(100vw - 32px)); border:1px solid #efcdb8; border-radius:16px; padding:22px; color:#441d0c; box-shadow:0 16px 50px #0003; }}
+.ai-prompt-edit-dialog::backdrop {{ background:#24130d66; }} .ai-prompt-edit-dialog h2 {{ margin-top:0; }}
+.ai-prompt-edit-dialog textarea {{ min-height:180px; resize:vertical; }} .ai-prompt-edit-dialog .actions {{ justify-content:flex-end; }}
 .ai-composer-links {{ margin-top:12px; color:#765b4d; line-height:1.6; }} .ai-composer-links .text-link {{ margin-right:4px; }} .ai-composer-links .text-link + .text-link::before {{ content:", "; color:#765b4d; text-decoration:none; display:inline-block; margin-right:4px; }}
 .ai-composer-links .text-link.is-disabled {{ opacity:.5; pointer-events:none; }}
 .ai-composer-toolbar {{ display:none; }}
@@ -1339,6 +1348,30 @@ function applyPrompt() {{
   updateAiModeHint();
   saveDashboardState();
 }}
+function openPromptEditor() {{
+  let dialog = document.getElementById("ai-prompt-edit-dialog");
+  if (!dialog) {{
+    dialog = document.createElement("dialog");
+    dialog.id = "ai-prompt-edit-dialog";
+    dialog.className = "ai-prompt-edit-dialog";
+    dialog.setAttribute("aria-labelledby", "ai-prompt-edit-title-heading");
+    dialog.innerHTML = `<form method="dialog"><h2 id="ai-prompt-edit-title-heading">${{translations[language.value].ai_prompt_edit_dialog}}</h2><p>${{translations[language.value].ai_prompt_edit_dialog_hint}}</p><label for="ai-prompt-edit-name">${{translations[language.value].ai_prompt_title}}</label><input id="ai-prompt-edit-name" type="text" maxlength="120"><label for="ai-prompt-edit-text">${{translations[language.value].ai_message}}</label><textarea id="ai-prompt-edit-text"></textarea><div class="actions"><button type="button" class="secondary" id="ai-prompt-edit-cancel">${{translations[language.value].ai_prompt_cancel}}</button><button type="button" id="ai-prompt-edit-save">${{translations[language.value].ai_prompt_save}}</button></div></form>`;
+    document.body.append(dialog);
+    dialog.querySelector("#ai-prompt-edit-cancel").addEventListener("click", () => dialog.close());
+    dialog.querySelector("#ai-prompt-edit-save").addEventListener("click", async () => {{
+      document.getElementById("ai-prompt-title").value = dialog.querySelector("#ai-prompt-edit-name").value.trim();
+      document.getElementById("ai-message").value = dialog.querySelector("#ai-prompt-edit-text").value;
+      await savePrompt();
+      dialog.close();
+    }});
+  }}
+  const selected = aiPromptLibrary.find(item => item.id === document.getElementById("ai-prompt-library").value);
+  if (selected) aiPromptEditingId = selected.id;
+  dialog.querySelector("#ai-prompt-edit-name").value = selected?.title || document.getElementById("ai-prompt-title").value || "";
+  dialog.querySelector("#ai-prompt-edit-text").value = selected?.prompt || document.getElementById("ai-message").value || "";
+  dialog.showModal();
+  dialog.querySelector("#ai-prompt-edit-name").focus();
+}}
 function setupPromptComposer() {{
   const select = document.getElementById("ai-prompt-library");
   const title = document.getElementById("ai-prompt-title");
@@ -1365,7 +1398,7 @@ function setupPromptComposer() {{
   edit.className = "secondary";
   edit.textContent = translations[language.value].ai_prompt_edit || "Edit prompt";
   edit.title = translations[language.value].ai_prompt_edit_hint || translations[language.value].ai_prompt_save;
-  edit.addEventListener("click", () => {{ title.classList.toggle("open"); if (title.classList.contains("open")) title.focus(); }});
+  edit.addEventListener("click", openPromptEditor);
   row.append(edit);
   const management = document.createElement("div");
   management.className = "ai-prompt-management";

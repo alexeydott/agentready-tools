@@ -199,6 +199,9 @@ def test_dashboard_ai_workspace_has_history_conversation_and_context_zones():
     assert 'className = "ai-message-row"' in html
     assert 'className = "ai-composer-links"' in html
     assert 'select.size = 1' in html
+    assert 'function openPromptEditor()' in html
+    assert 'ai-prompt-edit-dialog' in html
+    assert 'ai-prompt-edit-text' in html
     assert 'id="ai-skills-trigger"' in html
     assert 'id="ai-context-trigger"' in html
     assert 'function toggleAiToolPicker(kind)' in html
