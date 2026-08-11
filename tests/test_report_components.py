@@ -2,7 +2,10 @@ from agentready.report_components import (
     render_category_card,
     render_disclosure,
     render_progress_bar,
+    render_remediation_block,
     render_recommendation_list,
+    render_report_navigation,
+    render_report_toolbar,
     render_report_table,
     render_score_meter,
     render_section,
@@ -63,3 +66,23 @@ def test_recommendation_list_component_preserves_order_and_escapes_empty_state()
 
     assert output == "<ol class='recommendation-list'><li>First</li><li>Second</li></ol>"
     assert "&lt;No recommendations&gt;" in empty
+
+
+def test_remediation_block_preserves_rendered_sections_and_escapes_empty_state():
+    output = render_remediation_block("<section>Fix</section>", "<No remediation>")
+    empty = render_remediation_block("", "<No remediation>")
+
+    assert output == "<section>Fix</section>"
+    assert empty == "<p>&lt;No remediation&gt;</p>"
+
+
+def test_report_navigation_component_escapes_targets_and_labels():
+    output = render_report_navigation((("summary", "<Summary>"),), "<Report navigation>")
+
+    assert output == "<nav class='report-nav' aria-label='&lt;Report navigation&gt;'><a href='#summary'>&lt;Summary&gt;</a></nav>"
+
+
+def test_report_toolbar_component_preserves_language_control_and_escapes_label():
+    output = render_report_toolbar("<Language>", "<option value='en'>English</option>")
+
+    assert output == "<div class='toolbar'><label for='lang'>&lt;Language&gt;:</label><select id='lang'><option value='en'>English</option></select></div>"

@@ -91,6 +91,31 @@ def render_recommendation_list(rendered_items: str, empty_label: str) -> str:
     return f"<ol class='recommendation-list'>{content}</ol>"
 
 
+def render_remediation_block(rendered_sections: str, empty_label: str) -> str:
+    """Render remediation sections with an escaped localized empty state."""
+    return rendered_sections or f"<p>{html.escape(empty_label)}</p>"
+
+
+def render_report_navigation(
+    links: tuple[tuple[str, str], ...],
+    aria_label: str,
+) -> str:
+    """Render escaped in-document report navigation links."""
+    rendered_links = "".join(
+        f"<a href='#{html.escape(target, quote=True)}'>{html.escape(label)}</a>"
+        for target, label in links
+    )
+    return f"<nav class='report-nav' aria-label='{html.escape(aria_label)}'>{rendered_links}</nav>"
+
+
+def render_report_toolbar(label: str, options: str) -> str:
+    """Render the localized report language selector shell."""
+    return (
+        f"<div class='toolbar'><label for='lang'>{html.escape(label)}:</label>"
+        f"<select id='lang'>{options}</select></div>"
+    )
+
+
 def render_section(section_id: str, title: str, content: str, *, level: int = 2) -> str:
     """Wrap trusted rendered content in an explicitly labelled section."""
     safe_id = html.escape(section_id, quote=True)

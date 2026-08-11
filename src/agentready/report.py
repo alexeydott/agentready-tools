@@ -27,8 +27,11 @@ from .report_components import (
     render_disclosure,
     render_category_card,
     render_progress_bar,
+    render_remediation_block,
     render_recommendation_list,
+    render_report_navigation,
     render_report_table,
+    render_report_toolbar,
     render_score_meter,
     render_status_badge,
     render_section,
@@ -284,7 +287,15 @@ def _render_html_body(report: ScanReport, lang: str, generated: str, *, instance
     return (
         f"<h1>{html.escape(tr(lang, 'report_title'))}</h1>"
         f"<p class='report-generated'><small>{html.escape(tr(lang, 'generated_by'))}: {html.escape(generated)}</small></p>"
-        f"<nav class='report-nav' aria-label='{html.escape(tr(lang, 'report_navigation'))}'><a href='#{summary_id}'>{html.escape(tr(lang, 'summary'))}</a><a href='#{checks_id}'>{html.escape(tr(lang, 'checks'))}</a><a href='#{recommendations_id}'>{html.escape(tr(lang, 'prioritized_recommendations'))}</a><a href='#{remediation_id}'>{html.escape(tr(lang, 'remediation_prompts_short'))}</a></nav>"
+        + render_report_navigation(
+            (
+                (summary_id, tr(lang, "summary")),
+                (checks_id, tr(lang, "checks")),
+                (recommendations_id, tr(lang, "prioritized_recommendations")),
+                (remediation_id, tr(lang, "remediation_prompts_short")),
+            ),
+            tr(lang, "report_navigation"),
+        )
         + render_section(summary_id, tr(lang, "summary"), summary_content)
         + render_section(checks_id, tr(lang, "checks"), checks_content)
         + render_disclosure(
@@ -292,7 +303,11 @@ def _render_html_body(report: ScanReport, lang: str, generated: str, *, instance
             tr(lang, "prioritized_recommendations"),
             render_recommendation_list("".join(recs), tr(lang, "none")),
         )
-        + render_disclosure(remediation_id, tr(lang, "remediation_prompts_short"), f"{''.join(remediation) or '<p>' + html.escape(tr(lang, 'no_remediation')) + '</p>'}")
+        + render_disclosure(
+            remediation_id,
+            tr(lang, "remediation_prompts_short"),
+            render_remediation_block("".join(remediation), tr(lang, "no_remediation")),
+        )
     )
 
 
@@ -323,7 +338,7 @@ def render_html(report: ScanReport, lang: str | None = None) -> str:
 <html lang='{selected}'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>{html.escape(tr(selected, 'report_title'))} — {html.escape(report.target)}</title>
 <style>{BASE_REPORT_CSS}.toolbar{{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:16px}}.report-nav{{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 20px}}.report-nav a{{min-height:44px;display:inline-flex;align-items:center;padding:8px 12px;border:1px solid #ccc;border-radius:8px;color:inherit}}.report-filters{{display:grid;grid-template-columns:auto minmax(140px,220px) auto minmax(180px,1fr);gap:8px;align-items:center;margin:12px 0}}.report-filters p{{grid-column:1/-1;margin:0;font-size:.9rem}}.pass,.fail,.error,.warn{{font-weight:400}}code,pre{{background:#f4f4f4;padding:2px 4px}}pre{{padding:12px;overflow:auto;white-space:pre-wrap}}.bar{{height:8px;background:#eee;margin:8px 0;border-radius:8px;overflow:hidden}}.bar span{{display:block;height:100%;background:currentColor}}.pill{{font-size:.8em;border:1px solid #ccc;border-radius:20px;padding:2px 8px}}details.report-section{{margin:20px 0;border:1px solid #ddd;border-radius:8px;padding:0 12px}}details.report-section>summary{{cursor:pointer;font-weight:700;padding:12px 0}}li{{margin:12px 0}}select{{font:inherit;padding:5px 8px}}@media(max-width:700px){{.report-filters{{grid-template-columns:1fr}}}}</style></head>
-<body><a class='skip-link' href='#report-content'>Skip to report content</a><div class='toolbar'><label for='lang'>{html.escape(tr(selected, 'language_selector'))}:</label><select id='lang'>{options}</select></div>{mains}
+<body><a class='skip-link' href='#report-content'>Skip to report content</a>{render_report_toolbar(tr(selected, 'language_selector'), options)}{mains}
 <script>(function(){{const s=document.getElementById('lang');const mains=[...document.querySelectorAll('main[data-lang]')];const filterTemplates={filter_templates};function setLang(v){{document.documentElement.lang=v;mains.forEach(x=>x.hidden=x.dataset.lang!==v);const activeMain=mains.find(x=>x.dataset.lang===v),skip=document.querySelector('.skip-link');if(activeMain&&skip)skip.href='#'+activeMain.id;const label=document.querySelector('.toolbar label');label.textContent=(v==='ru'?'Язык отчёта':'Report language')+':';localStorage.setItem('agentready-report-lang',v)}}function bindFilters(main){{const status=main.querySelector("select[id^='report-status-filter']"),search=main.querySelector("input[id^='report-search']"),count=main.querySelector("p[id^='report-filter-count']"),table=main.querySelector("table[id^='report-checks-table']");if(!status||!search||!count||!table)return;const rows=[...table.tBodies[0].rows],filters=main.querySelector('.report-filters'),template=filterTemplates[main.dataset.lang]||filterTemplates.en;filters.hidden=false;function apply(){{const needle=search.value.trim().toLowerCase(),wanted=status.value;let visible=0;rows.forEach(row=>{{const match=(!wanted||row.dataset.status===wanted)&&(!needle||row.dataset.search.toLowerCase().includes(needle));row.hidden=!match;if(match)visible++}});count.textContent=template.replace('{{visible}}',visible).replace('{{total}}',rows.length)}}status.addEventListener('change',apply);search.addEventListener('input',apply);search.addEventListener('keydown',event=>{{if(event.key==='Escape'){{search.value='';apply()}}}});apply()}}mains.forEach(bindFilters);const saved=localStorage.getItem('agentready-report-lang');if(saved&&['en','ru'].includes(saved)){{s.value=saved;setLang(saved)}}s.addEventListener('change',()=>setLang(s.value));window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));}})();</script></body></html>"""
 
 
