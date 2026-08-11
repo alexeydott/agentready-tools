@@ -107,6 +107,8 @@ _TEXT = {
         "ai_thinking": "AI is thinking...",
         "ai_timeout": "The AI provider did not respond in time. Check the provider or try again.",
         "ai_report_title": "AI audit report",
+        "ai_open_full_report": "Show full audit report",
+        "ai_open_full_report_hint": "The complete AI audit report will open in a new window.",
         "ai_summary": "Summary",
         "ai_actions": "Prioritized recommendations",
         "ai_evidence": "Audit evidence",
@@ -326,6 +328,8 @@ _TEXT = {
         "ai_thinking": "AI-помощник обрабатывает запрос...",
         "ai_timeout": "AI-провайдер не ответил вовремя. Проверьте провайдера или повторите запрос.",
         "ai_report_title": "Отчёт AI-аудита",
+        "ai_open_full_report": "Показать полный отчёт аудита",
+        "ai_open_full_report_hint": "Полный отчёт AI-аудита откроется в новом окне.",
         "ai_summary": "Итог",
         "ai_actions": "Приоритетные рекомендации",
         "ai_evidence": "Данные аудита",
@@ -563,6 +567,8 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .ai-report {{ background:#fff; border:1px solid #efcdb8; border-radius:12px; padding:20px; }}
 .ai-report h3 {{ margin:22px 0 10px; }} .ai-report h3:first-child {{ margin-top:0; }}
 .ai-report-meta {{ color:#765b4d; font-size:.92rem; margin-bottom:16px; }}
+.ai-full-report-link {{ display:inline-flex; align-items:center; margin:4px 0 12px; color:#9e2f0b; font-weight:700; text-decoration:underline; }}
+.ai-full-report-link::after {{ content:" ↗"; font-size:.9em; }}
 .ai-report-summary {{ font-size:1.05rem; line-height:1.55; white-space:pre-wrap; }}
 .ai-report-list {{ display:grid; gap:12px; padding:0; list-style:none; }}
 .ai-report-card {{ border:1px solid #efcdb8; border-radius:10px; padding:14px; }}
@@ -1371,6 +1377,9 @@ function exportChat() {{
 function aiReportDocument() {{
   const report = document.getElementById("ai-result").cloneNode(true);
   report.querySelectorAll("button").forEach(button => button.remove());
+  report.querySelectorAll(".ai-full-report-link").forEach(link => link.remove());
+  const fullReport = report.querySelector("#ai-full-report");
+  if (fullReport) fullReport.hidden = false;
   return "<!doctype html><html lang='" + language.value + "'><head><meta charset='utf-8'><title>" +
     translations[language.value].ai_report_title + "</title><style>body{{font:16px system-ui;max-width:1100px;margin:2rem auto;padding:0 1rem}}.report-generated{{margin:.25rem 0 1rem;color:#6b7280;font-size:.85rem}}.ai-report-card{{border:1px solid #ddd;border-radius:8px;padding:10px;margin:8px 0}}pre{{white-space:pre-wrap}}button{{display:none}}</style></head><body>" +
     report.outerHTML + "</body></html>";
@@ -1390,6 +1399,13 @@ function printAiReport() {{
   popup.document.close();
   popup.focus();
   popup.print();
+}}
+function openAiFullReport() {{
+  const popup = window.open("", "_blank", "noopener,noreferrer");
+  if (!popup) return;
+  popup.document.write(aiReportDocument());
+  popup.document.close();
+  popup.focus();
 }}
 function modelCapabilityLabel(capability) {{
   const icons = {{chat:"💬",embedding:"🔢",rerank:"↕",moderation:"🛡",audio:"🔊",other:"◈"}};
@@ -1791,6 +1807,25 @@ function renderAiReport(data) {{
     details.append(summary, raw);
     output.append(details);
   }}
+  const visibleNodes = new Set([title, generated, reportActions, meta]);
+  const fullReport = document.createElement("div");
+  fullReport.id = "ai-full-report";
+  fullReport.hidden = true;
+  [...output.children].filter(node => !visibleNodes.has(node)).forEach(node => fullReport.append(node));
+  const fullReportLink = document.createElement("a");
+  fullReportLink.href = "#ai-full-report";
+  fullReportLink.target = "_blank";
+  fullReportLink.rel = "noopener noreferrer";
+  fullReportLink.className = "ai-full-report-link";
+  fullReportLink.title = translations[language.value].ai_open_full_report_hint;
+  fullReportLink.textContent = translations[language.value].ai_open_full_report;
+  fullReportLink.setAttribute("aria-label", translations[language.value].ai_open_full_report_hint);
+  fullReportLink.onclick = () => {{
+    const blobUrl = URL.createObjectURL(new Blob([aiReportDocument()], {{type:"text/html;charset=utf-8"}}));
+    fullReportLink.href = blobUrl;
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  }};
+  output.append(fullReportLink, fullReport);
   return output;
 }}
 async function runAi(path="/ai/recommend", retry=false) {{
