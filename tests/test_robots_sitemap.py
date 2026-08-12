@@ -4,6 +4,8 @@ import gzip
 
 import pytest
 
+from agentready.audit_core.store import MemorySiteStore, RunUrlRecord, RunUrlState
+from agentready.query_service import QueryService
 from agentready.robots import (
     RobotsFetchState,
     RobotsFetchStatus,
@@ -15,8 +17,6 @@ from agentready.robots import (
     sensitive_path_diagnostic,
     simulate_robots,
 )
-from agentready.audit_core.store import MemorySiteStore, RunUrlRecord, RunUrlState
-from agentready.query_service import QueryService
 from agentready.sitemap import (
     SitemapEvaluation,
     SitemapLimits,

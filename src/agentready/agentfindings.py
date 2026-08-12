@@ -94,13 +94,12 @@ def _finding(check: Any, target: str, lang: str, *, seo: bool) -> dict[str, Any]
 
     remediation = check.remediation or Remediation(
         summary="Review the protocol specification and publish a valid implementation.",
-        rerun_command=f"agentready scan {target!r} --only {check.id}",
+        rerun_command=f"agentready audit --mode readiness {target!r} --include {check.id}",
     )
     summary = guidance(check.id, remediation.summary, lang)
     prompt = agent_prompt(check.id, target, remediation.summary, lang)
-    if seo and normalize_language(lang) == "ru" and "agentready scan" in prompt:
-        prompt = prompt.replace("agentready scan", "agentready seo audit", 1)
-        prompt = prompt.replace(" --only ", " --checks ", 1)
+    if seo and normalize_language(lang) == "ru" and "agentready audit --mode readiness" in prompt:
+        prompt = prompt.replace("agentready audit --mode readiness", "agentready audit --mode seo", 1)
 
     return {
         "check_id": check.id,
@@ -163,7 +162,7 @@ def build_findings(report: ScanReport | SeoReport | MobilePageReport, lang: str 
     logger.debug("build_findings: emitted=%d of %d", len(findings), len(report.checks))
     mode = "mobile" if is_mobile else ("seo" if is_seo else "readiness")
     return {
-        "schema": "agentready.findings.v1",
+        "schema": "agentready.findings.v2",
         "mode": mode,
         "target": target,
         "score": report.score,
@@ -175,7 +174,7 @@ def build_findings(report: ScanReport | SeoReport | MobilePageReport, lang: str 
 
 
 def _build_v2_findings(report: dict[str, Any], lang: str | None = None) -> dict[str, Any]:
-    """Project canonical v2 findings without reaching into legacy report fields."""
+    """Project canonical v2 findings without reaching into renderer internals."""
     language = normalize_language(lang)
     target = str(report.get("target") or "")
     findings = []
@@ -207,7 +206,7 @@ def _build_v2_findings(report: dict[str, Any], lang: str | None = None) -> dict[
             },
         })
     return {
-        "schema": "agentready.findings.v1",
+        "schema": "agentready.findings.v2",
         "source_schema": "agentready.audit.v2",
         "mode": "readiness",
         "target": target,
@@ -247,7 +246,7 @@ def build_remediation_plan(report: ScanReport | SeoReport | MobilePageReport, la
     mode = payload["mode"]
     subject_key = {"readiness": "readiness_subject", "seo": "seo_subject", "mobile": "mobile_subject"}[mode]
     return {
-        "schema": "agentready.remediation-plan.v1",
+        "schema": "agentready.remediation-plan.v2",
         "mode": mode,
         "target": target,
         "language": language,

@@ -1,24 +1,22 @@
 """Bounded, deterministic discovery sources for audit planning."""
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, is_dataclass
-import hashlib
-import json
 import asyncio
 import gzip
+import hashlib
+import json
 import logging
-from typing import Protocol
+from dataclasses import asdict, dataclass, is_dataclass
+from typing import TYPE_CHECKING, Protocol
 from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree
-from typing import TYPE_CHECKING
 
 from .fetcher import FetchRequest
 
 if TYPE_CHECKING:
     from .crawler import CrawlConfig, CrawlScope
     from .egress import EgressPolicy
-    from .fetcher import FetchTransport
-    from .fetcher import FetcherBoundary
+    from .fetcher import FetcherBoundary, FetchTransport
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +152,7 @@ class SitemapSource:
         compressed: bool = False,
         same_origin_only: bool = True,
         max_bytes: int = 5 * 1024 * 1024,
-    ) -> "SitemapSource":
+    ) -> SitemapSource:
         raw = gzip.decompress(payload) if compressed else payload
         if len(raw) > max_bytes:
             raise ValueError("sitemap exceeds configured size limit")
@@ -197,7 +195,7 @@ class SitemapSource:
 
     async def discover_from_fetcher(
         self,
-        fetcher: "FetcherBoundary",
+        fetcher: FetcherBoundary,
         *,
         limit: int = 1000,
         max_depth: int = 3,
@@ -264,7 +262,7 @@ class RobotsSitemapSource:
 
     async def discover_from_fetcher(
         self,
-        fetcher: "FetcherBoundary",
+        fetcher: FetcherBoundary,
         *,
         limit: int = 1000,
     ) -> tuple[str, ...]:
@@ -320,10 +318,10 @@ class RobotsSitemapSource:
 class CrawlSource:
     """Discover URLs through the canonical bounded crawler."""
 
-    scope: "CrawlScope"
-    config: "CrawlConfig"
-    policy: "EgressPolicy"
-    transport: "FetchTransport | None" = None
+    scope: CrawlScope
+    config: CrawlConfig
+    policy: EgressPolicy
+    transport: FetchTransport | None = None
 
     def discover(self, *, limit: int = 1000) -> tuple[str, ...]:
         _validate_limit(limit)

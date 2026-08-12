@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import csv
+import html
 import io
 import json
-import html
-from dataclasses import replace
-from dataclasses import asdict, is_dataclass
-from typing import Any, Iterable
+from collections.abc import Iterable
+from dataclasses import asdict, is_dataclass, replace
+from typing import Any
 
 from .query_service import QueryService, QuerySpec
 

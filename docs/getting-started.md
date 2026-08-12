@@ -75,16 +75,16 @@ command-line application icon.
 ## First Scan
 
 ```bash
-agentready scan https://example.com
+agentready audit https://example.com --mode readiness
 ```
 
 Useful presets:
 
 ```bash
-agentready scan https://docs.example.com --preset content
-agentready scan https://api.example.com --preset api
-agentready scan https://example.com/article/ --preset ai-search --lang ru
-agentready scan https://example.com --preset all --lang en
+agentready audit https://docs.example.com --mode readiness --preset content
+agentready audit https://api.example.com --mode readiness --preset api
+agentready audit https://example.com/article/ --mode readiness --preset ai-search --lang ru
+agentready audit https://example.com --mode readiness --preset all --lang en
 ```
 
 The `all` preset runs the complete readiness set, including GEO-scored checks.
@@ -94,22 +94,36 @@ audit and combines both report sections in one HTML result.
 Independent SEO audit:
 
 ```bash
-agentready seo audit https://example.com/article/ --format html -o seo.html
+agentready audit https://example.com/article/ --mode seo --format html -o seo.html
 # Cross-page checks (broken links, duplicate metadata, redirect chains)
-agentready seo audit https://example.com --crawl --max-pages 25
+agentready audit https://example.com --mode seo --crawl --max-pages 25
 # Headless-browser rendering for JS-driven sites
-agentready seo audit https://example.com --crawl --render
+agentready audit https://example.com --mode seo --crawl --render
 ```
 
-The audit runs 23 single-page checks; `--crawl` adds 5 cross-page checks from a bounded same-origin crawl (default: 25 pages).
+The audit runs 23 single-page checks; `--crawl` adds 6 cross-page checks from a bounded same-origin crawl (default: 25 pages). The result includes explicit coverage and affected-URL evidence; a capped or interrupted crawl is not a statement about the entire site.
+
+Marketer inventory workflow:
+
+```bash
+agentready inventory RUN_ID pages --search "product" --sort-by title --format csv -o pages.csv
+agentready view list --base-url http://127.0.0.1:8765
+agentready compare https://example.com --baseline baseline.json
+agentready rescan https://example.com --rescan-of RUN_ID --select-url https://example.com/page
+```
+
+The dashboard uses the same typed inventory path. Saved views retain the
+selected kind, filter, limit, sort field, and direction. `agentready audit`
+remains the canonical local execution command; inventory/view/compare/rescan
+commands address an already running local v2 service.
 
 Analytics checks (GA4 traffic/bounce, Search Console clicks/impressions) run when Google credentials are configured:
 
 ```bash
 pip install -e '.[analytics]'
-agentready seo credentials set service-account.json
-agentready seo credentials status
-agentready seo audit https://example.com/page --ga-property 123456789 --gsc-site https://example.com/
+agentready credentials set service-account.json
+agentready credentials status
+agentready audit https://example.com/page --mode seo --ga-property 123456789 --gsc-site https://example.com/
 ```
 
 The service-account JSON is stored in the OS credential vault (Windows Credential Manager via `keyring`); `GOOGLE_APPLICATION_CREDENTIALS` is a supported fallback. API payloads are read-only (`analytics.readonly`, `webmasters.readonly` scopes).
@@ -117,8 +131,8 @@ The service-account JSON is stored in the OS credential vault (Windows Credentia
 Mobile-friendliness audit:
 
 ```bash
-agentready mobile audit https://example.com
-agentready mobile audit https://example.com https://example.com/about --render --format html -o mobile.html
+agentready audit https://example.com --mode mobile
+agentready audit https://example.com https://example.com/about --mode mobile --render --format html -o mobile.html
 ```
 
 This checks one or more pages for Google Mobile-Friendly signals (viewport, responsive CSS, fixed widths, touch targets, font readability, indexability). `--render` adds Playwright-rendered viewport metrics and requires the `playwright` extra.
@@ -154,9 +168,9 @@ non-executing and cannot guarantee rankings or indexing.
 ## Common Scan Options
 
 ```bash
-agentready scan https://example.com --only markdown-negotiation
-agentready scan https://example.com --exclude oauth-discovery --exclude oauth-protected-resource
-agentready scan https://example.com --with-llms --with-markdown-fallback --with-markdown-efficiency
+agentready audit https://example.com --mode readiness --include markdown-negotiation
+agentready audit https://example.com --mode readiness --exclude oauth-discovery --exclude oauth-protected-resource
+agentready audit https://example.com --mode readiness --include llms-txt --include markdown-index-fallback --include markdown-efficiency
 ```
 
 ## Validate Installation

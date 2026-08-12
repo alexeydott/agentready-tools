@@ -29,7 +29,7 @@ agentready checks --json
 Enable explicitly:
 
 ```bash
-agentready scan https://docs.example.com \
+agentready audit https://docs.example.com --mode readiness \
   --include llms-txt \
   --include markdown-index-fallback \
   --include markdown-efficiency
@@ -48,16 +48,16 @@ Supplemental, experimental, skipped, and error-only checks do not silently infla
 ## vNext audit foundations
 
 The implemented vNext layer adds shared evidence and bounded execution without
-changing the legacy v1 score contract:
+changing the canonical v2 score contract:
 
 | Capability | Implementation boundary |
 |---|---|
 | Typed v2 reports | `report_v2.py` emits `agentready.audit.v2` with config, evidence, coverage, findings, and fingerprints. |
-| Baselines and diffs | v2 adapters normalize legacy baselines and compare deterministic finding identities. |
+| Baselines and diffs | v2 reports compare deterministic finding identities; unsupported v1 baselines are rejected. |
 | Bounded crawl | `crawler.py` owns the async frontier, scope, item states, coverage classification, and page results. |
 | Fetch safety | `fetcher.py` and `egress.py` enforce response, redirect, timeout, and public-target limits. |
 | Protocol auditing | `protocols/` contains versioned passive profiles, evidence locators, and agent/MCP adapters. |
-| Shared SEO evidence | `seo/` atomic rules consume one parsed evidence snapshot and adapt to the independent SEO v1 report. |
+| Shared SEO evidence | `seo/` atomic rules consume one parsed evidence snapshot and emit the canonical SEO v2 report. |
 | Browser/interaction signals | `browser_pool.py`, `interaction.py`, and `crawler_identity.py` are opt-in diagnostic boundaries. |
 
 Robots and sitemap parsing remain passive policy modules. They do not perform

@@ -2,6 +2,7 @@ import pytest
 
 from agentready.audit_core.store import MemorySiteStore, RunUrlRecord, RunUrlState
 from agentready.query_service import QueryService, RunUrlQuery
+from agentready.sitemap import SitemapEvaluation, SitemapLimits, parse_sitemap
 from agentready.sitemap_reconciliation import (
     chunk_sitemap_urls,
     classify_sitemap_records,
@@ -9,7 +10,6 @@ from agentready.sitemap_reconciliation import (
     generate_sitemap_from_query,
     reconcile_sitemap_urls,
 )
-from agentready.sitemap import SitemapEvaluation, SitemapLimits, parse_sitemap
 
 
 def test_sitemap_reconciliation_is_sorted_and_bounded():

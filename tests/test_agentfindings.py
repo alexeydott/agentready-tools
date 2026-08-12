@@ -1,19 +1,26 @@
 import asyncio
-import pytest
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent))
 
-from agentready.agentfindings import build_findings, build_remediation_plan
-from agentready.models import Evidence, Remediation, ScanReport
-from agentready.seo_models import SeoCategoryScore, SeoCheckResult, SeoRecommendation, SeoReport
 from test_i18n import sample_report
+
+from agentready.agentfindings import build_findings, build_remediation_plan
+from agentready.models import Evidence, Remediation
+from agentready.seo_models import (
+    SeoCategoryScore,
+    SeoCheckResult,
+    SeoRecommendation,
+    SeoReport,
+)
 
 
 def _seo_report(language: str = "en") -> SeoReport:
     return SeoReport(
-        schema="agentready.seo.v1",
+        schema="agentready.seo.v2",
         target="https://example.com/page",
         origin="https://example.com",
         checks=[
@@ -27,7 +34,7 @@ def _seo_report(language: str = "en") -> SeoReport:
                 evidence=[Evidence(action="fetch page", finding="missing meta description")],
                 remediation=Remediation(
                     summary="Add a unique, descriptive meta description to the page.",
-                    rerun_command="agentready seo audit 'https://example.com/page' --checks page-metadata",
+                    rerun_command="agentready audit 'https://example.com/page' --mode seo --checks page-metadata",
                     references=["https://developers.google.com/search/docs/appearance/snippet"],
                 ),
             ),
@@ -61,7 +68,7 @@ def _seo_report(language: str = "en") -> SeoReport:
 
 def test_findings_include_only_problem_checks_with_instructions():
     payload = build_findings(sample_report("en"), "en")
-    assert payload["schema"] == "agentready.findings.v1"
+    assert payload["schema"] == "agentready.findings.v2"
     assert payload["mode"] == "readiness"
     assert payload["findings_count"] == 1
     item = payload["findings"][0]
@@ -69,7 +76,7 @@ def test_findings_include_only_problem_checks_with_instructions():
     assert item["status"] == "fail"
     assert item["why"]
     assert item["remediation"]["instructions"]
-    assert item["remediation"]["rerun_command"] == "agentready scan 'https://example.com/' --only robots-txt"
+    assert item["remediation"]["rerun_command"] == "agentready audit 'https://example.com/' --mode readiness --include robots-txt"
     assert item["remediation"]["references"] == ["https://www.rfc-editor.org/rfc/rfc9309"]
     assert "robots-txt" in item["remediation"]["agent_prompt"]
     assert item["priority"] == 1
@@ -117,21 +124,21 @@ def test_findings_for_seo_mode():
 def test_findings_for_seo_mode_russian_prompt_uses_seo_command():
     payload = build_findings(_seo_report("ru"), "ru")
     prompt = payload["findings"][0]["remediation"]["agent_prompt"]
-    assert "agentready seo audit" in prompt
-    assert "--checks" in prompt
+    assert "agentready audit --mode seo" in prompt
+    assert "--include" in prompt
     assert payload["findings"][0]["category"] == "Метаданные"
 
 
 def test_remediation_plan_orders_steps_by_priority():
     report = sample_report("en")
     plan = build_remediation_plan(report, "en")
-    assert plan["schema"] == "agentready.remediation-plan.v1"
+    assert plan["schema"] == "agentready.remediation-plan.v2"
     assert plan["mode"] == "readiness"
     assert plan["steps_count"] == 1
     step = plan["steps"][0]
     assert step["step"] == 1
     assert step["check_id"] == "robots-txt"
-    assert step["verify"].startswith("agentready scan")
+    assert step["verify"].startswith("agentready audit 'https://example.com/' --mode readiness")
     assert step["references"]
     assert plan["intro"]
 
@@ -141,7 +148,7 @@ def test_remediation_plan_seo_mode():
     assert plan["mode"] == "seo"
     assert plan["subject"] == "SEO-оптимизации"
     assert plan["steps_count"] == 1
-    assert "agentready seo audit" in plan["steps"][0]["agent_prompt"]
+    assert "agentready audit --mode seo" in plan["steps"][0]["agent_prompt"]
 
 
 def test_mcp_server_registers_agent_tools_and_rejects_bad_mode(monkeypatch):
@@ -152,19 +159,24 @@ def test_mcp_server_registers_agent_tools_and_rejects_bad_mode(monkeypatch):
         return await mcp_module.mcp.list_tools()
 
     names = {tool.name for tool in asyncio.run(_tools())}
-    assert {"scan_site", "seo_audit", "audit_findings", "remediation_plan"} <= names
+    assert {"audit_v2", "seo_audit_v2", "audit_findings", "remediation_plan"} <= names
 
     monkeypatch.setattr(
         mcp_module,
-        "scan",
-        lambda url, **kwargs: sample_report(kwargs.get("language", "en")),
+        "audit_v2",
+        lambda url, **kwargs: {
+            "schema": "agentready.audit.v2",
+            "target": url,
+            "coverage": {},
+            "findings": [{"id": "robots-txt", "title": "Robots", "status": "fail", "reason": "Missing"}],
+        },
     )
     payload = mcp_module.audit_findings("https://example.com", language="ru")
-    assert payload["schema"] == "agentready.findings.v1"
+    assert payload["schema"] == "agentready.findings.v2"
     assert payload["language"] == "ru"
 
     plan = mcp_module.remediation_plan("https://example.com", language="en")
-    assert plan["schema"] == "agentready.remediation-plan.v1"
+    assert plan["schema"] == "agentready.remediation-plan.v2"
 
     with pytest.raises(ValueError, match="unsupported mode"):
         mcp_module.audit_findings("https://example.com", mode="bogus")
@@ -178,16 +190,16 @@ def test_mcp_seo_audit_exposes_crawl_option(monkeypatch):
 
     class FakeReport:
         def to_dict(self):
-            return {"schema": "agentready.seo.v1", "checks": []}
+            return {"schema": "agentready.seo.v2", "checks": []}
 
     def fake_audit(url, **kwargs):
         captured.update(kwargs)
         return FakeReport()
 
     monkeypatch.setattr(mcp_module, "audit_seo", fake_audit)
-    result = mcp_module.seo_audit("https://example.com", crawl=True, max_pages=7, language="ru")
+    result = mcp_module.seo_audit_v2("https://example.com", crawl=True, max_pages=7, language="ru")
 
-    assert result["schema"] == "agentready.seo.v1"
+    assert result["schema"] == "agentready.seo.v2"
     assert captured["crawl"] is True
     assert captured["max_pages"] == 7
     assert captured["language"] == "ru"

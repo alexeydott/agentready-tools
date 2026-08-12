@@ -15,6 +15,7 @@ class ExecutionPlan:
     """Bounded execution inputs shared by all transport adapters."""
 
     target: str
+    mode: str
     profile: str
     max_pages: int
     timeout: float
@@ -29,6 +30,7 @@ class ExecutionPlan:
     def to_dict(self) -> dict[str, Any]:
         return {
             "target": self.target,
+            "mode": self.mode,
             "profile": self.profile,
             "max_pages": self.max_pages,
             "timeout": self.timeout,
@@ -46,16 +48,19 @@ class PlanCompiler:
     """Compile requests without touching the network or optional providers."""
 
     def compile(self, request: AuditRequest) -> ExecutionPlan:
-        overrides = dict(request.limits)
+        overrides = {key: value for key, value in request.limits.items() if key != "check_limit"}
         overrides.update(max_pages=request.max_pages, timeout=request.timeout)
         profile = resolve_profile(request.profile, overrides=overrides)
         capabilities = ["crawl", "static-facts", "coverage"]
+        if request.mode == "seo":
+            capabilities.extend(("seo", "parsed-facts", "atomic-seo-rules"))
         if request.render:
             capabilities.append("rendered-dom")
         if request.provider:
             capabilities.append(f"provider:{request.provider}")
         payload = {
             "target": request.target,
+            "mode": request.mode,
             "preset": request.preset,
             "profile": profile.name,
             "config": profile.config.__dict__ if hasattr(profile.config, "__dict__") else repr(profile.config),
@@ -65,6 +70,7 @@ class PlanCompiler:
             "exclude": list(request.exclude),
             "render": request.render,
             "provider": request.provider,
+            "crawl": request.crawl,
             "language": request.language,
             "capabilities": capabilities,
         }
@@ -73,6 +79,7 @@ class PlanCompiler:
         ).hexdigest()
         return ExecutionPlan(
             request.target,
+            request.mode,
             profile.name,
             request.max_pages,
             request.timeout,

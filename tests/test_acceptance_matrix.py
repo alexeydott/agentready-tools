@@ -37,14 +37,14 @@ def test_l2_cli_api_mcp_surface_contracts_preserve_shared_fields():
         ]
     )
     api = V2AuditRequest(
-        url=args.url,
+            url=args.url[0],
         profile=args.profile,
         max_pages=args.max_pages,
         render=args.render,
         provider=args.provider,
     )
     assert {
-        "url": args.url,
+        "url": args.url[0],
         "profile": api.profile,
         "max_pages": api.max_pages,
         "render": api.render,
@@ -63,6 +63,17 @@ def test_l3_dashboard_has_keyboard_safe_inventory_controls():
     html = render_dashboard("en")
     assert 'label for="v2-inventory-limit"' in html
     assert 'label for="v2-inventory-filter"' in html
+
+
+def test_dashboard_inventory_workspace_has_typed_table_and_marketer_actions():
+    html = render_dashboard("en")
+    assert 'id="v2-inventory-kind"' in html
+    assert 'id="v2-inventory-sort"' in html
+    assert 'id="v2-inventory-desc"' in html
+    assert "compareV2Inventory()" in html
+    assert "rescanV2Selection()" in html
+    assert "runV2InventoryJob()" in html
+    assert 'scope="col"' in html
     assert 'role="status"' in html
 
 

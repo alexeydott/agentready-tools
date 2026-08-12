@@ -7,6 +7,28 @@ from typing import Any
 SUPPORTED_LANGUAGES = ("en", "ru")
 DEFAULT_LANGUAGE = "en"
 
+_CRAWL_CLASSIFICATION_LABELS = {
+    "en": {
+        "complete_within_scope": "Complete within scope",
+        "partial_limit": "Partial — page limit reached",
+        "partial_error": "Partial — fetch errors",
+        "unknown": "Unknown",
+    },
+    "ru": {
+        "complete_within_scope": "Полностью в пределах области",
+        "partial_limit": "Частичное — достигнут лимит страниц",
+        "partial_error": "Частичное — ошибки загрузки",
+        "unknown": "Неизвестно",
+    },
+}
+
+
+def crawl_classification_label(value: object, language: str | None = None) -> str:
+    """Return a user-facing label for a crawler coverage classification."""
+    active = normalize_language(language)
+    key = str(value or "unknown")
+    return _CRAWL_CLASSIFICATION_LABELS[active].get(key, key.replace("_", " "))
+
 
 def normalize_language(value: str | None) -> str:
     if not value:
@@ -496,7 +518,7 @@ def _ru_detail_patterns(text: str) -> str:
             return fn(m)
     # Network/library exception texts are third-party messages; keep the technical
     # payload intact but make the report context Russian.
-    if re.search(r"(?:timed out|timeout|connection|certificate|DNS|HTTP|SSL|TLS|refused|unreachable|redirect)", text, re.I):
+    if re.search(r"(?:timed out|timeout|connection|certificate|DNS|HTTP|SSL|TLS|refused|unreachable|redirect)", text, re.IGNORECASE):
         return "сетевая/протокольная ошибка: " + text
     return text
 
@@ -523,13 +545,13 @@ def agent_prompt(check_id: str, target: str, fallback_summary: str, lang: str) -
         return (
             f"Improve this website for AI-agent readiness by fixing the `{check_id}` audit. "
             f"{fallback_summary} Preserve existing human-facing behavior and security controls. "
-            f"After implementation, verify with: agentready scan {target!r} --only {check_id}."
+            f"After implementation, verify with: agentready audit --mode readiness {target!r} --include {check_id}."
         )
     summary = guidance(check_id, fallback_summary, "ru")
     return (
         f"Улучшите готовность сайта к работе с ИИ-агентами, исправив проверку `{check_id}`. "
         f"{summary} Сохраните существующее поведение пользовательского интерфейса и меры безопасности. "
-        f"После реализации проверьте результат командой: agentready scan {target!r} --only {check_id} --lang ru."
+        f"После реализации проверьте результат командой: agentready audit --mode readiness {target!r} --include {check_id} --lang ru."
     )
 
 

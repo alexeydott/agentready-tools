@@ -5,7 +5,7 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-_SECRET_KEY = re.compile(r"(authorization|proxy-authorization|cookie|set-cookie|token|secret|password|api[-_]?key)", re.I)
+_SECRET_KEY = re.compile(r"(authorization|proxy-authorization|cookie|set-cookie|token|secret|password|api[-_]?key)", re.IGNORECASE)
 _BEARER = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
 
 

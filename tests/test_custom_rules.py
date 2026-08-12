@@ -1,6 +1,12 @@
 import pytest
 
-from agentready.custom_rules import CustomRule, CustomRuleKind, apply_rule, debug_representation
+from agentready.custom_rules import (
+    CustomRule,
+    CustomRuleKind,
+    apply_rule,
+    builtin_presets,
+    debug_representation,
+)
 
 
 def test_custom_rules_support_bounded_text_regex_and_header_extraction():
@@ -29,3 +35,12 @@ def test_custom_rule_debugger_is_stable_and_bounded():
     assert first == second
     assert [item.rule_id for item in first] == ["a", "b"]
     assert all(item.count <= 1 or item.rule_id == "b" for item in first)
+
+
+def test_css_rules_require_matches_from_shared_representation_and_presets_are_editable():
+    rule = CustomRule("css", CustomRuleKind.CSS, "img[loading=lazy]")
+    assert apply_rule(rule, text="img[loading=lazy]") == ()
+    assert apply_rule(rule, css_matches=("img[loading=lazy]",)) == ("img[loading=lazy]",)
+    presets = builtin_presets()
+    assert {"analytics", "schema"} <= set(presets)
+    assert presets["analytics"] is not builtin_presets()["analytics"]

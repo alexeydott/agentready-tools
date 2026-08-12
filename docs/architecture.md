@@ -36,28 +36,28 @@ CLI / FastAPI / MCP / Dashboard
   `i18n.py`, `exports.py` и `agentfindings.py` преобразуют результаты в
   локализованные отчёты и машинные проекции, не выполняя аудит заново.
 
-## Потоки выполнения
-
-### Legacy v1
-
-CLI/API/MCP вызывают соответствующий v1-сканер. Его идентификаторы отчётов,
-форматы и scoring остаются стабильными для существующих потребителей.
-
-### Additive v2
+## Потоки выполнения v2
 
 1. Точка входа валидирует URL, профиль и ограничения.
 2. `AuditService` компилирует bounded-план и создаёт `AuditRunContext`.
 3. `Fetcher` и `EgressPolicy` получают только разрешённые публичные ресурсы;
    crawler ведёт frontier, coverage и `run_id`.
 4. Парсеры и доменные правила создают типизированные evidence/findings.
-5. `report_v2.py` формирует additive-проекцию с coverage, fingerprints,
+5. `report_v2.py` формирует каноническую проекцию с coverage, fingerprints,
    diff/export и совместимыми идентификаторами.
 6. `QueryService` предоставляет bounded-инвентарь страниц, ссылок, ресурсов,
    findings и метрик; произвольные SQL-запросы наружу не выдаются.
 
-v2 не заменяет v1-маршруты и не меняет их default scoring. Новые режимы
-добавляются по шаблону `*_models`, `*_checks`, `*_scoring`, `*_report`,
-`*_scanner` с тонкими CLI/FastAPI/MCP-адаптерами.
+Provider enrichment uses the same `MetricRecord` and `QueryService` path. A
+provider job may add timestamped observed metrics or an unavailable state, but
+it never enters the core score calculation. The dashboard, CLI inventory
+command, HTTP inventory endpoint, and MCP `run_inventory_v2` are thin adapters
+over this one projection.
+
+v2 — единственный публичный контракт. Новые режимы добавляются по шаблону
+`*_models`, `*_checks`, `*_scoring`, `*_report`, `*_scanner` с тонкими
+CLI/FastAPI/MCP-адаптерами. Product v1 routes, schemas и baseline adapters не
+поддерживаются и не должны получать новую функциональность.
 
 ## Dashboard и AI
 
@@ -74,8 +74,8 @@ API, строит bounded AI-контекст из результата и пе�
   тестами; транспортные адаптеры должны только подключать её.
 - Сетевой код использовать только через общие bounded Fetcher/EgressPolicy;
   не добавлять независимые HTTP-вызовы в report/dashboard/MCP.
-- Новые публичные форматы делать additive и фиксировать в compatibility,
-  документации и regression-тестах.
+- Новые публичные форматы фиксировать в v2 contract manifest, документации и
+  regression-тестах; не добавлять v1 aliases.
 - Не смешивать локализованный текст с машинными идентификаторами findings.
 - Не включать `.ai-factory`, `.agents`, `.codex`, `AGENTS.md` и другие AI-
   context-файлы в исходные публикации или удалённые коммиты.

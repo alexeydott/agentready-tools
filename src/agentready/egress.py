@@ -1,12 +1,11 @@
 """Shared HTTP/browser egress policy and redirect validation."""
 from __future__ import annotations
 
+import ipaddress
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from urllib.parse import urlsplit
-
-from collections.abc import Callable
-import ipaddress
 
 from .target import TargetError, ensure_public_url, parse_target
 

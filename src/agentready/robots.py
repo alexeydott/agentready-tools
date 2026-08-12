@@ -237,7 +237,7 @@ def sensitive_path_diagnostic(policy: RobotsPolicy) -> tuple[str, ...]:
     """Return informational diagnostics; robots.txt never grants authorization."""
     sensitive = tuple(
         rule.path for group in policy.groups for rule in group.rules
-        if rule.allow is False and re.search(r"(?:admin|login|private|secret|backup)", rule.path, re.I)
+        if rule.allow is False and re.search(r"(?:admin|login|private|secret|backup)", rule.path, re.IGNORECASE)
     )
     return tuple(f"robots rule mentions sensitive path {path}; robots.txt is not an access control" for path in sensitive)
 
@@ -246,7 +246,7 @@ def _pattern_matches(pattern: str, path: str) -> bool:
     regex = re.escape(pattern).replace(r"\*", ".*")
     if pattern.endswith("$"):
         regex = regex[:-2] + "$"
-    return re.match("^" + regex, path, re.I) is not None
+    return re.match("^" + regex, path, re.IGNORECASE) is not None
 
 
 def _match_length(pattern: str, path: str) -> int:

@@ -1,12 +1,12 @@
 """Optional async Playwright pool sharing one browser process per audit run."""
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncContextManager, Protocol
+from typing import Any, Protocol, Self
 
 from .egress import EgressPolicy, EgressPolicyError
 
@@ -45,7 +45,7 @@ class BrowserPoolBoundary(Protocol):
         *,
         user_agent: str | None = None,
         viewport: dict[str, int] | None = None,
-    ) -> AsyncContextManager[BrowserPage]:
+    ) -> AbstractAsyncContextManager[BrowserPage]:
         ...
 
     async def goto(self, page: BrowserPage, url: str, **kwargs: Any) -> Any:
@@ -119,7 +119,7 @@ class BrowserPool:
             if playwright is not None:
                 await playwright.stop()
 
-    async def __aenter__(self) -> "BrowserPool":
+    async def __aenter__(self) -> Self:
         await self.start()
         return self
 

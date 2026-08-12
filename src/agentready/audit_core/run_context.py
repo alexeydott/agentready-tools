@@ -6,9 +6,9 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class AuditRunContext:
         tool_version: str,
         rule_catalog_version: str,
         run_id: str | None = None,
-    ) -> "AuditRunContext":
+    ) -> AuditRunContext:
         encoded = json.dumps(configuration, sort_keys=True, separators=(",", ":"), default=str)
         config_hash = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
         context = cls(
@@ -51,7 +51,7 @@ class AuditRunContext:
             config_hash=config_hash,
             tool_version=tool_version,
             rule_catalog_version=rule_catalog_version,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
         logger.info("audit run created run_id=%s config_hash=%s", context.run_id, config_hash[:12])
         return context
@@ -73,7 +73,7 @@ class RunCoordinator:
     error_kind: str | None = None
     _history: list[RunState] = field(default_factory=lambda: [RunState.CREATED], repr=False)
 
-    _TRANSITIONS = {
+    _TRANSITIONS: ClassVar[dict[RunState, set[RunState]]] = {
         RunState.CREATED: {RunState.RUNNING, RunState.CANCELLED},
         RunState.RUNNING: {
             RunState.COMPLETED,
@@ -91,7 +91,7 @@ class RunCoordinator:
     }
 
     @classmethod
-    def resume(cls, snapshot: RunSnapshot) -> "RunCoordinator":
+    def resume(cls, snapshot: RunSnapshot) -> RunCoordinator:
         if snapshot.state is not RunState.INTERRUPTED:
             raise ValueError("only interrupted runs can be resumed")
         coordinator = cls(snapshot.context, state=RunState.INTERRUPTED)
@@ -105,7 +105,7 @@ class RunCoordinator:
         self.state = state
         self.error_kind = error_kind
         if state in {RunState.COMPLETED, RunState.PARTIAL, RunState.CANCELLED, RunState.FAILED}:
-            self.completed_at = datetime.now(timezone.utc).isoformat()
+            self.completed_at = datetime.now(UTC).isoformat()
         self._history.append(state)
         logger.info("audit run transition run_id=%s state=%s", self.context.run_id, state.value)
         return self.snapshot()

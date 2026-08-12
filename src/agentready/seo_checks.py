@@ -182,7 +182,7 @@ def _fetch_page(url: str, client: HttpClient) -> tuple[SeoHtmlParser | None, obj
 def check_page_available(url: str, client: HttpClient) -> SeoCheckResult:
     started = time.perf_counter()
     try:
-        parser, response, error = _fetch_page(url, client)
+        _parser, response, error = _fetch_page(url, client)
     except FetchError as exc:
         logger.error("SEO page fetch failed: %s", exc)
         return _result("page-available", "HTML page availability", "technical", "error", True, str(exc), started, [])
@@ -216,7 +216,7 @@ def check_metadata(url: str, client: HttpClient) -> SeoCheckResult:
         issues.append(f"expected one H1, found {len(parser.h1)}")
     status = "fail" if issues else "pass"
     detail = "title, meta description and exactly one H1 are present" if not issues else "; ".join(issues)
-    remediation = _remediation("Add a unique descriptive title, meta description and one clear H1.", f"agentready seo audit {url!r}", [_GOOGLE_SEO, _YANDEX]) if issues else None
+    remediation = _remediation("Add a unique descriptive title, meta description and one clear H1.", f"agentready audit {url!r} --mode seo", [_GOOGLE_SEO, _YANDEX]) if issues else None
     return _result("page-metadata", "Title, description and headings", "metadata", status, True, detail, started, evidence, remediation)
 
 
@@ -231,7 +231,7 @@ def check_indexability(url: str, client: HttpClient) -> SeoCheckResult:
         return _result("page-indexability", "Page indexability directives", "indexability", "error", True, error or "page parser unavailable", started, evidence)
     directives = ",".join(parser.meta_robots + [parser.x_robots]).lower()
     blocked = any(token in directives for token in ("noindex", "none"))
-    remediation = _remediation("Remove unintended noindex directives and keep the page publicly crawlable.", f"agentready seo audit {url!r}", [_GOOGLE_SEO]) if blocked else None
+    remediation = _remediation("Remove unintended noindex directives and keep the page publicly crawlable.", f"agentready audit {url!r} --mode seo", [_GOOGLE_SEO]) if blocked else None
     return _result("page-indexability", "Page indexability directives", "indexability", "fail" if blocked else "pass", True, "noindex directive detected" if blocked else "no noindex directive detected", started, evidence, remediation)
 
 
@@ -247,7 +247,7 @@ def check_canonical(url: str, client: HttpClient) -> SeoCheckResult:
     canonical = urljoin(url, parser.canonicals[0]) if parser.canonicals else ""
     expected = urlsplit(url)._replace(fragment="", query="").geturl()
     valid = len(parser.canonicals) == 1 and canonical.rstrip("/") == expected.rstrip("/")
-    remediation = _remediation("Publish one canonical link matching the selected public URL unless a deliberate duplicate strategy applies.", f"agentready seo audit {url!r}", [_GOOGLE_SEO, _YANDEX]) if not valid else None
+    remediation = _remediation("Publish one canonical link matching the selected public URL unless a deliberate duplicate strategy applies.", f"agentready audit {url!r} --mode seo", [_GOOGLE_SEO, _YANDEX]) if not valid else None
     return _result("canonical", "Canonical URL", "indexability", "pass" if valid else "fail", True, "one canonical matches the selected URL" if valid else "canonical is missing, duplicated or points elsewhere", started, evidence, remediation)
 
 
@@ -277,14 +277,14 @@ def check_robots_and_sitemap(url: str, client: HttpClient) -> SeoCheckResult:
             logger.debug("SEO sitemap candidate rejected: url=%s error=%s", sitemap_url, exc)
     ok = robots.status_code == 200 and has_agent and valid_sitemap
     detail = "robots.txt and a valid XML sitemap are available" if ok else "robots.txt must be HTTP 200 with User-agent and a valid XML sitemap must be discoverable"
-    remediation = _remediation("Publish a valid robots.txt and discoverable XML sitemap.", f"agentready seo audit {url!r}", [_GOOGLE_SITEMAP, _YANDEX]) if not ok else None
+    remediation = _remediation("Publish a valid robots.txt and discoverable XML sitemap.", f"agentready audit {url!r} --mode seo", [_GOOGLE_SITEMAP, _YANDEX]) if not ok else None
     return _result("robots-sitemap", "Robots policy and sitemap", "crawlability", "pass" if ok else "fail", True, detail, started, evidence, remediation)
 
 
 def check_favicon(url: str, client: HttpClient) -> SeoCheckResult:
     started = time.perf_counter()
     try:
-        parser, response, error = _fetch_page(url, client)
+        parser, _response, error = _fetch_page(url, client)
         if error or parser is None:
             return _result("favicon", "Favicon reachability", "metadata", "warn", False, error or "page unavailable", started, [])
         favicon = urljoin(url, parser.favicons[0]) if parser.favicons else urljoin(url, "/favicon.ico")
@@ -308,7 +308,7 @@ def check_jsonld(url: str, client: HttpClient) -> SeoCheckResult:
         return _result("jsonld", "JSON-LD validity and applicability", "structured-data", "error", True, error or "page parser unavailable", started, evidence)
     nodes, errors, block_count = extract_jsonld_nodes(response.text)  # type: ignore[attr-defined]
     if errors:
-        return _result("jsonld", "JSON-LD validity and applicability", "structured-data", "fail", True, f"{len(errors)} invalid JSON-LD block(s)", started, evidence, _remediation("Fix invalid JSON-LD syntax and validate the resulting structured data.", f"agentready seo audit {url!r}", [_GOOGLE_STRUCTURED]))
+        return _result("jsonld", "JSON-LD validity and applicability", "structured-data", "fail", True, f"{len(errors)} invalid JSON-LD block(s)", started, evidence, _remediation("Fix invalid JSON-LD syntax and validate the resulting structured data.", f"agentready audit {url!r} --mode seo", [_GOOGLE_STRUCTURED]))
     if block_count == 0:
         return _result("jsonld", "JSON-LD validity and applicability", "structured-data", "warn", False, "no JSON-LD blocks found; structured data is optional and depends on page type", started, evidence)
     types = sorted({item for node in nodes for item in node_types(node)})
@@ -345,7 +345,7 @@ def _check_title_length(url: str, client: HttpClient) -> SeoCheckResult:
         status = "warn"
     else:
         return _result("title-length", "Title length", "metadata", "pass", True, f"title length is {length} chars", started, evidence)
-    remediation = _remediation("Keep the title between 30 and 60 characters so it is not truncated or too vague in search results.", f"agentready seo audit {url!r}", [_GOOGLE_TITLES])
+    remediation = _remediation("Keep the title between 30 and 60 characters so it is not truncated or too vague in search results.", f"agentready audit {url!r} --mode seo", [_GOOGLE_TITLES])
     return _result("title-length", "Title length", "metadata", status, True, detail, started, evidence, remediation)
 
 
@@ -369,7 +369,7 @@ def _check_description_length(url: str, client: HttpClient) -> SeoCheckResult:
         status = "warn"
     else:
         return _result("description-length", "Meta description length", "metadata", "pass", True, f"meta description length is {length} chars", started, evidence)
-    remediation = _remediation("Write a meta description between 70 and 160 characters that summarizes the page value.", f"agentready seo audit {url!r}", [_GOOGLE_SNIPPETS])
+    remediation = _remediation("Write a meta description between 70 and 160 characters that summarizes the page value.", f"agentready audit {url!r} --mode seo", [_GOOGLE_SNIPPETS])
     return _result("description-length", "Meta description length", "metadata", status, True, detail, started, evidence, remediation)
 
 
@@ -389,7 +389,7 @@ def _check_multiple_metadata(url: str, client: HttpClient) -> SeoCheckResult:
         issues.append(f"{len(parser.descriptions)} meta description tags")
     ok = not issues
     detail = "exactly one title and one meta description tag" if ok else "multiple " + " and ".join(issues) + " found"
-    remediation = _remediation("Keep exactly one <title> and one meta description tag; duplicates confuse search engines.", f"agentready seo audit {url!r}", [_GOOGLE_TITLES]) if not ok else None
+    remediation = _remediation("Keep exactly one <title> and one meta description tag; duplicates confuse search engines.", f"agentready audit {url!r} --mode seo", [_GOOGLE_TITLES]) if not ok else None
     return _result("multiple-metadata", "Duplicate metadata tags", "metadata", "pass" if ok else "fail", True, detail, started, evidence, remediation)
 
 
@@ -409,7 +409,7 @@ def _check_metadata_collisions(url: str, client: HttpClient) -> SeoCheckResult:
         issues.append("title is identical to meta description")
     ok = not issues
     detail = "title, H1 and description are distinct" if ok else "; ".join(issues)
-    remediation = _remediation("Make title, H1 and meta description distinct: title for search snippets, H1 for the on-page heading, description as a summary.", f"agentready seo audit {url!r}", [_GOOGLE_TITLES]) if not ok else None
+    remediation = _remediation("Make title, H1 and meta description distinct: title for search snippets, H1 for the on-page heading, description as a summary.", f"agentready audit {url!r} --mode seo", [_GOOGLE_TITLES]) if not ok else None
     return _result("metadata-collisions", "Metadata collisions", "metadata", "pass" if ok else "warn", True, detail, started, evidence, remediation)
 
 
@@ -429,7 +429,7 @@ def _check_metadata_special_chars(url: str, client: HttpClient) -> SeoCheckResul
         issues.append("emoji/special symbols in meta description")
     ok = not issues
     detail = "no emoji or unusual special characters in metadata" if ok else "; ".join(issues)
-    remediation = _remediation("Remove emoji and decorative special characters from title and meta description; they can be stripped or misrendered in search results.", f"agentready seo audit {url!r}", [_GOOGLE_TITLES]) if not ok else None
+    remediation = _remediation("Remove emoji and decorative special characters from title and meta description; they can be stripped or misrendered in search results.", f"agentready audit {url!r} --mode seo", [_GOOGLE_TITLES]) if not ok else None
     return _result("metadata-special-chars", "Emoji in metadata", "metadata", "pass" if ok else "warn", True, detail, started, evidence, remediation)
 
 
@@ -464,7 +464,7 @@ def _check_image_attributes(url: str, client: HttpClient) -> SeoCheckResult:
     )
     ok = missing == 0
     detail = f"all {len(parser.images)} images have alt text" if ok else f"{missing} of {len(parser.images)} images missing alt text"
-    remediation = _remediation("Add descriptive alt attributes to content images; leave alt empty only for purely decorative images.", f"agentready seo audit {url!r}", [_GOOGLE_IMAGES]) if not ok else None
+    remediation = _remediation("Add descriptive alt attributes to content images; leave alt empty only for purely decorative images.", f"agentready audit {url!r} --mode seo", [_GOOGLE_IMAGES]) if not ok else None
     return _result("image-alt", "Image alt attributes", "content", "pass" if ok else "warn", True, detail, started, evidence, remediation)
 
 
@@ -488,7 +488,7 @@ def _check_mixed_content(url: str, client: HttpClient) -> SeoCheckResult:
     )
     ok = not insecure
     detail = "all subresources use HTTPS" if ok else f"{len(insecure)} insecure http:// subresource(s), e.g. {insecure[0][:80]}"
-    remediation = _remediation("Load all images, scripts and styles over HTTPS; browsers block or flag mixed content.", f"agentready seo audit {url!r}", [_GOOGLE_HTTPS]) if not ok else None
+    remediation = _remediation("Load all images, scripts and styles over HTTPS; browsers block or flag mixed content.", f"agentready audit {url!r} --mode seo", [_GOOGLE_HTTPS]) if not ok else None
     return _result("mixed-content", "Mixed HTTP/HTTPS content", "technical", "pass" if ok else "fail", True, detail, started, evidence, remediation)
 
 
@@ -498,7 +498,7 @@ def _check_https_scheme(url: str, client: HttpClient) -> SeoCheckResult:
     if urlsplit(url).scheme == "https":
         return _result("https-scheme", "HTTPS scheme", "technical", "pass", True, "page is served over HTTPS", started, evidence)
     detail = "page is not served over HTTPS"
-    remediation = _remediation("Serve the site over HTTPS with a valid certificate; HTTPS is a baseline security and ranking signal.", f"agentready seo audit {url!r}", [_GOOGLE_HTTPS])
+    remediation = _remediation("Serve the site over HTTPS with a valid certificate; HTTPS is a baseline security and ranking signal.", f"agentready audit {url!r} --mode seo", [_GOOGLE_HTTPS])
     return _result("https-scheme", "HTTPS scheme", "technical", "fail", True, detail, started, evidence, remediation)
 
 
@@ -514,7 +514,7 @@ def _check_url_format(url: str, client: HttpClient) -> SeoCheckResult:
         issues.append("URL contains percent-encoded characters")
     ok = not issues
     detail = "URL format is clean (lowercase, reasonable length, no encoding)" if ok else "; ".join(issues)
-    remediation = _remediation("Use short lowercase URLs without percent-encoding; avoid mixed case and unnecessary parameters.", f"agentready seo audit {url!r}", [_GOOGLE_CRAWL]) if not ok else None
+    remediation = _remediation("Use short lowercase URLs without percent-encoding; avoid mixed case and unnecessary parameters.", f"agentready audit {url!r} --mode seo", [_GOOGLE_CRAWL]) if not ok else None
     return _result("url-format", "URL format", "technical", "pass" if ok else "warn", True, detail, started, [], remediation)
 
 
@@ -529,7 +529,7 @@ def _check_meta_refresh(url: str, client: HttpClient) -> SeoCheckResult:
         return _result("meta-refresh", "Meta refresh redirect", "technical", "error", True, error or "page parser unavailable", started, evidence)
     ok = not parser.meta_refresh
     detail = "no meta refresh redirect" if ok else f"meta refresh found: {parser.meta_refresh[:80]}"
-    remediation = _remediation("Replace meta refresh redirects with server-side 301 redirects; meta refresh is slower and weakens link signals.", f"agentready seo audit {url!r}", [_GOOGLE_CRAWL]) if not ok else None
+    remediation = _remediation("Replace meta refresh redirects with server-side 301 redirects; meta refresh is slower and weakens link signals.", f"agentready audit {url!r} --mode seo", [_GOOGLE_CRAWL]) if not ok else None
     return _result("meta-refresh", "Meta refresh redirect", "technical", "pass" if ok else "fail", True, detail, started, evidence, remediation)
 
 
@@ -557,7 +557,7 @@ def _check_insecure_links(url: str, client: HttpClient) -> SeoCheckResult:
     )
     ok = not insecure
     detail = "no HTTPS→HTTP links" if ok else f"{len(insecure)} link(s) point from HTTPS to HTTP, e.g. {insecure[0][:80]}"
-    remediation = _remediation("Update links to HTTPS versions; linking from HTTPS pages to HTTP targets weakens security signals.", f"agentready seo audit {url!r}", [_GOOGLE_HTTPS]) if not ok else None
+    remediation = _remediation("Update links to HTTPS versions; linking from HTTPS pages to HTTP targets weakens security signals.", f"agentready audit {url!r} --mode seo", [_GOOGLE_HTTPS]) if not ok else None
     return _result("insecure-links", "HTTPS to HTTP links", "technical", "pass" if ok else "warn", True, detail, started, evidence, remediation)
 
 
@@ -581,7 +581,7 @@ def _check_content_size(url: str, client: HttpClient) -> SeoCheckResult:
         issues.append(f"low text/HTML ratio ({text_chars / html_bytes:.1%})")
     ok = not issues
     detail = "content size, HTML weight and text ratio are reasonable" if ok else "; ".join(issues)
-    remediation = _remediation("Publish substantive text content, keep HTML lean, and aim for a healthy text-to-markup ratio.", f"agentready seo audit {url!r}", [_GOOGLE_SEO]) if not ok else None
+    remediation = _remediation("Publish substantive text content, keep HTML lean, and aim for a healthy text-to-markup ratio.", f"agentready audit {url!r} --mode seo", [_GOOGLE_SEO]) if not ok else None
     return _result("content-size", "Content size", "content", "pass" if ok else "warn", True, detail, started, evidence, remediation)
 
 
@@ -598,7 +598,7 @@ def _check_response_time(url: str, client: HttpClient) -> SeoCheckResult:
     detail = f"server responded in {elapsed_ms} ms"
     if not ok:
         detail += f" (above {threshold_ms} ms)"
-    remediation = _remediation("Reduce server response time below ~800 ms with caching, faster backends and CDN delivery.", f"agentready seo audit {url!r}", [_GOOGLE_SEO]) if not ok else None
+    remediation = _remediation("Reduce server response time below ~800 ms with caching, faster backends and CDN delivery.", f"agentready audit {url!r} --mode seo", [_GOOGLE_SEO]) if not ok else None
     return _result("response-time", "Server response time", "technical", "pass" if ok else "warn", True, detail, started, evidence, remediation)
 
 
@@ -618,7 +618,7 @@ def _check_content_quality(url: str, client: HttpClient) -> SeoCheckResult:
         issues.append("Flash content (object/embed) found")
     ok = not issues
     detail = "no placeholder text or legacy Flash content" if ok else "; ".join(issues)
-    remediation = _remediation("Replace lorem ipsum placeholders with real content and remove Flash; both are unsupported quality signals.", f"agentready seo audit {url!r}", [_GOOGLE_SEO]) if not ok else None
+    remediation = _remediation("Replace lorem ipsum placeholders with real content and remove Flash; both are unsupported quality signals.", f"agentready audit {url!r} --mode seo", [_GOOGLE_SEO]) if not ok else None
     return _result("content-quality", "Content quality signals", "content", "pass" if ok else "fail", True, detail, started, evidence, remediation)
 
 
@@ -631,10 +631,10 @@ def _check_microdata(url: str, client: HttpClient) -> SeoCheckResult:
     evidence = [response.evidence("inspect structured markup")]  # type: ignore[attr-defined]
     if error or parser is None:
         return _result("microdata", "Structured markup presence", "structured-data", "error", True, error or "page parser unavailable", started, evidence)
-    nodes, _, jsonld_blocks = extract_jsonld_nodes(response.text)  # type: ignore[attr-defined]
+    _nodes, _, jsonld_blocks = extract_jsonld_nodes(response.text)  # type: ignore[attr-defined]
     has_markup = parser.has_itemscope or jsonld_blocks > 0
     detail = "structured markup present (microdata itemscope and/or JSON-LD)" if has_markup else "no microdata or JSON-LD structured markup found"
-    remediation = _remediation("Add Schema.org structured markup (JSON-LD preferred) describing the page entity.", f"agentready seo audit {url!r}", [_GOOGLE_STRUCTURED]) if not has_markup else None
+    remediation = _remediation("Add Schema.org structured markup (JSON-LD preferred) describing the page entity.", f"agentready audit {url!r} --mode seo", [_GOOGLE_STRUCTURED]) if not has_markup else None
     return _result("microdata", "Structured markup presence", "structured-data", "pass" if has_markup else "warn", False, detail, started, evidence, remediation)
 
 
@@ -667,7 +667,7 @@ def _check_hreflang(url: str, client: HttpClient) -> SeoCheckResult:
         issues.append("no hreflang link to the current URL")
     ok = not issues
     detail = f"valid hreflang set with {len(parser.hreflangs)} annotation(s)" if ok else "; ".join(issues)
-    remediation = _remediation("Fix hreflang annotations: valid ISO codes, absolute URLs, no duplicates, and a self-referencing entry.", f"agentready seo audit {url!r}", [_GOOGLE_HREFLANG]) if not ok else None
+    remediation = _remediation("Fix hreflang annotations: valid ISO codes, absolute URLs, no duplicates, and a self-referencing entry.", f"agentready audit {url!r} --mode seo", [_GOOGLE_HREFLANG]) if not ok else None
     return _result("hreflang", "Hreflang annotations", "indexability", "pass" if ok else "warn", True, detail, started, evidence, remediation)
 
 

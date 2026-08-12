@@ -61,8 +61,8 @@ These rules are project policy for humans and coding agents. They do not claim t
 
 ## Verification commands
 ```bash
-agentready scan https://example.com/page/ --preset ai-search
-agentready scan https://example.com/page/ --preset ai-search --lang ru --format html -o geo-report.html
+agentready audit https://example.com/page/ --mode readiness --preset ai-search
+agentready audit https://example.com/page/ --mode readiness --preset ai-search --lang ru --format html -o geo-report.html
 agentready indexnow verify https://example.com YOUR_KEY
 agentready indexnow git --repo . --base-url https://example.com --content-root site --from-ref HEAD~1 --to-ref HEAD
 agentready google-indexing publish https://example.com/jobs/42
@@ -131,8 +131,8 @@ agentready logs ai-bots /var/log/nginx/access.log
 
 ## Команды проверки
 ```bash
-agentready scan https://example.com/page/ --preset ai-search --lang ru
-agentready scan https://example.com/page/ --preset ai-search --lang ru --format html -o geo-report.html
+agentready audit https://example.com/page/ --mode readiness --preset ai-search --lang ru
+agentready audit https://example.com/page/ --mode readiness --preset ai-search --lang ru --format html -o geo-report.html
 agentready indexnow verify https://example.com YOUR_KEY
 agentready indexnow git --repo . --base-url https://example.com --content-root site --from-ref HEAD~1 --to-ref HEAD
 agentready google-indexing publish https://example.com/jobs/42

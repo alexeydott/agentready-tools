@@ -58,7 +58,7 @@ def test_agent_adapter_is_additive_and_version_aware() -> None:
 
     payload = to_agent_findings(findings)
 
-    assert payload["schema"] == "agentready.protocol-findings.v1"
+    assert payload["schema"] == "agentready.protocol-findings.v2"
     assert payload["findings_count"] == 1
     assert payload["findings"][0]["profile_id"] == "mcp"
     assert payload["findings"][0]["version"] == "2026-07-28"

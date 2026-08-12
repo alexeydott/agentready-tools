@@ -32,7 +32,7 @@ MAX_HTML_BYTES = 512 * 1024
 
 
 class CrawledPage:
-    __slots__ = ("url", "status", "title", "description", "h1", "links", "nofollow_links", "redirect_chain", "fetch_ms")
+    __slots__ = ("description", "fetch_ms", "h1", "links", "nofollow_links", "redirect_chain", "status", "title", "url")
 
     def __init__(self, url: str, status: int, parser: SeoHtmlParser | None, redirect_chain: list[str], fetch_ms: int) -> None:
         self.url = url
@@ -190,7 +190,7 @@ def check_broken_links(pages: list[CrawledPage], start_url: str) -> SeoCheckResu
     evidence = [Evidence(action="crawl same-origin pages", url=p.url, status_code=p.status or None, finding=f"HTTP {p.status}") for p in broken[:5]]
     remediation = Remediation(
         summary="Fix or remove links to pages returning 4xx/5xx so crawlers do not hit dead ends.",
-        rerun_command=f"agentready seo audit {start_url!r} --crawl",
+        rerun_command=f"agentready audit {start_url!r} --mode seo --crawl",
         references=[_GOOGLE_LINKS],
     ) if not ok else None
     return _result("broken-links", "Broken internal links", "crawlability", "pass" if ok else "fail", True, detail, started, evidence, remediation)
@@ -204,7 +204,7 @@ def check_redirect_chains(pages: list[CrawledPage], start_url: str) -> SeoCheckR
     evidence = [Evidence(action="follow redirects", url=p.url, finding=f"{len(p.redirect_chain)} redirect hop(s)") for p in chained[:5]]
     remediation = Remediation(
         summary="Point links directly at final URLs; multi-hop redirect chains waste crawl budget and dilute signals.",
-        rerun_command=f"agentready seo audit {start_url!r} --crawl",
+        rerun_command=f"agentready audit {start_url!r} --mode seo --crawl",
         references=[_GOOGLE_REDIRECTS],
     ) if not ok else None
     return _result("redirect-chains", "Redirect chains", "crawlability", "pass" if ok else "warn", True, detail, started, evidence, remediation)
@@ -233,7 +233,7 @@ def check_duplicate_metadata(pages: list[CrawledPage], start_url: str) -> SeoChe
     evidence = [Evidence(action="compare page metadata", url=urls[0], finding=f"shared by {len(urls)} pages") for urls in list(dup_titles.values())[:5]]
     remediation = Remediation(
         summary="Give every indexable page a unique title and meta description so pages do not compete with each other.",
-        rerun_command=f"agentready seo audit {start_url!r} --crawl",
+        rerun_command=f"agentready audit {start_url!r} --mode seo --crawl",
         references=[_GOOGLE_DUPLICATES],
     ) if not ok else None
     return _result("duplicate-metadata", "Duplicate metadata across pages", "metadata", "pass" if ok else "fail", True, detail, started, evidence, remediation)
@@ -247,7 +247,7 @@ def check_internal_nofollow(pages: list[CrawledPage], start_url: str) -> SeoChec
     evidence = [Evidence(action="inspect link rel attributes", url=url, finding=f"{count} nofollow internal link(s)") for url, count in flagged[:5]]
     remediation = Remediation(
         summary="Remove rel=nofollow from internal links unless there is a deliberate crawl-policy reason.",
-        rerun_command=f"agentready seo audit {start_url!r} --crawl",
+        rerun_command=f"agentready audit {start_url!r} --mode seo --crawl",
         references=[_GOOGLE_LINKS],
     ) if not ok else None
     return _result("internal-nofollow", "Internal nofollow links", "crawlability", "pass" if ok else "warn", True, detail, started, evidence, remediation)
@@ -262,7 +262,7 @@ def check_link_counts(pages: list[CrawledPage], start_url: str) -> SeoCheckResul
     evidence = [Evidence(action="count page links", url=url, finding=f"{count} links") for url, count in heavy[:5]]
     remediation = Remediation(
         summary="Split pages with excessive link counts; very long link lists dilute each link's value and usability.",
-        rerun_command=f"agentready seo audit {start_url!r} --crawl",
+        rerun_command=f"agentready audit {start_url!r} --mode seo --crawl",
         references=[_GOOGLE_LINKS],
     ) if not ok else None
     return _result("link-counts", "Excessive link counts", "crawlability", "pass" if ok else "warn", True, detail, started, evidence, remediation)
@@ -312,7 +312,7 @@ def check_insecure_links_pages(pages: list[CrawledPage], start_url: str) -> SeoC
     )
     remediation = Remediation(
         summary="Update HTTP links on every affected crawled page to their HTTPS versions.",
-        rerun_command=f"agentready seo audit {start_url!r} --crawl",
+        rerun_command=f"agentready audit {start_url!r} --mode seo --crawl",
         references=[_GOOGLE_LINKS],
     ) if not ok else None
     return _result("insecure-links-pages", "HTTPS to HTTP links across crawled pages", "technical", "pass" if ok else "warn", True, detail, started, evidence, remediation)

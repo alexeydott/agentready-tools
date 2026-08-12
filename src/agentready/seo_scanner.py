@@ -1,27 +1,20 @@
 from __future__ import annotations
 
-import logging
 import json
-import time
-from collections.abc import Callable, Sequence
+import logging
+from collections.abc import Sequence
 
-from .http import HttpClient
-from .seo_models import SeoCheckResult, SeoReport
-from .seo_recommendations import rank_recommendations
-from .seo_scoring import score_checks
-from .target import ensure_public_url, parse_target
-from .models import utc_now_iso
+from .seo_models import SeoReport
 
 logger = logging.getLogger(__name__)
 
-SeoCheck = Callable[[str, HttpClient], SeoCheckResult]
-
+SEO_SCHEMA = "agentready.seo.v2"
 
 def compare_seo_baseline(report: SeoReport, path: str) -> list[str]:
     with open(path, encoding="utf-8") as handle:
         baseline = json.load(handle)
-    if baseline.get("schema") != "agentready.seo.v1":
-        raise ValueError("baseline is not an agentready.seo.v1 SEO report")
+    if baseline.get("schema") != SEO_SCHEMA:
+        raise ValueError(f"baseline is not an {SEO_SCHEMA} SEO report")
     warnings: list[str] = []
     if isinstance(baseline.get("score"), int) and report.score < baseline["score"]:
         warnings.append(f"SEO score regressed from {baseline['score']} to {report.score}")
@@ -35,87 +28,51 @@ def compare_seo_baseline(report: SeoReport, path: str) -> list[str]:
 def audit_seo(
     url: str,
     *,
-    checks: Sequence[SeoCheck] | None = None,
+    checks: Sequence[object] | None = None,
     timeout: float = 5.0,
     verify: bool = True,
     allow_private: bool = True,
     max_redirects: int = 5,
     max_bytes: int = 5 * 1024 * 1024,
     recommendation_limit: int = 10,
+    limits: dict[str, int | float] | None = None,
     language: str = "en",
+    profile: str = "standard",
     crawl: bool = False,
     max_pages: int = 25,
     render: bool = False,
-    crawl_checks: Sequence | None = None,
+    crawl_checks: Sequence[object] | None = None,
     ga_property: str | None = None,
     gsc_site: str | None = None,
 ) -> SeoReport:
-    target = parse_target(url)
-    if not allow_private:
-        ensure_public_url(target.url)
-    started = utc_now_iso()
-    if checks is None:
-        from .seo_checks import SEO_CHECKS
+    """Run every public SEO request through the canonical AuditService path."""
+    from .audit_service import AuditRequest, AuditService
+    from .seo_checks import SEO_CHECKS_BY_ID
+    from .seo_crawler import CRAWL_CHECKS_BY_ID
 
-        checks = SEO_CHECKS
-    logger.info("SEO audit started: origin=%s checks=%d crawl=%s", target.origin, len(checks), crawl)
-    started_perf = time.perf_counter()
-    with HttpClient(
-        timeout=timeout,
-        verify=verify,
-        allow_private=allow_private,
-        max_redirects=max_redirects,
-        max_bytes=max_bytes,
-    ) as client:
-        results = [check(target.url, client) for check in checks]
-    if crawl:
-        from .seo_crawler import CRAWL_CHECKS, crawl_site
+    by_callable = {value: key for key, value in (*SEO_CHECKS_BY_ID.items(), *CRAWL_CHECKS_BY_ID.items())}
+    selected = tuple(by_callable.get(check, getattr(check, "__name__", "")) for check in checks or ())
+    selected += tuple(by_callable.get(check, getattr(check, "__name__", "")) for check in crawl_checks or ())
+    logger.info("[FIX:seo-canonical] public SEO request checks=%d providers=%s", len(selected), bool(ga_property or gsc_site))
 
-        pages = crawl_site(
-            target.url,
+    result = AuditService().run(
+        AuditRequest(
+            target=url,
+            mode="seo",
+            profile=profile,
             max_pages=max_pages,
             timeout=timeout,
-            verify=verify,
-            allow_private=allow_private,
             render=render,
+            language=language,
+            crawl=crawl,
+            recommendation_limit=recommendation_limit,
+            limits=limits or {},
+            allow_private=allow_private,
+            include=selected,
+            ga_property=ga_property,
+            gsc_site=gsc_site,
         )
-        selected_crawl = CRAWL_CHECKS if crawl_checks is None else crawl_checks
-        results.extend(check(pages, target.url) for check in selected_crawl)
-    if ga_property or gsc_site:
-        from .seo_analytics import ANALYTICS_CHECKS, AnalyticsContext
-
-        context = AnalyticsContext(ga_property=ga_property, gsc_site=gsc_site)
-        for check in ANALYTICS_CHECKS:
-            try:
-                results.append(check(target.url, context))
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Analytics check failed: check=%s error=%s", check.__name__, exc)
-                results.append(
-                    SeoCheckResult(
-                        id=check.__name__.replace("check_", "").replace("_", "-"),
-                        title=check.__name__.replace("check_", "").replace("_", " ").title(),
-                        category="analytics",
-                        status="error",
-                        scored=True,
-                        details=str(exc),
-                    )
-                )
-    score, categories = score_checks(results)
-    recommendations = rank_recommendations(results, limit=recommendation_limit)
-    report = SeoReport(
-        schema="agentready.seo.v1",
-        target=target.url,
-        origin=target.origin,
-        checks=results,
-        score=score,
-        categories=categories,
-        recommendations=recommendations,
-        started_at=started,
-        finished_at=utc_now_iso(),
-        language=language,
     )
-    logger.info(
-        "SEO audit finished: origin=%s score=%d checks=%d duration_ms=%d",
-        target.origin, score, len(results), round((time.perf_counter() - started_perf) * 1000),
-    )
-    return report
+    if result.seo_report is None:
+        raise RuntimeError("canonical SEO execution returned no SEO report")
+    return result.seo_report

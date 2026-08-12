@@ -84,6 +84,21 @@ def test_v2_schema_is_valid_json_and_declares_stable_id():
     assert schema["properties"]["schema"]["const"] == "agentready.audit.v2"
 
 
+def test_canonical_audit_payload_validates_against_published_schema():
+    jsonschema = pytest.importorskip("jsonschema")
+    from agentready.report_v2 import AuditReport, Coverage, Finding, FindingStatus
+
+    schema_path = Path(__file__).parents[1] / "schemas" / "agentready.audit.v2.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    payload = AuditReport(
+        "https://example.test",
+        (Finding("robots", "Robots", FindingStatus.PASS, "ok"),),
+        Coverage(1, 1, 1, 1),
+    ).to_dict()
+
+    jsonschema.Draft202012Validator(schema).validate(payload)
+
+
 def test_core_modules_do_not_import_transport_adapters():
     package = Path(__file__).parents[1] / "src" / "agentready" / "audit_core"
     forbidden = ("agentready.cli", "agentready.server", "agentready.mcp_server", "tests.")

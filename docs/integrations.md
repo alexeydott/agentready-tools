@@ -10,10 +10,10 @@ Start service:
 agentready serve --host 127.0.0.1 --port 8765 --data-dir .cache
 ```
 
-Trigger scan:
+Trigger canonical v2 audit:
 
 ```bash
-curl -X POST http://127.0.0.1:8765/scan \
+curl -X POST http://127.0.0.1:8765/v2/audit \
   -H 'content-type: application/json' \
   -d '{
     "url":"https://example.com",
@@ -23,7 +23,7 @@ curl -X POST http://127.0.0.1:8765/scan \
   }'
 ```
 
-The `/scan` endpoint supports every scanner preset through the `preset` field:
+The `/v2/audit` endpoint supports every scanner preset through the `preset` field:
 `all`, `content`, `api`, and `ai-search`. The equivalent check catalog is available
 without running a network scan:
 
@@ -33,9 +33,8 @@ curl 'http://127.0.0.1:8765/checks?language=ru'
 
 ### v2 application/report contract
 
-The additive v2 surface returns `agentready.audit.v2` reports with bounded
+The v2 surface returns `agentready.audit.v2` reports with bounded
 evidence, coverage, version metadata, and deterministic finding fingerprints.
-Existing v1 endpoints remain supported:
 
 ```bash
 curl -X POST http://127.0.0.1:8765/v2/audit \
@@ -97,10 +96,9 @@ scope, normalized URL identity, bounded frontier, explicit item states, and
 coverage accounting. Protocol profiles audit passive documents and expose
 evidence through the same report and agent/MCP projection boundaries.
 
-Release `0.10.0` freezes the compatibility manifest: v1 CLI/API facades stay
-supported, while v2 schemas and protocol manifests are additive. Migration
-status is intentionally `v1-preserved-v2-additive`; no v1 endpoint is removed
-by this stable release.
+Release `0.12.0` completes the v2 transport parity milestone. The compatibility
+manifest lists only v2 schemas and surfaces; legacy report identifiers and
+routes are rejected rather than silently adapted.
 
 The dashboard is available at `/dashboard` and preserves bounded form/chat
 state in browser `localStorage`. Credential status is restored only as
@@ -111,51 +109,66 @@ English and Russian title/body variants when edited.
 Get localized HTML dashboard:
 
 ```bash
-curl -X POST http://127.0.0.1:8765/scan/dashboard \
+curl -X POST http://127.0.0.1:8765/v2/audit/dashboard \
   -H 'content-type: application/json' \
   -d '{"url":"https://example.com","language":"ru"}' \
   -o dashboard.html
 ```
 
-The dashboard's `all` profile calls both `/scan/dashboard` (including GEO
-checks) and `/seo/audit/dashboard`, then presents their results as one
-downloadable HTML report with GEO and SEO sections. The independent endpoints
-remain unchanged for API consumers that need one report source.
+The dashboard's `all` profile calls both `/v2/audit/dashboard` (including GEO
+checks) and `/v2/seo/audit/dashboard`, then presents their results as one
+downloadable HTML report with GEO and SEO sections.
 
 Independent SEO endpoints (optional `crawl`, `max_pages`, `render` fields enable cross-page checks and headless-browser link extraction):
 
 ```bash
-curl -X POST http://127.0.0.1:8765/seo/audit \
+curl -X POST http://127.0.0.1:8765/v2/seo/audit \
   -H 'content-type: application/json' \
   -d '{"url":"https://example.com","language":"en","crawl":true,"max_pages":25}'
-curl -X POST http://127.0.0.1:8765/seo/audit/dashboard \
+curl -X POST http://127.0.0.1:8765/v2/seo/audit/dashboard \
   -H 'content-type: application/json' \
   -d '{"url":"https://example.com"}' -o seo.html
 ```
 
-The MCP facade additionally exposes `seo_audit`. API and MCP SEO requests reject private targets and do not perform mutations. Optional `ga_property` / `gsc_site` fields enable GA4/Search Console analytics checks using the stored service account (see Getting Started).
+The MCP facade exposes `seo_audit_v2`, `run_inventory_v2`, and
+`provider_enrichment_v2`. API and MCP SEO requests reject private targets and
+do not perform mutations. Optional `ga_property` / `gsc_site` fields enable
+GA4/Search Console analytics checks using the stored service account (see
+Getting Started). Provider enrichment is timestamped, bounded, cached/opt-in,
+and excluded from the core score.
 
-Credential management is CLI-only (`agentready seo credentials set|status|clear`) and is intentionally not exposed as an API/MCP endpoint.
+Generic inventory parity:
+
+```bash
+agentready inventory RUN_ID links --search "pricing" --format jsonl
+```
+
+The equivalent HTTP request is
+`GET /v2/runs/{run_id}/inventory/links?search=pricing&limit=100`; MCP callers
+use one `run_inventory_v2` tool with `kind`, `limit`, `cursor`, `search`,
+`sort_by`, `descending`, and optional `export_format`.
+
+Credential management is CLI-only (`agentready credentials set|status|clear`) and is intentionally not exposed as an API/MCP endpoint.
 
 Mobile endpoints:
 
 ```bash
-curl -X POST http://127.0.0.1:8765/mobile/audit \
+curl -X POST http://127.0.0.1:8765/v2/mobile/audit \
   -H 'content-type: application/json' \
   -d '{"urls":["https://example.com"],"language":"en"}'
-curl -X POST http://127.0.0.1:8765/mobile/audit/dashboard \
+curl -X POST http://127.0.0.1:8765/v2/mobile/audit/dashboard \
   -H 'content-type: application/json' \
   -d '{"urls":["https://example.com"],"render":true}' -o mobile.html
 ```
 
-The MCP facade additionally exposes `mobile_audit`, `mobile_findings`, and `mobile_remediation_plan` for coding-agent workflows.
+The MCP facade additionally exposes `mobile_audit_v2`, `mobile_findings`, and `mobile_remediation_plan` for coding-agent workflows.
 
 The HTTP `serve` surface is intentionally read-only: filesystem-only commands
 (`init`, `geo init-rules`, and `logs`) and credentialed/mutating publisher commands
 are not exposed as unauthenticated API endpoints.
 
-The dashboard and AI assistant preserve the v1 localized HTML experience while
-using the v2 evidence/coverage projection for AI context. AI output is
+The dashboard and AI assistant use the v2 localized HTML and
+evidence/coverage projections for AI context. AI output is
 advisory, bounded, and must not receive credential material; provider keys stay
 in the OS credential vault and saved chats remain local runtime data.
 
@@ -274,14 +287,16 @@ Endpoint:
 http://127.0.0.1:8766/mcp
 ```
 
-`scan_site` accepts optional `include` checks and `language: "en" | "ru"`.
+The canonical MCP tools are `audit_v2`, `seo_audit_v2`, `mobile_audit_v2`,
+`audit_findings`, and `remediation_plan`; the removed legacy scan tool is not
+exposed.
 
 ### Tools for coding agents
 
 Two tools are designed for autonomous coding agents that need to fix a site:
 
-- `audit_findings(url, mode, preset, language, recommendation_limit)` — runs the audit and returns **only the optimization gaps** (failed/warned checks). Each finding contains a localized `title`, `category`, `why` (why it matters), observed `evidence`, and a `remediation` block with fix `instructions`, a ready-to-use `agent_prompt`, a `rerun_command` and reference links. Response schema: `agentready.findings.v1`.
-- `remediation_plan(url, mode, preset, language, recommendation_limit)` — returns a **prioritized step-by-step fix plan** ordered by impact/effort. Each step carries instructions, an agent prompt and a verification command. Response schema: `agentready.remediation-plan.v1`.
+- `audit_findings(url, mode, preset, language, recommendation_limit)` — runs the audit and returns **only the optimization gaps** (failed/warned checks). Each finding contains a localized `title`, `category`, `why` (why it matters), observed `evidence`, and a `remediation` block with fix `instructions`, a ready-to-use `agent_prompt`, a `rerun_command` and reference links. Response schema: `agentready.findings.v2`.
+- `remediation_plan(url, mode, preset, language, recommendation_limit)` — returns a **prioritized step-by-step fix plan** ordered by impact/effort. Each step carries instructions, an agent prompt and a verification command. Response schema: `agentready.remediation-plan.v2`.
 
 Both tools support `mode: "readiness"` (default, full protocol audit) and `mode: "seo"` (single-page SEO audit), and `language: "en" | "ru"` for all human-facing text.
 

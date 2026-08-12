@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from html.parser import HTMLParser
 from urllib.parse import urljoin
@@ -39,7 +39,7 @@ class Representation:
         source: str = RepresentationSource.STATIC_HTML,
         content_type: str = "text/html",
         observed_at: str | None = None,
-    ) -> "Representation":
+    ) -> Representation:
         digest = hashlib.sha256(body).hexdigest()
         return cls(
             representation_id or f"{source}:{digest}",
@@ -49,7 +49,7 @@ class Representation:
             content_type,
             digest,
             len(body),
-            observed_at or datetime.now(timezone.utc).isoformat(),
+            observed_at or datetime.now(UTC).isoformat(),
         )
 
 
@@ -86,6 +86,12 @@ class ImageFact:
     alt: str | None = None
     title: str | None = None
     srcset: str | None = None
+    loading: str | None = None
+    width: int | None = None
+    height: int | None = None
+    status_code: int | None = None
+    content_length: int | None = None
+    content_type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,7 +140,7 @@ class ParsedFacts:
 
 @dataclass(frozen=True, slots=True)
 class ParsedPage:
-    """Legacy page projection plus the single typed facts contract."""
+    """Compatibility page projection plus the single typed facts contract."""
 
     title: str
     links: tuple[str, ...]
@@ -207,7 +213,11 @@ class _FallbackParser(HTMLParser):
         if tag == "a" and values.get("href"):
             self._link = _LinkBuilder(values["href"], values.get("rel", ""), [])
         if tag == "img" and values.get("src"):
-            self.images.append(ImageFact(values["src"], values.get("alt") or None, values.get("title") or None, values.get("srcset") or None))
+            self.images.append(ImageFact(
+                values["src"], values.get("alt") or None, values.get("title") or None,
+                values.get("srcset") or None, values.get("loading") or None,
+                _dimension(values.get("width")), _dimension(values.get("height")),
+            ))
         if tag in {"img", "script", "iframe", "link", "source"}:
             candidate = values.get("src") or values.get("href")
             if candidate:
@@ -263,6 +273,16 @@ class _FallbackParser(HTMLParser):
 
 def _clean_text(value: str) -> str:
     return " ".join(value.split())
+
+
+def _dimension(value: str | None) -> int | None:
+    if not value:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
 
 
 def _facts_from_parser(parser: _FallbackParser) -> ParsedFacts:
@@ -359,6 +379,9 @@ def _parse_with_selectolax(body: bytes, representation: Representation) -> Parse
             node.attributes.get("alt") or None,
             node.attributes.get("title") or None,
             node.attributes.get("srcset") or None,
+            node.attributes.get("loading") or None,
+            _dimension(node.attributes.get("width")),
+            _dimension(node.attributes.get("height")),
         )
         for node in document.css("img[src]")
     )
@@ -419,7 +442,7 @@ def parse_page(
     *,
     representation: Representation | None = None,
 ) -> ParsedPage:
-    """Parse once and return both the typed facts and the legacy projection."""
+    """Parse once and return both the typed facts and the compatibility projection."""
     representation = representation or Representation.from_body(body)
     try:
         return _parse_with_selectolax(body, representation)

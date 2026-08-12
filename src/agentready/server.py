@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import json
 import html
+import json
 import logging
+import os
 import re
 import sys
 import threading
 from collections import OrderedDict
 from dataclasses import asdict, is_dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -19,26 +20,34 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Server dependencies missing. Install: pip install 'agentready-tools[server]'") from exc
 
-from .i18n import category_name, check_hint, check_title, guidance, localized_report_dict, normalize_language
+from .ai_prompts import ai_skill_catalog
+from .audit_core.store import MemorySiteStore, RunUrlState, SQLiteSiteStore
+from .audit_service import AuditRequest, AuditService
+from .compatibility import COMPATIBILITY
+from .crawl_profiles import HARD_CAPS
 from .dashboard import render_dashboard
-from .remediation import remediation_for
-from .registry import CHECKS
-from .report import render_html
-from .scanner import scan
-from .seo_report import render_seo_html
-from .seo_checks import SEO_CHECKS_BY_ID, SEO_CHECK_METADATA
-from .seo_crawler import CRAWL_CHECK_METADATA
-from .seo_scanner import audit_seo
-from .mobile_checks import MOBILE_CHECK_METADATA, MOBILE_STATIC_CHECKS_BY_ID
+from .exports import export_query
+from .i18n import (
+    category_name,
+    check_hint,
+    check_title,
+    crawl_classification_label,
+    guidance,
+    normalize_language,
+)
+from .jobs_v2 import AuditJobManager
+from .metrics import (
+    ExternalMetric,
+    ProviderConfig,
+    ProviderStatus,
+    ga4_adapter,
+    gsc_adapter,
+    pagespeed_adapter,
+    url_inspection_adapter,
+)
+from .mobile_checks import MOBILE_CHECK_METADATA
 from .mobile_report import render_mobile_html
 from .mobile_scanner import audit_mobile
-from .target import TargetError
-from .ai_prompts import ai_skill_catalog
-from .compatibility import COMPATIBILITY
-from .jobs_v2 import AuditJobManager
-from .report_v2 import diff_reports, export_inventory, report_from_checks, report_from_dict
-from .audit_service import AuditRequest, AuditService
-from .audit_core.store import MemorySiteStore, RunUrlState
 from .query_service import (
     FindingQuery,
     LinkQuery,
@@ -50,8 +59,16 @@ from .query_service import (
     ResourceQuery,
     RunUrlQuery,
 )
+from .registry import CHECKS
+from .remediation import remediation_for
+from .report_storage import save_report
+from .report_v2 import diff_reports, export_inventory, report_from_dict
 from .saved_views import SavedView, SavedViewRegistry
-from .exports import export_query
+from .seo_checks import SEO_CHECK_METADATA, SEO_CHECKS_BY_ID
+from .seo_crawler import CRAWL_CHECK_METADATA
+from .seo_report import render_seo_html
+from .seo_scanner import audit_seo
+from .target import TargetError
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +141,15 @@ class _V2RunRegistry:
         with self._lock:
             store = self._runs.get(run_id)
             if store is None:
-                raise KeyError(run_id)
+                if os.environ.get("AGENTREADY_SERVE_SQLITE") == "1":
+                    durable = _serve_sqlite_store()
+                    if durable is not None:
+                        logger.info("[FIX:serve-recovery] rehydrated durable run store run_id=%s", run_id)
+                        self._runs[run_id] = durable  # type: ignore[assignment]
+                        self._sizes[run_id] = 0
+                        store = durable
+                if store is None:
+                    raise KeyError(run_id)
             self._runs.move_to_end(run_id)
             return store
 
@@ -133,11 +158,120 @@ _V2_RUNS = _V2RunRegistry()
 _V2_SAVED_VIEWS = SavedViewRegistry()
 
 
+def _serve_sqlite_store() -> SQLiteSiteStore | None:
+    """Open the optional durable serve store when explicitly enabled."""
+    if os.environ.get("AGENTREADY_SERVE_SQLITE") != "1":
+        return None
+    path = _SERVER_DATA_DIR / "audit.sqlite3"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    logger.info("[FIX:serve-recovery] durable SQLite serve history path=%s", path)
+    return SQLiteSiteStore(path)
+
+
+def _saved_views_path() -> Path:
+    _SERVER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    return _SERVER_DATA_DIR / "saved-views.jsonl"
+
+
+def _persist_saved_views() -> None:
+    path = _saved_views_path()
+    path.write_text("\n".join(_V2_SAVED_VIEWS.snapshot()) + ("\n" if _V2_SAVED_VIEWS.list() else ""), encoding="utf-8")
+
+
+def _restore_saved_views() -> None:
+    path = _saved_views_path()
+    if not path.is_file():
+        return
+    records = tuple(line for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+    try:
+        restored = _V2_SAVED_VIEWS.restore(records)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        logger.error("[FIX:serve-recovery] saved-view restore failed path=%s error=%s", path, exc)
+        return
+    logger.info("[FIX:serve-recovery] saved views restored count=%d", restored)
+
+
+def _run_provider_enrichment(run_id: str, request: ProviderEnrichmentRequest) -> dict:
+    """Persist bounded, explicitly supplied provider observations.
+
+    Public API/MCP calls never receive credentials and never contact a provider
+    implicitly.  A caller may replay a redacted cached fixture; otherwise the
+    typed result is ``not_requested`` and the core audit score is untouched.
+    """
+    try:
+        store = _V2_RUNS.get(run_id)
+    except KeyError as exc:
+        raise ValueError("run not found") from exc
+    service = QueryService(store)
+    urls = list(dict.fromkeys(request.sample_urls))[:100]
+    if not urls:
+        page = service.run_urls(RunUrlQuery(run_id, limit=100))
+        urls = [item.url_key for item in page.items]
+    metrics = tuple(
+        ExternalMetric(
+            request.provider,
+            item.name,
+            item.value,
+            item.unit,
+            item.source,
+            item.version,
+            item.observed_at,
+        )
+        for item in request.cached_metrics
+        if item.url_key is None or item.url_key in urls
+    )
+    if not metrics:
+        result = {
+            "provider": request.provider,
+            "status": ProviderStatus.NOT_REQUESTED.value,
+            "detail": "no cached observations supplied; credentials remain in the local OS vault",
+            "from_cache": False,
+            "sample_count": len(urls),
+            "metrics": [],
+        }
+    else:
+        adapter = {
+            "pagespeed": pagespeed_adapter,
+            "ga4": ga4_adapter,
+            "gsc": gsc_adapter,
+            "url-inspection": url_inspection_adapter,
+        }[request.provider](ProviderConfig())
+        result = adapter.run(lambda _: metrics, cached=metrics).to_dict()
+        result["sample_count"] = len(urls)
+        for item in request.cached_metrics:
+            if item.url_key is None:
+                targets = urls[:1] or [None]
+            else:
+                targets = [item.url_key]
+            metric = ExternalMetric(
+                request.provider,
+                item.name,
+                item.value,
+                item.unit,
+                item.source,
+                item.version,
+                item.observed_at,
+            )
+            for url_key in targets:
+                store.put_metric(metric.to_record(run_id, url_key=url_key))
+        store.put_evidence(run_id, f"provider:{request.provider}:summary", result)
+    logger.info(
+        "provider enrichment complete run_id=%s provider=%s status=%s samples=%d metrics=%d",
+        run_id,
+        request.provider,
+        result["status"],
+        len(urls),
+        len(result.get("metrics", [])),
+    )
+    return result
+
+
 def configure_data_dir(path: str | Path | None = None) -> Path:
     """Configure and create the serve-owned directory for AI tool settings."""
     global _SERVER_DATA_DIR
     _SERVER_DATA_DIR = (Path(path).expanduser() if path is not None else default_data_dir()).resolve()
     _SERVER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _restore_saved_views()
     logger.info("Serve data directory ready: %s", _SERVER_DATA_DIR)
     return _SERVER_DATA_DIR
 
@@ -274,29 +408,13 @@ def dashboard(request: Request, language: Literal["en", "ru"] | None = None) -> 
     return HTMLResponse(render_dashboard(lang))
 
 
-class ScanRequest(BaseModel):
-    url: str
-    preset: Literal["all", "content", "api", "ai-search"] = "all"
-    language: Literal["en", "ru"] = "en"
-    content_url: str | None = None
-    commerce_url: str | None = None
-    only: list[str] | None = None
-    include: list[str] | None = None
-    exclude: list[str] | None = None
-    verify_skill_digests: bool = False
-    timeout: float = Field(default=5.0, ge=1.0, le=30.0)
-    workers: int = Field(default=8, ge=1, le=24)
-    level_threshold: float = Field(default=0.8, gt=0.0, le=1.0)
-    recommendation_limit: int = Field(default=10, ge=0, le=50)
-
-
 class V2AuditRequest(BaseModel):
     url: str
     preset: Literal["all", "content", "api", "ai-search"] = "all"
     profile: Literal["quick", "standard", "deep", "custom"] = "standard"
     language: Literal["en", "ru"] = "en"
     timeout: float = Field(default=5.0, ge=1.0, le=30.0)
-    max_pages: int = Field(default=25, ge=1, le=100)
+    max_pages: int = Field(default=25, ge=0, le=25_000)
     limits: dict[str, int | float] = Field(default_factory=dict)
     include: list[str] = Field(default_factory=list)
     exclude: list[str] = Field(default_factory=list)
@@ -308,12 +426,14 @@ class V2AuditRequest(BaseModel):
 
 class SeoRequest(BaseModel):
     url: str
+    profile: Literal["quick", "standard", "deep", "custom"] = "standard"
     language: Literal["en", "ru"] = "en"
     checks: list[str] | None = None
     timeout: float = Field(default=5.0, ge=1.0, le=30.0)
     recommendation_limit: int = Field(default=10, ge=0, le=50)
+    limits: dict[str, int | float] = Field(default_factory=dict)
     crawl: bool = False
-    max_pages: int = Field(default=25, ge=1, le=100)
+    max_pages: int = Field(default=25, ge=0, le=25_000)
     render: bool = False
     ga_property: str | None = None
     gsc_site: str | None = None
@@ -325,6 +445,22 @@ class MobileRequest(BaseModel):
     render: bool = False
     timeout: float = Field(default=5.0, ge=1.0, le=30.0)
     recommendation_limit: int = Field(default=10, ge=0, le=50)
+
+
+class ProviderMetricInput(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    value: int | float | str | None = None
+    unit: str | None = Field(default=None, max_length=32)
+    source: str = Field(default="cached-fixture", min_length=1, max_length=120)
+    version: str = Field(default="unknown", min_length=1, max_length=80)
+    observed_at: str = Field(min_length=1, max_length=80)
+    url_key: str | None = Field(default=None, max_length=2048)
+
+
+class ProviderEnrichmentRequest(BaseModel):
+    provider: Literal["pagespeed", "ga4", "gsc", "url-inspection"]
+    sample_urls: list[str] = Field(default_factory=list, max_length=100)
+    cached_metrics: list[ProviderMetricInput] = Field(default_factory=list, max_length=500)
 
 
 class AIRequest(BaseModel):
@@ -487,11 +623,11 @@ def ai_chat_get_endpoint(filename: str, http_request: Request) -> dict:
 @app.post("/ai/chats")
 def ai_chats_save_endpoint(request: AIChatSaveRequest, http_request: Request) -> dict:
     _require_loopback(http_request)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", request.name).strip("-").lower()[:60] or "chat"
     path = _chats_dir() / f"{stamp}-{slug}.json"
     payload = request.model_dump()
-    payload["created_at"] = datetime.now(timezone.utc).isoformat()
+    payload["created_at"] = datetime.now(UTC).isoformat()
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     logger.info("Saved AI chat path=%s messages=%d", path, len(request.messages))
     return {"file": path.name, "name": request.name}
@@ -503,7 +639,13 @@ def ai_provider_save_endpoint(request: AIProviderRequest, http_request: Request)
     _require_loopback(http_request)
     from .ai_credentials import store_api_key
     from .ai_provider import validate_base_url
-    from .config import AI_PROVIDER_ID, ai_provider_profiles, load_config, save_ai_enablement, save_ai_provider_config
+    from .config import (
+        AI_PROVIDER_ID,
+        ai_provider_profiles,
+        load_config,
+        save_ai_enablement,
+        save_ai_provider_config,
+    )
 
     provider_id = request.provider_id or re.sub(r"[^A-Za-z0-9._-]+", "-", request.name.strip().lower()).strip("-")[:64]
     if not provider_id or not AI_PROVIDER_ID.fullmatch(provider_id):
@@ -558,6 +700,7 @@ def ai_provider_models_endpoint(provider_id: str, http_request: Request) -> dict
     """Load the provider model catalog for the local dashboard picker."""
     _require_loopback(http_request)
     import asyncio
+
     from .ai_provider import AIProviderError, OpenAICompatibleProvider
     from .config import ai_provider_profiles, load_config
 
@@ -589,7 +732,7 @@ def ai_provider_delete_endpoint(provider_id: str, http_request: Request) -> dict
     """Remove a provider profile and its OS-vault key."""
     _require_loopback(http_request)
     from .ai_credentials import clear_api_key
-    from .config import ai_provider_profiles, load_config, save_ai_provider_config
+    from .config import ai_provider_profiles, load_config, save_ai_provider_profiles
 
     cfg, config_path = load_config()
     providers = ai_provider_profiles(cfg["ai"])
@@ -692,35 +835,6 @@ def seo_checks_endpoint(language: Literal["en", "ru"] = "en") -> list[dict[str, 
     ]
 
 
-def _run_scan(request: ScanRequest):
-    return scan(
-        request.url,
-        preset=request.preset,
-        only=request.only,
-        include=request.include,
-        exclude=request.exclude,
-        content_url=request.content_url,
-        commerce_url=request.commerce_url,
-        verify_skill_digests=request.verify_skill_digests,
-        timeout=request.timeout,
-        allow_private=False,
-        workers=request.workers,
-        level_threshold=request.level_threshold,
-        recommendation_limit=request.recommendation_limit,
-        language=request.language,
-    )
-
-
-@app.post("/scan")
-def scan_endpoint(request: ScanRequest) -> dict:
-    """Run a scan and return localized JSON. Stable IDs/status values remain language-neutral."""
-    try:
-        report = _run_scan(request)
-        return localized_report_dict(report, request.language)
-    except (TargetError, ValueError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
 def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None) -> dict:
     fields_set = getattr(request, "model_fields_set", None)
     if fields_set is None:
@@ -728,9 +842,11 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None) -
     max_pages = request.max_pages
     if "max_pages" not in fields_set and "max_pages" in request.limits:
         max_pages = int(request.limits["max_pages"])
-    if not 1 <= max_pages <= 100:
-        raise ValueError("max_pages must be between 1 and 100")
-    store = MemorySiteStore()
+    if not 0 <= max_pages <= HARD_CAPS.max_pages:
+        raise ValueError(f"max_pages must be between 0 and {HARD_CAPS.max_pages}")
+    if max_pages == 0:
+        max_pages = HARD_CAPS.max_pages
+    store = _serve_sqlite_store() or MemorySiteStore()
     result = _AUDIT_SERVICE.run(
         AuditRequest(
             target=request.url,
@@ -764,15 +880,31 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None) -
 
 def _render_v2_dashboard(payload: dict) -> str:
     """Render a bounded HTML projection of the canonical v2 report."""
+    language = normalize_language(payload.get("request", {}).get("language", "en"))
+    labels = {
+        "en": {"title": "AgentReady v2 audit", "target": "Target", "coverage": "Coverage", "fetched": "fetched", "finding": "Finding", "status": "Status", "summary": "Summary"},
+        "ru": {"title": "Аудит AgentReady v2", "target": "Проверяемый адрес", "coverage": "Покрытие", "fetched": "загружено", "finding": "Проверка", "status": "Статус", "summary": "Описание"},
+    }[language]
+    status_labels = {
+        "pass": "пройдено" if language == "ru" else "pass",
+        "fail": "ошибка" if language == "ru" else "fail",
+        "warn": "предупреждение" if language == "ru" else "warning",
+        "error": "ошибка" if language == "ru" else "error",
+        "skip": "не применимо" if language == "ru" else "not applicable",
+    }
     findings = payload.get("findings", [])
     coverage = payload.get("coverage", {})
     rows = "".join(
         "<tr><td>"
         + html.escape(str(item.get("id", "")))
         + "</td><td>"
-        + html.escape(str(item.get("status", "")))
+        + html.escape(status_labels.get(str(item.get("status", "")), str(item.get("status", ""))))
         + "</td><td>"
-        + html.escape(str(item.get("summary", item.get("title", ""))))
+        + html.escape(
+            crawl_classification_label(item.get("summary"), language)
+            if str(item.get("summary", "")) in {"complete_within_scope", "partial_limit", "partial_error"}
+            else str(item.get("summary", item.get("title", "")))
+        )
         + "</td></tr>"
         for item in findings
         if isinstance(item, dict)
@@ -780,19 +912,34 @@ def _render_v2_dashboard(payload: dict) -> str:
     report_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
     return (
         "<!doctype html><html lang='"
-        + html.escape(str(payload.get("request", {}).get("language", "en")))
-        + "'><head><meta charset='utf-8'><title>AgentReady v2 audit</title>"
+        + html.escape(language)
+        + "'><head><meta charset='utf-8'><title>"
+        + html.escape(labels["title"])
+        + "</title>"
         + "<style>body{font:16px system-ui,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem}"
         + "table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccd;padding:.5rem;text-align:left}"
         + "code{background:#f3f4f6;padding:.1rem .25rem}</style></head><body>"
-        + "<main id='report-content'><h1>AgentReady v2 audit</h1>"
-        + "<p>Target: <code>"
+        + "<main id='report-content'><h1>"
+        + html.escape(labels["title"])
+        + "</h1><p>"
+        + html.escape(labels["target"])
+        + ": <code>"
         + html.escape(str(payload.get("target", "")))
-        + "</code></p><p>Coverage: "
-        + html.escape(str(coverage.get("classification", "unknown")))
-        + ", fetched "
+        + "</code></p><p>"
+        + html.escape(labels["coverage"])
+        + ": "
+        + html.escape(crawl_classification_label(coverage.get("classification"), payload.get("request", {}).get("language", "en")))
+        + ", "
+        + html.escape(labels["fetched"])
+        + " "
         + html.escape(str(coverage.get("urls_fetched", 0)))
-        + " URL(s).</p><table><thead><tr><th>Finding</th><th>Status</th><th>Summary</th></tr></thead><tbody>"
+        + " URL(s).</p><table><thead><tr><th>"
+        + html.escape(labels["finding"])
+        + "</th><th>"
+        + html.escape(labels["status"])
+        + "</th><th>"
+        + html.escape(labels["summary"])
+        + "</th></tr></thead><tbody>"
         + rows
         + "</tbody></table></main><script id='agentready-v2-report' type='application/json'>"
         + report_json
@@ -802,9 +949,12 @@ def _render_v2_dashboard(payload: dict) -> str:
 
 @app.post("/v2/audit")
 def audit_v2_endpoint(request: V2AuditRequest) -> dict:
-    """Run the additive canonical v2 report without changing the v1 endpoint."""
+    """Run the canonical v2 report through the shared audit service."""
     try:
-        return _run_v2_scan(request)
+        payload = _run_v2_scan(request)
+        saved_path = save_report(payload, target=request.url, surface="api-v2", fmt="json")
+        logger.info("API report saved path=%s", saved_path)
+        return payload
     except (TargetError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -813,7 +963,11 @@ def audit_v2_endpoint(request: V2AuditRequest) -> dict:
 def audit_v2_dashboard_endpoint(request: V2AuditRequest) -> HTMLResponse:
     """Render the canonical AuditService result for dashboard projections."""
     try:
-        return HTMLResponse(_render_v2_dashboard(_run_v2_scan(request)))
+        payload = _run_v2_scan(request)
+        html_report = _render_v2_dashboard(payload)
+        saved_path = save_report(html_report, target=request.url, surface="dashboard-v2", fmt="html")
+        logger.info("dashboard report saved path=%s", saved_path)
+        return HTMLResponse(html_report)
     except (TargetError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -856,6 +1010,29 @@ def audit_v2_job_cancel_endpoint(job_id: str) -> dict:
     return _V2_JOBS.get(job_id).to_dict()
 
 
+@app.post("/v2/runs/{run_id}/provider-enrichment")
+def provider_enrichment_endpoint(run_id: str, request: ProviderEnrichmentRequest) -> dict:
+    """Project cached external measurements into the canonical metric inventory."""
+    try:
+        return _run_provider_enrichment(run_id, request)
+    except ValueError as exc:
+        raise HTTPException(status_code=404 if "run not found" in str(exc) else 400, detail=str(exc)) from exc
+
+
+@app.post("/v2/runs/{run_id}/provider-jobs")
+def provider_job_endpoint(run_id: str, request: ProviderEnrichmentRequest) -> dict:
+    """Queue bounded provider enrichment; credentials are never accepted here."""
+    try:
+        _V2_RUNS.get(run_id)
+        job_id = _V2_JOBS.submit(lambda: _run_provider_enrichment(run_id, request))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    logger.info("provider enrichment job submitted run_id=%s job_id=%s provider=%s", run_id, job_id, request.provider)
+    return {"job_id": job_id, "status": "running", "provider": request.provider}
+
+
 @app.post("/v2/diff")
 def audit_v2_diff_endpoint(payload: dict) -> dict:
     try:
@@ -891,8 +1068,8 @@ def _json_safe(value: object) -> object:
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_json_safe(item) for item in value]
-    if hasattr(value, "value") and isinstance(getattr(value, "value"), str):
-        return getattr(value, "value")
+    if hasattr(value, "value") and isinstance(value.value, str):
+        return value.value
     return value
 
 
@@ -920,19 +1097,33 @@ def _build_inventory_query(run_id: str, kind: str, payload: dict) -> object:
         "limit": int(payload.get("limit", 100)),
     }
     if kind == "pages":
-        return PageQuery(run_id, status_code=payload.get("status_code"), **common)
+        return PageQuery(
+            run_id,
+            status_code=payload.get("status_code"),
+            locally_indexable=payload.get("locally_indexable"),
+            min_depth=payload.get("min_depth"),
+            max_depth=payload.get("max_depth"),
+            title_contains=payload.get("title_contains"),
+            canonical=payload.get("canonical"),
+            sort_by=payload.get("sort_by", "url"),
+            descending=bool(payload.get("descending", False)),
+            **common,
+        )
     if kind in {"run-urls", "urls"}:
         state = payload.get("state")
         return RunUrlQuery(run_id, state=RunUrlState(state) if state else None, **common)
     if kind == "links":
-        return LinkQuery(run_id, source_key=payload.get("source_key"), **common)
+        return LinkQuery(run_id, source_key=payload.get("source_key"), target_key=payload.get("target_key"), rel=payload.get("rel"), anchor_contains=payload.get("anchor_contains"), internal=payload.get("internal"), sort_by=payload.get("sort_by", "source"), descending=bool(payload.get("descending", False)), **common)
     if kind == "resources":
-        return ResourceQuery(run_id, page_key=payload.get("page_key"), **common)
+        return ResourceQuery(run_id, page_key=payload.get("page_key"), resource_type=payload.get("resource_type"), status_code=payload.get("status_code"), sort_by=payload.get("sort_by", "page"), descending=bool(payload.get("descending", False)), **common)
     if kind == "redirects":
         return RedirectQuery(
             run_id,
             from_url=payload.get("from_url"),
             status_code=payload.get("status_code"),
+            to_url=payload.get("to_url"),
+            sort_by=payload.get("sort_by", "from_url"),
+            descending=bool(payload.get("descending", False)),
             **common,
         )
     if kind == "findings":
@@ -940,6 +1131,9 @@ def _build_inventory_query(run_id: str, kind: str, payload: dict) -> object:
             run_id,
             finding_id=payload.get("finding_id"),
             status=payload.get("status"),
+            affected_url=payload.get("affected_url"),
+            sort_by=payload.get("sort_by", "finding_id"),
+            descending=bool(payload.get("descending", False)),
             **common,
         )
     if kind == "metrics":
@@ -947,6 +1141,10 @@ def _build_inventory_query(run_id: str, kind: str, payload: dict) -> object:
             run_id,
             provider=payload.get("provider"),
             name=payload.get("name"),
+            min_value=payload.get("min_value"),
+            max_value=payload.get("max_value"),
+            sort_by=payload.get("sort_by", "url"),
+            descending=bool(payload.get("descending", False)),
             **common,
         )
     raise ValueError(f"unsupported inventory kind: {kind}")
@@ -960,6 +1158,7 @@ def create_v2_saved_view(payload: dict) -> dict:
         run_id = str(payload["run_id"])
         query = _build_inventory_query(run_id, str(payload["kind"]), payload)
         view = _V2_SAVED_VIEWS.save(SavedView(view_id, name, query))
+        _persist_saved_views()
         return {"id": view.id, "name": view.name, "query": type(view.query).__name__}
     except (KeyError, TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -967,10 +1166,18 @@ def create_v2_saved_view(payload: dict) -> dict:
 
 @app.get("/v2/saved-views")
 def list_v2_saved_views() -> list[dict]:
-    return [
-        {"id": view.id, "name": view.name, "query": type(view.query).__name__}
-        for view in _V2_SAVED_VIEWS.list()
-    ]
+    return [view.to_dict() for view in _V2_SAVED_VIEWS.list()]
+
+
+@app.delete("/v2/saved-views/{view_id}")
+def delete_v2_saved_view(view_id: str) -> dict:
+    try:
+        view = _V2_SAVED_VIEWS.get(view_id)
+        _V2_SAVED_VIEWS.delete(view_id)
+        _persist_saved_views()
+        return {"id": view.id, "deleted": True}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="saved view not found") from exc
 
 
 @app.get("/v2/saved-views/{view_id}")
@@ -978,7 +1185,9 @@ def execute_v2_saved_view(view_id: str, limit: int = Query(default=100, ge=1, le
     try:
         view = _V2_SAVED_VIEWS.get(view_id)
         query = replace(view.query, limit=limit)
-        return _inventory_response(query.run_id, query)
+        payload = _inventory_response(query.run_id, query)
+        payload["query"] = view.to_dict()
+        return payload
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="saved view not found") from exc
     except (TypeError, ValueError) as exc:
@@ -1048,16 +1257,21 @@ def audit_v2_inventory_endpoint(
     kind: Literal["pages", "run-urls", "links", "resources", "redirects", "findings", "metrics"],
     cursor: str | None = None,
     limit: int = Query(default=100, ge=1, le=1000),
+    search: str | None = None,
+    sort_by: str | None = None,
+    descending: bool = False,
 ) -> dict:
     """Dispatch only to the fixed, typed inventory projections."""
+    default_sort = {"pages": "url", "run-urls": "url", "links": "source", "resources": "page", "redirects": "from_url", "findings": "finding_id", "metrics": "url"}[kind]
+    requested_sort = sort_by or default_sort
     queries = {
-        "pages": PageQuery(run_id, cursor=cursor, limit=limit),
+        "pages": PageQuery(run_id, cursor=cursor, limit=limit, title_contains=search, sort_by=requested_sort if requested_sort in {"url", "status", "depth", "title", "canonical", "content_hash"} else "url", descending=descending),
         "run-urls": RunUrlQuery(run_id, cursor=cursor, limit=limit),
-        "links": LinkQuery(run_id, cursor=cursor, limit=limit),
-        "resources": ResourceQuery(run_id, cursor=cursor, limit=limit),
-        "redirects": RedirectQuery(run_id, cursor=cursor, limit=limit),
-        "findings": FindingQuery(run_id, cursor=cursor, limit=limit),
-        "metrics": MetricQuery(run_id, cursor=cursor, limit=limit),
+        "links": LinkQuery(run_id, cursor=cursor, limit=limit, anchor_contains=search, sort_by=requested_sort if requested_sort in {"source", "target", "anchor", "ordinal"} else "source", descending=descending),
+        "resources": ResourceQuery(run_id, cursor=cursor, limit=limit, resource_type=search, sort_by=requested_sort if requested_sort in {"page", "resource", "type", "status"} else "page", descending=descending),
+        "redirects": RedirectQuery(run_id, cursor=cursor, limit=limit, to_url=search, sort_by=requested_sort if requested_sort in {"from_url", "to_url", "status"} else "from_url", descending=descending),
+        "findings": FindingQuery(run_id, cursor=cursor, limit=limit, affected_url=search, sort_by=requested_sort if requested_sort in {"finding_id", "status", "affected_url"} else "finding_id", descending=descending),
+        "metrics": MetricQuery(run_id, cursor=cursor, limit=limit, name=search, sort_by=requested_sort if requested_sort in {"url", "provider", "name", "value"} else "url", descending=descending),
     }
     return _inventory_response(run_id, queries[kind])
 
@@ -1124,19 +1338,6 @@ def audit_v2_metrics_endpoint(
     )
 
 
-@app.post("/scan/dashboard", response_class=HTMLResponse)
-def scan_dashboard(request: ScanRequest) -> HTMLResponse:
-    """Run a scan and return the self-contained bilingual HTML dashboard."""
-    try:
-        report = _run_scan(request)
-        html = render_html(report, request.language)
-        v2 = report_from_checks(request.url, report.checks).to_dict()
-        embedded = json.dumps(v2, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
-        return HTMLResponse(f'{html}\n<script id="agentready-v2-report" type="application/json">{embedded}</script>')
-    except (TargetError, ValueError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
 @app.get("/mobile/checks")
 def mobile_checks_endpoint(language: Literal["en", "ru"] = "en") -> list[dict[str, str]]:
     """List localized mobile-friendliness checks."""
@@ -1166,16 +1367,19 @@ def _run_mobile(request: MobileRequest):
     )
 
 
-@app.post("/mobile/audit")
+@app.post("/v2/mobile/audit")
 def mobile_audit_endpoint(request: MobileRequest) -> dict:
     """Run a mobile-friendliness audit for one or more public pages."""
     try:
-        return _run_mobile(request).to_dict()
+        payload = _run_mobile(request).to_dict()
+        saved_path = save_report(payload, target=request.urls[0], surface="api-mobile", fmt="json")
+        logger.info("API report saved path=%s", saved_path)
+        return payload
     except (TargetError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.post("/mobile/audit/dashboard", response_class=HTMLResponse)
+@app.post("/v2/mobile/audit/dashboard", response_class=HTMLResponse)
 def mobile_audit_dashboard(request: MobileRequest) -> HTMLResponse:
     """Return the mobile-friendliness audit as a self-contained HTML report."""
     try:
@@ -1202,12 +1406,11 @@ def _build_agentready_mcp_context(report: object | None, tools: list[str], langu
 def _ai_assistant(request: AIRequest):
     import asyncio
     from dataclasses import replace
+
     from .ai_assistant import AIAssistant
-    from .ai_models import AssistantRequest, AssistantUsage, ConversationMessage
+    from .ai_models import AssistantRequest, ConversationMessage
     from .ai_provider import AIProviderError, OpenAICompatibleProvider
     from .config import load_config
-    from .report_v2 import report_from_checks
-    from .scanner import scan
 
     cfg, _ = load_config()
     ai_cfg = cfg["ai"]
@@ -1216,9 +1419,8 @@ def _ai_assistant(request: AIRequest):
     if request.report is None:
         if not request.target:
             raise HTTPException(status_code=400, detail="target or report is required")
-        legacy_report = scan(request.target, allow_private=False, language=request.language)
-        report_object = report_from_checks(request.target, legacy_report.checks)
-        report = report_object.to_dict()
+        report = _run_v2_scan(V2AuditRequest(url=request.target, language=request.language))
+        report_object = report
     else:
         report_object = None
         report = request.report
@@ -1317,53 +1519,50 @@ def ai_chat_endpoint(request: AIRequest, http_request: Request) -> dict:
 
 def _run_seo(request: SeoRequest):
     from .seo_crawler import CRAWL_CHECKS_BY_ID
-
-    checks = None
-    crawl_ids: list[str] = []
-    if request.checks is not None:
-        page_ids: list[str] = []
-        unknown: list[str] = []
-        for check_id in request.checks:
-            if check_id in SEO_CHECKS_BY_ID:
-                page_ids.append(check_id)
-            elif check_id in CRAWL_CHECKS_BY_ID:
-                crawl_ids.append(check_id)
-            else:
-                unknown.append(check_id)
-        if unknown:
-            raise ValueError(f"Unknown SEO check(s): {', '.join(unknown)}")
-        checks = [SEO_CHECKS_BY_ID[check_id] for check_id in page_ids]
-        logger.debug("SEO request split: page_checks=%d crawl_checks=%d", len(page_ids), len(crawl_ids))
+    known = set(SEO_CHECKS_BY_ID) | set(CRAWL_CHECKS_BY_ID)
+    selected = tuple(request.checks or ())
+    unknown = [check_id for check_id in selected if check_id not in known]
+    if unknown:
+        raise ValueError(f"Unknown SEO check(s): {', '.join(unknown)}")
+    logger.info("[FIX:seo-canonical] HTTP SEO request checks=%d providers=%s", len(selected), bool(request.ga_property or request.gsc_site))
     return audit_seo(
         request.url,
-        checks=checks,
+        profile=request.profile,
         timeout=request.timeout,
         allow_private=False,
         recommendation_limit=request.recommendation_limit,
+        limits=request.limits,
         language=request.language,
-        crawl=request.crawl or bool(crawl_ids),
+        crawl=request.crawl or bool(selected),
         max_pages=request.max_pages,
         render=request.render,
-        crawl_checks=[CRAWL_CHECKS_BY_ID[check_id] for check_id in crawl_ids] if crawl_ids else None,
+        checks=tuple(SEO_CHECKS_BY_ID[check_id] for check_id in selected if check_id in SEO_CHECKS_BY_ID),
+        crawl_checks=tuple(CRAWL_CHECKS_BY_ID[check_id] for check_id in selected if check_id in CRAWL_CHECKS_BY_ID),
         ga_property=request.ga_property,
         gsc_site=request.gsc_site,
     )
 
 
-@app.post("/seo/audit")
+@app.post("/v2/seo/audit")
 def seo_audit_endpoint(request: SeoRequest) -> dict:
     """Run the independent SEO audit against one public page and discovery resources."""
     try:
-        return _run_seo(request).to_dict()
+        payload = _run_seo(request).to_dict()
+        saved_path = save_report(payload, target=request.url, surface="api-seo", fmt="json")
+        logger.info("API report saved path=%s", saved_path)
+        return payload
     except (TargetError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.post("/seo/audit/dashboard", response_class=HTMLResponse)
+@app.post("/v2/seo/audit/dashboard", response_class=HTMLResponse)
 def seo_audit_dashboard(request: SeoRequest) -> HTMLResponse:
     """Return the independent SEO audit as a self-contained HTML report."""
     try:
         report = _run_seo(request)
-        return HTMLResponse(render_seo_html(report, request.language))
+        html_report = render_seo_html(report, request.language)
+        saved_path = save_report(html_report, target=request.url, surface="dashboard-seo", fmt="html")
+        logger.info("dashboard report saved path=%s", saved_path)
+        return HTMLResponse(html_report)
     except (TargetError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

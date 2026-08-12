@@ -1,9 +1,9 @@
 """Safe, bounded custom extraction rules without executable code or network access."""
 from __future__ import annotations
 
-import re
-import logging
 import json
+import logging
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
@@ -35,6 +35,8 @@ class CustomRule:
     def __post_init__(self) -> None:
         if not self.id.strip() or not self.pattern:
             raise ValueError("custom rule id and pattern are required")
+        if len(self.pattern) > 2048:
+            raise ValueError("custom rule pattern must not exceed 2048 characters")
         if self.max_matches <= 0 or self.max_matches > 1000:
             raise ValueError("custom rule max_matches must be between 1 and 1000")
         if self.kind is CustomRuleKind.REGEX:
@@ -62,9 +64,12 @@ def apply_rule(
     structured_data: Iterable[Mapping[str, object]] = (),
     links: Iterable[str] = (),
     resources: Iterable[str] = (),
+    css_matches: Iterable[str] = (),
 ) -> tuple[str, ...]:
     if rule.kind is CustomRuleKind.CSS:
-        return (rule.pattern,) if rule.pattern in text else ()
+        # CSS is deliberately not a substring search.  Callers must provide
+        # matches from the shared parsed representation (bounded externally).
+        return tuple(css_matches)[:rule.max_matches]
     if rule.kind is CustomRuleKind.TEXT:
         return (rule.pattern,) if rule.pattern in text else ()
     if rule.kind is CustomRuleKind.HEADER:
@@ -95,6 +100,7 @@ def debug_representation(
     structured_data: Iterable[Mapping[str, object]] = (),
     links: Iterable[str] = (),
     resources: Iterable[str] = (),
+    css_matches: Iterable[str] = (),
     max_rules: int = 100,
 ) -> tuple[CustomRuleMatch, ...]:
     """Apply allowlisted rules to one saved representation with bounded output."""
@@ -114,6 +120,7 @@ def debug_representation(
                 structured_data=structured_data,
                 links=links,
                 resources=resources,
+                css_matches=css_matches,
             ),
         )
         for rule in selected
@@ -124,3 +131,23 @@ def debug_representation(
         ",".join(f"{item.rule_id}:{item.count}" for item in matches),
     )
     return matches
+
+
+# Editable, safe presets.  Values are declarative CustomRule objects; callers
+# may copy/modify them without introducing executable code or network access.
+BUILTIN_PRESETS: dict[str, tuple[CustomRule, ...]] = {
+    "analytics": (
+        CustomRule("google-analytics", CustomRuleKind.TEXT, "googletagmanager.com/gtag/js"),
+        CustomRule("google-tag-manager", CustomRuleKind.RESOURCE, "googletagmanager.com"),
+        CustomRule("yandex-metrica", CustomRuleKind.RESOURCE, "mc.yandex.ru"),
+    ),
+    "schema": (
+        CustomRule("jsonld-schema", CustomRuleKind.JSON_LD, "@type"),
+        CustomRule("microdata-schema", CustomRuleKind.TEXT, "itemtype"),
+    ),
+}
+
+
+def builtin_presets() -> dict[str, tuple[CustomRule, ...]]:
+    """Return a copy of built-in presets suitable for UI editing."""
+    return {name: (*rules,) for name, rules in BUILTIN_PRESETS.items()}

@@ -1,17 +1,17 @@
 from agentready.report_components import (
     render_category_card,
+    render_check_cell,
     render_disclosure,
     render_progress_bar,
-    render_remediation_block,
     render_recommendation_list,
+    render_remediation_block,
     render_report_navigation,
-    render_report_toolbar,
     render_report_table,
+    render_report_toolbar,
     render_score_meter,
-    render_check_cell,
     render_section,
-    render_status_cell,
     render_status_badge,
+    render_status_cell,
 )
 from agentready.report_styles import BASE_REPORT_CSS
 

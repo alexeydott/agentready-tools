@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from agentready.http import Fetched
-from agentready.seo.engine import aggregate_v1, run_atomic_rules
+from agentready.seo.engine import aggregate_v2, run_atomic_rules
 from agentready.seo.evidence import collect_page_evidence
 
 
@@ -60,15 +60,15 @@ def test_optional_capability_and_heuristic_rules_are_not_mandatory_score() -> No
     assert findings["jsonld"].status == "skip"
 
 
-def test_actionable_findings_have_evidence_and_v1_adapter_is_compatible() -> None:
+def test_actionable_findings_have_evidence_and_v2_projection_is_canonical() -> None:
     html = b"<html><head><meta name='robots' content='noindex'></head><body></body></html>"
     findings = run_atomic_rules(collect_page_evidence("https://example.test/page", FakeClient(html)))
     indexability = next(item for item in findings if item.rule.id == "indexability")
     assert indexability.status == "fail"
     assert indexability.evidence_ids
-    v1 = aggregate_v1(findings)
-    assert all(item.id for item in v1)
-    assert any(item.id == "indexability" and item.status == "fail" for item in v1)
+    v2 = aggregate_v2(findings)
+    assert all(item.id for item in v2)
+    assert any(item.id == "indexability" and item.status.value == "fail" for item in v2)
 
 
 def test_invalid_jsonld_is_evidence_backed_failure() -> None:

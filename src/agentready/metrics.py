@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Protocol
 
 from .audit_core.store import MetricRecord
 from .query_service import QueryService, RunUrlQuery
@@ -159,7 +161,7 @@ class ProviderAdapter:
         except FutureTimeout:
             logger.warning("provider operation timed out provider=%s", self.provider)
             return ProviderResult(self.provider, ProviderStatus.TIMEOUT, detail="provider operation timed out")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - provider adapters are a defensive trust boundary
             logger.warning("provider operation failed provider=%s type=%s", self.provider, type(exc).__name__)
             return ProviderResult(self.provider, ProviderStatus.UNAVAILABLE, detail="provider operation unavailable")
         if not isinstance(metrics, tuple) or not all(isinstance(item, ExternalMetric) for item in metrics):
@@ -317,7 +319,7 @@ def sample_cwv(
     observed_at: str | None = None,
 ) -> ProviderResult:
     """Convert bounded CWV samples into evidence-bearing enrichment metrics."""
-    timestamp = observed_at or datetime.now(timezone.utc).isoformat()
+    timestamp = observed_at or datetime.now(UTC).isoformat()
     metrics = tuple(
         ExternalMetric("pagespeed", name.lower(), value, "ms" if name.lower() != "cls" else None, source, version, timestamp)
         for name, value in sorted(samples.items())

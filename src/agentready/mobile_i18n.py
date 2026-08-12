@@ -70,7 +70,7 @@ def mobile_detail(text: str, lang: str) -> str:
     """Translate a scanner-generated mobile detail string for Russian reports."""
     if normalize_language(lang) != "ru":
         return text
-    if re.search(r"(?:timed out|timeout|connection|certificate|DNS|SSL|TLS|refused|unreachable)", text, re.I):
+    if re.search(r"(?:timed out|timeout|connection|certificate|DNS|SSL|TLS|refused|unreachable)", text, re.IGNORECASE):
         return "сетевая/протокольная ошибка: " + text
     return _translate_detail(text)
 

@@ -1,7 +1,7 @@
 """Versioned, passive protocol audit contracts."""
 
-from .audit import audit_documents
 from .adapters import to_agent_findings
+from .audit import audit_documents
 from .manifest import PROTOCOL_MANIFEST, ProtocolProfile
 from .models import ProtocolEvidence, ProtocolFinding, ProtocolStatus
 

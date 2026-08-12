@@ -1,7 +1,7 @@
-from fastapi.testclient import TestClient
 from types import SimpleNamespace
 
 import pytest
+from fastapi.testclient import TestClient
 
 import agentready.server as server_module
 from agentready.ai_provider import ProviderModel
@@ -10,10 +10,23 @@ from agentready.audit_core.store import (
     MetricRecord,
     PageRecord,
     RedirectFact,
+    RunRecord,
     RunUrlRecord,
     RunUrlState,
 )
-from agentready.server import app
+from agentready.server import _render_v2_dashboard, app
+
+
+def test_v2_dashboard_localizes_coverage_and_status_values():
+    html = _render_v2_dashboard({
+        "request": {"language": "ru"},
+        "target": "https://example.test/",
+        "coverage": {"classification": "partial_limit", "urls_fetched": 1},
+        "findings": [{"id": "crawl-coverage", "status": "warn", "summary": "partial_limit"}],
+    })
+    assert "Частичное — достигнут лимит страниц" in html
+    assert "предупреждение" in html
+    assert "partial_limit" not in html.split("<script", 1)[0]
 
 
 def test_server_exposes_all_read_only_audit_modes():
@@ -29,12 +42,68 @@ def test_server_exposes_all_read_only_audit_modes():
         "/ai/providers/{provider_id}/models",
         "/checks",
         "/seo/checks",
-        "/scan",
-        "/scan/dashboard",
-        "/v2/audit/dashboard",
-        "/seo/audit",
-        "/seo/audit/dashboard",
+            "/v2/audit/dashboard",
+            "/v2/seo/audit",
+            "/v2/seo/audit/dashboard",
+            "/v2/mobile/audit",
+            "/v2/mobile/audit/dashboard",
     } <= paths
+
+
+def test_server_rejects_removed_v1_audit_routes():
+    client = TestClient(app)
+    for path in ("/scan", "/scan/dashboard", "/seo/audit", "/mobile/audit"):
+        assert client.post(path, json={"url": "https://example.com"}).status_code == 404
+
+
+def test_provider_enrichment_is_cached_opt_in_and_persists_typed_metrics():
+    run_id = "run-provider-http"
+    store = MemorySiteStore()
+    store.begin_run(RunRecord(run_id, "config", "tool", "rules"))
+    store.put_run_url(RunUrlRecord(run_id, "https://example.com/", RunUrlState.PARSED))
+    server_module._V2_RUNS.put(run_id, store)
+    client = TestClient(app)
+
+    not_requested = client.post(
+        f"/v2/runs/{run_id}/provider-enrichment",
+        json={"provider": "ga4"},
+    )
+    assert not_requested.status_code == 200
+    assert not_requested.json()["status"] == "not_requested"
+    assert "credential" in not_requested.json()["detail"]
+
+    cached = client.post(
+        f"/v2/runs/{run_id}/provider-enrichment",
+        json={
+            "provider": "pagespeed",
+            "cached_metrics": [{
+                "name": "lcp",
+                "value": 1200,
+                "unit": "ms",
+                "source": "fixture",
+                "version": "psi-v5",
+                "observed_at": "2026-08-12T00:00:00+00:00",
+            }],
+        },
+    )
+    assert cached.status_code == 200
+    assert cached.json()["from_cache"] is True
+    assert next(iter(store.iter_metrics(run_id))).provider == "pagespeed"
+
+
+def test_provider_job_endpoint_uses_bounded_job_path():
+    run_id = "run-provider-job"
+    store = MemorySiteStore()
+    store.begin_run(RunRecord(run_id, "config", "tool", "rules"))
+    server_module._V2_RUNS.put(run_id, store)
+    response = TestClient(app).post(
+        f"/v2/runs/{run_id}/provider-jobs",
+        json={"provider": "gsc"},
+    )
+    assert response.status_code == 200
+    job_id = response.json()["job_id"]
+    assert response.json()["provider"] == "gsc"
+    assert TestClient(app).get(f"/v2/jobs/{job_id}").status_code == 200
 
 
 def test_v2_endpoint_maps_request_fields_to_shared_audit_service(monkeypatch):
@@ -387,8 +456,8 @@ def test_dashboard_is_localized_and_describes_each_operation():
     assert "chat_only:document.getElementById(\"ai-provider-chat-only\").checked" in response.text
     assert 'id="ai-model"' in response.text
     assert "model:document.getElementById(\"ai-model\").value" in response.text
-    assert "/scan/dashboard" in response.text
-    assert "/seo/audit/dashboard" in response.text
+    assert "/v2/audit/dashboard" in response.text
+    assert "/v2/seo/audit/dashboard" in response.text
     assert 'value="seo"' in response.text
     assert "progress-bar" in response.text
     assert "white-space:pre-line" in response.text
@@ -449,7 +518,7 @@ def test_dashboard_refreshes_provider_models_and_clears_new_provider_catalog():
     assert "renderModelCatalog([], null)" in response.text
     assert "loadAiModels(provider.id, restoredDashboardState[\"ai-model\"] || provider.model)" in response.text
     assert 'id="ai-chat-provider"' in response.text
-    assert "agentready.dashboard.state.v1" in response.text
+    assert "agentready.dashboard.state.v2" in response.text
     assert "localStorage.setItem" in response.text
     assert "provider-spin" in response.text
     assert 'id="ai-skill"' in response.text
@@ -503,7 +572,7 @@ def test_dashboard_offers_mobile_profile_with_localized_hint_and_debug_gate():
     assert 'value="mobile"' in response.text
     assert "Мобильная дружественность" in response.text
     assert "/mobile/checks" in response.text
-    assert "/mobile/audit/dashboard" in response.text
+    assert "/v2/mobile/audit/dashboard" in response.text
     assert "runMobile()" in response.text
     # 1.2 selected profile purpose is exposed only via the (?) hover tooltip
     assert 'id="preset-desc"' not in response.text
@@ -647,11 +716,11 @@ def test_seo_checks_endpoint_returns_localized_descriptions():
 
 
 def test_seo_audit_endpoints_execute(monkeypatch):
-    """Regression: /seo/audit and /seo/audit/dashboard must call a defined _run_seo."""
+    """Regression: canonical v2 SEO routes call the defined SEO runner."""
     from agentready.seo_models import SeoCategoryScore, SeoCheckResult, SeoReport
 
     report = SeoReport(
-        schema="agentready.seo.v1",
+        schema="agentready.seo.v2",
         target="https://example.com/",
         origin="https://example.com",
         checks=[SeoCheckResult("page-metadata", "t", "metadata", "pass", True, "ok")],
@@ -665,13 +734,38 @@ def test_seo_audit_endpoints_execute(monkeypatch):
     assert hasattr(server_module, "_run_seo")
 
     client = TestClient(app)
-    json_response = client.post("/seo/audit", json={"url": "https://example.com"})
+    json_response = client.post("/v2/seo/audit", json={"url": "https://example.com"})
     assert json_response.status_code == 200
-    assert json_response.json()["schema"] == "agentready.seo.v1"
+    assert json_response.json()["schema"] == "agentready.seo.v2"
 
-    html_response = client.post("/seo/audit/dashboard", json={"url": "https://example.com"})
+    html_response = client.post("/v2/seo/audit/dashboard", json={"url": "https://example.com"})
     assert html_response.status_code == 200
     assert "SEO" in html_response.text
+
+
+def test_seo_endpoint_preserves_crawl_profile_and_budget(monkeypatch):
+    captured = {}
+
+    def fake_audit(*args, **kwargs):
+        captured.update(kwargs)
+        from agentready.seo_models import SeoCategoryScore, SeoCheckResult, SeoReport
+
+        return SeoReport(
+            schema="agentready.seo.v2", target=args[0], origin="https://example.com",
+            checks=[SeoCheckResult("page-metadata", "t", "metadata", "pass", True, "ok")],
+            score=100, categories=[SeoCategoryScore("metadata", 1, 1, 100)],
+            recommendations=[], started_at="now", finished_at="now",
+        )
+
+    monkeypatch.setattr(server_module, "audit_seo", fake_audit)
+    response = TestClient(app).post(
+        "/v2/seo/audit",
+        json={"url": "https://example.com", "profile": "deep", "crawl": True, "max_pages": 9},
+    )
+    assert response.status_code == 200
+    assert captured["profile"] == "deep"
+    assert captured["crawl"] is True
+    assert captured["max_pages"] == 9
 
 
 def test_seo_audit_accepts_crawl_check_ids(monkeypatch):
@@ -683,7 +777,7 @@ def test_seo_audit_accepts_crawl_check_ids(monkeypatch):
     def fake_audit(url, **kwargs):
         captured.update(kwargs)
         return SeoReport(
-            schema="agentready.seo.v1",
+        schema="agentready.seo.v2",
             target=url,
             origin="https://example.com",
             checks=[SeoCheckResult("page-metadata", "t", "metadata", "pass", True, "ok")],
@@ -697,7 +791,7 @@ def test_seo_audit_accepts_crawl_check_ids(monkeypatch):
     monkeypatch.setattr(server_module, "audit_seo", fake_audit)
     client = TestClient(app)
     response = client.post(
-        "/seo/audit/dashboard",
+        "/v2/seo/audit/dashboard",
         json={"url": "https://example.com", "checks": ["page-metadata", "broken-links", "duplicate-metadata"]},
     )
     assert response.status_code == 200
@@ -705,5 +799,5 @@ def test_seo_audit_accepts_crawl_check_ids(monkeypatch):
     assert captured["crawl_checks"] is not None and len(captured["crawl_checks"]) == 2
     assert captured["checks"] is not None and len(captured["checks"]) == 1
 
-    unknown = client.post("/seo/audit", json={"url": "https://example.com", "checks": ["bogus-id"]})
+    unknown = client.post("/v2/seo/audit", json={"url": "https://example.com", "checks": ["bogus-id"]})
     assert unknown.status_code == 400

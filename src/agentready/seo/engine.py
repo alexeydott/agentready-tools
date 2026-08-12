@@ -1,10 +1,10 @@
-"""SEO atomic-rule execution and compatibility aggregation."""
+"""SEO atomic-rule execution and canonical v2 aggregation."""
 from __future__ import annotations
 
 import logging
 
 from ..http import HttpClient
-from ..seo_models import SeoCheckResult
+from ..report_v2 import Finding
 from .evidence import SeoPageEvidence, collect_page_evidence
 from .rules.builtin import run_rules
 from .rules.models import AtomicFinding
@@ -17,11 +17,11 @@ def run_atomic_rules(evidence: SeoPageEvidence) -> tuple[AtomicFinding, ...]:
     return run_rules(evidence)
 
 
-def aggregate_v1(findings: tuple[AtomicFinding, ...] | list[AtomicFinding]) -> list[SeoCheckResult]:
-    """Adapt v2 atomic findings to v1 result shape without changing legacy checks."""
+def aggregate_v2(findings: tuple[AtomicFinding, ...] | list[AtomicFinding]) -> list[Finding]:
+    """Aggregate atomic rule findings into canonical v2 report findings."""
     ordered = sorted(findings, key=lambda item: (item.rule.category, item.rule.id, item.target))
-    results = [item.to_v1() for item in ordered]
-    logger.debug("[WP6.4] aggregated atomic findings into v1 results=%d", len(results))
+    results = [item.to_v2() for item in ordered]
+    logger.debug("[WP6.4] aggregated atomic findings into v2 findings=%d", len(results))
     return results
 
 

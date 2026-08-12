@@ -1,38 +1,43 @@
-# AgentReady Tools 0.10.0
+# AgentReady Tools 0.12.0
 
 > Audit public websites for AI-agent protocol readiness and AI Search/GEO readiness.
 
-AgentReady Tools is a Python toolkit that checks whether a site is easy for autonomous AI agents to discover, read, authenticate to, integrate with, and transact with. It follows Cloudflare-style public methodology for protocol readiness, adds optional GEO checks, and provides reproducible scoring, maturity levels, CI gates, and remediation guidance.
+AgentReady Tools is a Python toolkit that checks whether a site is easy for autonomous AI agents to discover, read, authenticate to, integrate with, and transact with. It follows Cloudflare-style public methodology for protocol readiness, adds optional GEO checks, and provides reproducible scoring, CI gates, and remediation guidance.
 
 > AgentReady does **not** claim score compatibility with Cloudflare. The formulas here are explicit and reproducible for this project.
 
 ## Independent SEO audit
 
-The separate SEO mode audits the selected page (23 single-page checks: metadata, indexability, canonical, robots.txt/sitemap, images, HTTPS/mixed content, URL format, content quality, performance, hreflang, structured data) plus an optional bounded same-origin crawl (broken links, redirect chains, duplicate metadata across pages, internal nofollow, link counts). It does not predict rankings, query Search Console/Yandex Webmaster, or modify the target:
+The separate SEO mode audits the selected page (23 single-page checks: metadata, indexability, canonical, robots.txt/sitemap, images, HTTPS/mixed content, URL format, content quality, performance, hreflang, structured data) plus an optional bounded same-origin crawl (broken links, redirect chains, duplicate metadata across pages, internal nofollow, link counts, HTTPS-to-HTTP links). It does not predict rankings, query Search Console/Yandex Webmaster, or modify the target:
 
 ```bash
-agentready seo audit https://example.com --format html -o seo.html
-agentready seo audit https://example.com --lang ru --min-score 80
+agentready audit https://example.com --mode seo --format html -o seo.html
+agentready audit https://example.com --mode seo --lang ru --min-score 80
 # Cross-page checks via a bounded same-origin crawl
-agentready seo audit https://example.com --crawl --max-pages 25
+agentready audit https://example.com --mode seo --crawl --max-pages 25
 # Headless-browser link extraction for JS-driven sites (requires Playwright)
-agentready seo audit https://example.com --crawl --render
+agentready audit https://example.com --mode seo --crawl --render
 ```
 
-Checks requiring Google Analytics / Search Console credentials (traffic, impressions, bounce data) run when configured — see [Getting Started](docs/getting-started.md). The audit never mutates the target.
+Checks requiring Google Analytics / Search Console credentials (traffic, impressions, bounce data) run when configured — see [Getting Started](docs/getting-started.md). External PageSpeed/GA4/GSC/URL Inspection observations are opt-in enrichments with timestamps and do not affect the deterministic core score. The audit never mutates the target.
+
+For marketer workflows, use the reusable v2 inventory workspace in the dashboard
+or the transport-neutral CLI/API/MCP surfaces. A run exposes typed pages, links,
+resources, redirects, findings, metrics, saved views, comparison, bounded
+rescan, and export; partial crawl coverage remains explicitly partial.
 
 ## Mobile-friendliness audit
 
 The mobile mode audits one or more pages for Google Mobile-Friendly signals. Static checks (viewport, responsive CSS, fixed-width elements, touch targets, font readability, indexability) run without a browser; `--render` adds Playwright-rendered viewport metrics:
 
 ```bash
-agentready mobile audit https://example.com
-agentready mobile audit https://example.com https://example.com/about --render --format html -o mobile.html
+agentready audit https://example.com --mode mobile
+agentready audit https://example.com https://example.com/about --mode mobile --render --format html -o mobile.html
 ```
 
-Mobile reports use the dedicated `agentready.mobile.v1` JSON schema and are available as console, JSON, Markdown, and HTML. The optional API exposes `POST /mobile/audit` and `POST /mobile/audit/dashboard`; the optional MCP facade exposes `mobile_audit`, `mobile_findings`, and `mobile_remediation_plan`.
+Mobile reports use the canonical `agentready.mobile.v2` JSON schema and are available as console, JSON, Markdown, and HTML. The API exposes `POST /v2/mobile/audit` and `POST /v2/mobile/audit/dashboard`; the MCP facade exposes v2 audit projections.
 
-SEO reports use the dedicated `agentready.seo.v1` JSON schema and are available as console, JSON, Markdown, and HTML. The optional API exposes `POST /seo/audit` and `POST /seo/audit/dashboard`; the optional MCP facade exposes `seo_audit`. Remote transports reject private targets and retain bounded timeout, redirect, response-size, and TLS controls.
+SEO reports use the canonical `agentready.seo.v2` JSON schema and are available as console, JSON, Markdown, and HTML. The API exposes `POST /v2/seo/audit` and `POST /v2/seo/audit/dashboard`; the MCP facade exposes v2 audit projections. Remote transports reject private targets and retain bounded timeout, redirect, response-size, and TLS controls.
 
 ## Quick Start
 
@@ -41,7 +46,7 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Linux/macOS: source .venv/bin/activate
 pip install -e .
-agentready scan https://example.com
+agentready audit https://example.com --mode readiness
 ```
 
 ### Clean developer setup and build
@@ -109,8 +114,8 @@ line application icon.
 
 - **Protocol readiness checks** across discoverability, content accessibility, bot controls, protocol discovery, and commerce signals.
 - **Separate AI Search/GEO score** (`ai_search_score`) so GEO quality does not overwrite core protocol readiness.
-- **CI gating support** via minimum score/level thresholds and optional strict fail-on-checks behavior.
-- **Additive v2 audit contract** with bounded evidence, coverage accounting, deterministic finding fingerprints, baseline diff, rescan, inventory pagination, JSONL/CSV export, and bounded asynchronous jobs.
+- **CI gating support** via minimum score and optional strict fail-on-checks behavior.
+- **Canonical v2 audit contract** with bounded evidence, coverage accounting, deterministic finding fingerprints, baseline diff, rescan, inventory pagination, JSONL/CSV export, and bounded asynchronous jobs.
 - **AuditService-backed v2 dashboard profile** with escaped report projection and bounded server-side run inventory APIs for pages, URLs, links, resources, redirects, findings, and metrics.
 - **Bounded v2 crawler foundation** with deterministic frontier/scope accounting, shared fetch and egress policy, robots/sitemap reconciliation, protocol profiles, and optional browser rendering.
 - **Prioritized recommendations** ranked by impact and effort.
@@ -130,10 +135,8 @@ line application icon.
 
 ```bash
 # Full protocol + GEO run with CI gates
-agentready scan https://example.com \
-  --preset all \
-  --with-ai-search \
-  --ci --min-score 80 --min-level 3 --min-ai-search-score 80 \
+agentready audit https://example.com --mode readiness \
+  --preset ai-search --min-score 80 --fail-on-checks \
   --format markdown -o report.md
 ```
 
@@ -149,8 +152,9 @@ agentready scan https://example.com \
 | [Configuration & CI](docs/configuration-and-ci.md) | `.agentready.yml`, environment, overrides, gates |
 | [Reporting](docs/reporting.md) | JSON/Markdown/HTML outputs, baselines |
 | [Integrations](docs/integrations.md) | HTTP API and MCP usage |
+| [Yandex provider decision](docs/yandex-provider-decision-2026-08-12.md) | Dated official-API assessment and safe deferral |
 | [Safety](docs/safety.md) | Network, crawler, commerce safety boundaries |
-| [Architecture](docs/architecture.md) | Runtime layers and v1/v2 boundaries |
+| [Architecture](docs/architecture.md) | Runtime layers and the canonical v2 contract |
 | [Development](docs/development.md) | Project layout and validation |
 | [Dashboard FAQ (RU)](docs/dashbord_faq_ru.md) | Beginner dashboard guide in Russian |
 | [Dashboard FAQ (EN)](docs/dashbor_faq_en.md) | Beginner dashboard guide in English |

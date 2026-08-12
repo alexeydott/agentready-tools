@@ -89,7 +89,7 @@ def _git(repo: Path, *args: str, env=None):
         import os
         merged = os.environ.copy()
         merged.update(env)
-    subprocess.run(["git", "-C", str(repo), *args], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=merged)
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, env=merged)
 
 
 def test_git_changed_urls_and_date_audit(tmp_path: Path):

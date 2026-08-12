@@ -1,6 +1,7 @@
-from agentready.seo.rules.builtin import SEO_ATOMIC_RULES, rule_groups, rule_manifest
-from pathlib import Path
 import ast
+from pathlib import Path
+
+from agentready.seo.rules.builtin import SEO_ATOMIC_RULES, rule_groups, rule_manifest
 
 
 def test_builtin_rule_manifest_is_unique_and_machine_readable():

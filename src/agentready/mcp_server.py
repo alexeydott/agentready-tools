@@ -1,4 +1,4 @@
-"""Optional MCP facade exposing the scanner as a read-only scan_site tool.
+"""Optional MCP facade exposing canonical v2 audit tools.
 
 Requires: pip install 'agentready-tools[mcp]'
 The tool blocks private/loopback targets because remote MCP servers must not be
@@ -15,14 +15,25 @@ except ImportError as exc:  # pragma: no cover
         "`python -c \"import mcp; print(mcp.__file__)\"`."
     ) from exc
 
+import logging
+
 from .agentfindings import build_findings, build_remediation_plan
 from .audit_service import AuditRequest, AuditService
-from .i18n import localized_report_dict
+from .exports import export_query
+from .metrics import ExternalMetric, ProviderStatus, cached_result
 from .mobile_scanner import audit_mobile
-from .scanner import scan
+from .query_service import (
+    FindingQuery,
+    LinkQuery,
+    MetricQuery,
+    PageQuery,
+    QueryService,
+    RedirectQuery,
+    ResourceQuery,
+    RunUrlQuery,
+)
+from .report_storage import save_report
 from .seo_scanner import audit_seo
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -34,28 +45,6 @@ mcp = MCPServer(
         "and remediation_plan to get a prioritized step-by-step fix plan with ready-to-use prompts."
     ),
 )
-
-
-@mcp.tool()
-def scan_site(
-    url: str,
-    preset: str = "all",
-    content_url: str | None = None,
-    commerce_url: str | None = None,
-    include: list[str] | None = None,
-    language: str = "en",
-) -> dict:
-    """Scan a public website for AI-agent readiness. No payment or credentials are submitted."""
-    report = scan(
-        url,
-        preset=preset,
-        content_url=content_url,
-        commerce_url=commerce_url,
-        include=include,
-        allow_private=False,
-        language=language,
-    )
-    return localized_report_dict(report, language)
 
 
 @mcp.tool()
@@ -99,11 +88,14 @@ def audit_v2(
             allow_private=False,
         )
     )
-    return result.to_dict()
+    payload = result.to_dict()
+    saved_path = save_report(payload, target=url, surface="mcp-v2", fmt="json")
+    logger.info("MCP report saved path=%s", saved_path)
+    return payload
 
 
 @mcp.tool()
-def seo_audit(
+def seo_audit_v2(
     url: str,
     language: str = "en",
     recommendation_limit: int = 10,
@@ -120,7 +112,7 @@ def seo_audit(
     and insecure HTTP links with affected page URLs).
     ``render=True`` uses a headless browser for JS-driven pages.
     ``ga_property`` / ``gsc_site`` enable GA4/Search Console analytics checks
-    using the service account stored via `agentready seo credentials set`.
+    using the service account stored via `agentready credentials set`.
     """
     report = audit_seo(
         url,
@@ -133,7 +125,93 @@ def seo_audit(
         ga_property=ga_property,
         gsc_site=gsc_site,
     )
-    return report.to_dict()
+    payload = report.to_dict()
+    saved_path = save_report(payload, target=url, surface="mcp-seo", fmt="json")
+    logger.info("MCP report saved path=%s", saved_path)
+    return payload
+
+
+@mcp.tool()
+def provider_enrichment_v2(
+    provider: str,
+    cached_metrics: list[dict] | None = None,
+) -> dict:
+    """Normalize a bounded cached provider fixture without accepting credentials.
+
+    Live provider calls belong to the trusted local HTTP/CLI workflow. MCP can
+    safely inspect deterministic cached PageSpeed, GA4, GSC, or URL Inspection
+    observations and keeps them explicitly outside core scoring.
+    """
+    supported = {"pagespeed", "ga4", "gsc", "url-inspection"}
+    if provider not in supported:
+        raise ValueError("unsupported provider")
+    metrics = tuple(
+        ExternalMetric(
+            provider,
+            str(item["name"]),
+            item.get("value"),
+            item.get("unit"),
+            str(item.get("source", "cached-fixture")),
+            str(item.get("version", "unknown")),
+            str(item["observed_at"]),
+        )
+        for item in (cached_metrics or [])[:500]
+        if isinstance(item, dict) and item.get("name") and item.get("observed_at")
+    )
+    if not metrics:
+        return {
+            "provider": provider,
+            "status": ProviderStatus.NOT_REQUESTED.value,
+            "detail": "no cached observations supplied; credentials remain in the local OS vault",
+            "metrics": [],
+            "from_cache": False,
+        }
+    result = cached_result(provider, metrics).to_dict()
+    logger.info("MCP provider fixture normalized provider=%s metrics=%d", provider, len(metrics))
+    return result
+
+
+@mcp.tool()
+def run_inventory_v2(
+    run_id: str,
+    kind: str = "pages",
+    limit: int = 100,
+    cursor: str | None = None,
+    search: str | None = None,
+    sort_by: str | None = None,
+    descending: bool = False,
+    export_format: str | None = None,
+) -> dict:
+    """Query or export one bounded typed inventory projection for a v2 run."""
+    if limit < 1 or limit > 1000:
+        raise ValueError("limit must be between 1 and 1000")
+    if kind not in {"pages", "run-urls", "links", "resources", "redirects", "findings", "metrics"}:
+        raise ValueError("unsupported inventory kind")
+    from . import server as server_module
+
+    store = server_module._V2_RUNS.get(run_id)
+    query_args = {"run_id": run_id, "cursor": cursor, "limit": limit, "descending": descending}
+    if kind == "pages":
+        query = PageQuery(title_contains=search, sort_by=sort_by or "url", **query_args)
+    elif kind == "run-urls":
+        query = RunUrlQuery(**{key: value for key, value in query_args.items() if key != "descending"})
+    elif kind == "links":
+        query = LinkQuery(anchor_contains=search, sort_by=sort_by or "source", **query_args)
+    elif kind == "resources":
+        query = ResourceQuery(resource_type=search, sort_by=sort_by or "page", **query_args)
+    elif kind == "redirects":
+        query = RedirectQuery(to_url=search, sort_by=sort_by or "from_url", **query_args)
+    elif kind == "findings":
+        query = FindingQuery(affected_url=search, sort_by=sort_by or "finding_id", **query_args)
+    else:
+        query = MetricQuery(name=search, sort_by=sort_by or "url", **query_args)
+    page = QueryService(store).execute(query)
+    payload = {"run_id": run_id, "kind": kind, "items": [server_module._inventory_item(item) for item in page.items], "next_cursor": page.next_cursor}
+    if export_format:
+        payload["export"] = export_query(QueryService(store), query, format=export_format, limit=1000)
+        payload["export_format"] = export_format
+    logger.debug("MCP inventory query run_id=%s kind=%s limit=%d", run_id, kind, limit)
+    return payload
 
 
 @mcp.tool()
@@ -146,7 +224,7 @@ def audit_findings(
 ) -> dict:
     """Return only optimization gaps for a coding agent.
 
-    Runs a readiness scan (mode="readiness") or a single-page SEO audit
+    Runs a canonical readiness audit (mode="readiness") or a single-page SEO audit
     (mode="seo") and returns each failed/warned check with a localized
     explanation of why it matters, observed evidence, and fix instructions.
     """
@@ -161,7 +239,7 @@ def audit_findings(
         return build_findings(report, language)
     if mode != "readiness":
         raise ValueError("unsupported mode: expected 'readiness' or 'seo'")
-    report = scan(url, preset=preset, allow_private=False, language=language)
+    report = audit_v2(url, preset=preset, language=language)
     return build_findings(report, language)
 
 
@@ -189,12 +267,12 @@ def remediation_plan(
         return build_remediation_plan(report, language)
     if mode != "readiness":
         raise ValueError("unsupported mode: expected 'readiness' or 'seo'")
-    report = scan(url, preset=preset, allow_private=False, language=language)
+    report = audit_v2(url, preset=preset, language=language)
     return build_remediation_plan(report, language)
 
 
 @mcp.tool()
-def mobile_audit(
+def mobile_audit_v2(
     urls: list[str],
     render: bool = False,
     language: str = "en",
@@ -266,6 +344,7 @@ def _run_ai(
     history: list[dict[str, str]] | None = None,
 ) -> dict:
     import asyncio
+
     from .ai_assistant import AIAssistant
     from .ai_models import AssistantRequest, ConversationMessage
     from .ai_provider import OpenAICompatibleProvider

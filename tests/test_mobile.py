@@ -1,10 +1,18 @@
 import sys
 from pathlib import Path
+from typing import ClassVar
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from agentready.mobile_checks import MOBILE_CHECK_METADATA, check_mobile_indexability, check_viewport_meta
-from agentready.mobile_models import MobileCheckResult, MobilePageReport, MobileRecommendation, MobileReport
+from agentready.mobile_checks import (
+    MOBILE_CHECK_METADATA,
+    check_viewport_meta,
+)
+from agentready.mobile_models import (
+    MobileCheckResult,
+    MobilePageReport,
+    MobileReport,
+)
 from agentready.mobile_report import render_mobile, render_mobile_html
 from agentready.mobile_scanner import audit_mobile
 from agentready.mobile_scoring import rank_mobile_recommendations, score_mobile_checks
@@ -22,7 +30,7 @@ def _check(check_id: str, status: str, category: str = "configuration", scored: 
         evidence=[Evidence(action="inspect", finding=f"{check_id} finding")],
         remediation=Remediation(
             summary=f"Fix {check_id}.",
-            rerun_command=f"agentready mobile audit 'https://example.com' --render",
+            rerun_command="agentready audit 'https://example.com' --mode mobile --render",
             references=["https://example.com/ref"],
         )
         if status in {"fail", "warn", "error"}
@@ -48,7 +56,7 @@ def _report(pages: list[MobilePageReport]) -> MobileReport:
     all_checks = [check for page in pages for check in page.checks]
     score, categories = score_mobile_checks(all_checks)
     return MobileReport(
-        schema="agentready.mobile.v1",
+        schema="agentready.mobile.v2",
         targets=[page.url for page in pages],
         pages=pages,
         score=score,
@@ -65,7 +73,7 @@ def test_mobile_static_checks_run_against_fixture_html():
         status_code = 200
         content_type = "text/html"
         text = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1'></head><body><p>Hello</p></body></html>"
-        headers = {}
+        headers: ClassVar[dict[str, str]] = {}
 
         def evidence(self, action, **kwargs):
             return Evidence(action=action, url="https://example.com")
@@ -83,7 +91,7 @@ def test_mobile_scoring_aggregates_pages():
     page_a = _page("https://a.example", [_check("viewport-meta", "pass"), _check("font-readability", "fail", "content")])
     page_b = _page("https://b.example", [_check("viewport-meta", "pass"), _check("touch-targets", "warn", "usability")])
     report = _report([page_a, page_b])
-    assert report.schema == "agentready.mobile.v1"
+    assert report.schema == "agentready.mobile.v2"
     assert report.score == 50  # 2 pass of 4 applicable
     assert len(report.categories) == 3
     assert len(report.recommendations) == 2
@@ -134,17 +142,16 @@ def test_mobile_report_print_uses_a4_and_expands_details():
 def test_mobile_audit_rejects_private_targets():
     import pytest
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         audit_mobile(["http://127.0.0.1/"], allow_private=False)
 
 
-def test_mobile_cli_help_includes_examples():
+def test_mobile_mode_help_is_available_on_canonical_audit_command():
     from agentready.cli import build_parser
 
     command = next(action for action in build_parser()._actions if action.dest == "command")
-    mobile_parser = command.choices["mobile"]
-    assert "agentready mobile audit" in (mobile_parser.epilog or "")
-    audit_parser = next(action for action in mobile_parser._actions if action.dest == "mobile_command").choices["audit"]
+    audit_parser = command.choices["audit"]
+    assert "--mode" in audit_parser.format_help()
     assert "--render" in audit_parser.format_help()
 
 
@@ -154,7 +161,7 @@ def test_mobile_server_endpoints_exist():
     from agentready.server import app
 
     paths = {route.path for route in app.routes}
-    assert {"/mobile/checks", "/mobile/audit", "/mobile/audit/dashboard"} <= paths
+    assert {"/mobile/checks", "/v2/mobile/audit", "/v2/mobile/audit/dashboard"} <= paths
 
     client = TestClient(app)
     response = client.get("/mobile/checks", params={"language": "ru"})
@@ -177,13 +184,13 @@ def test_mobile_mcp_tools_registered(monkeypatch):
         return await mcp_module.mcp.list_tools()
 
     names = {tool.name for tool in asyncio.run(_tools())}
-    assert {"mobile_audit", "mobile_findings", "mobile_remediation_plan"} <= names
+    assert {"mobile_audit_v2", "mobile_findings", "mobile_remediation_plan"} <= names
 
     page = _page("https://example.com", [_check("viewport-meta", "fail")])
     fake_report = _report([page])
     monkeypatch.setattr(mcp_module, "audit_mobile", lambda urls, **kwargs: fake_report)
-    payload = mcp_module.mobile_audit(["https://example.com"], language="en")
-    assert payload["schema"] == "agentready.mobile.v1"
+    payload = mcp_module.mobile_audit_v2(["https://example.com"], language="en")
+    assert payload["schema"] == "agentready.mobile.v2"
     assert payload["score"] == 0
 
     findings = mcp_module.mobile_findings("https://example.com", language="en")
@@ -210,7 +217,7 @@ def test_mobile_render_preserves_exact_optional_dependency_skip(monkeypatch):
         status_code = 200
         content_type = "text/html"
         text = "<html><head><meta name='viewport' content='width=device-width'></head></html>"
-        headers = {}
+        headers: ClassVar[dict[str, str]] = {}
 
         def evidence(self, action, **kwargs):
             return Evidence(action=action, url="https://example.com")

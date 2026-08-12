@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.13.0 — 2026-08-13
+
+### Full-site crawl and localized dashboard fixes
+
+- Added full same-origin crawl mode: `max_pages=0` expands to the shared
+  25,000-URL safety cap across dashboard, HTTP, SEO, and `AuditService` paths.
+- Made crawl-profile budgets visible and predictable: deep profile defaults to
+  100 pages while explicit page limits remain respected.
+- Fixed dashboard report restoration so stale `Сводка инвентаря` HTML is
+  invalidated and regenerated with the localized `Состав и объём данных` label.
+- Preserved crawl profile and page-budget selections in dashboard requests and
+  added regression coverage for profile, SEO crawl, localization, and full-site
+  budget behavior.
+- Completed v2 SEO/marketer tooling, reports, inventory, MCP, jobs, saved views,
+  and release-gate cleanup accumulated since 0.12.0.
+
+## 0.12.0 — 2026-08-12
+
+### v2 transport parity and final marketer workflow
+
+- Added canonical CLI inventory/view/export/compare/rescan commands.
+- Added MCP `run_inventory_v2` and credential-free cached provider fixture
+  normalization alongside the existing v2 audit tools.
+- Added bounded PageSpeed, GA4, GSC, and URL Inspection enrichment jobs using
+  the existing metric/store/query path; enrichment cannot change core scores.
+- Added the dated official-source Yandex Webmaster/Metrica deferral record.
+- Updated compatibility/version/package metadata, dashboard acceptance storage
+  keys, documentation, and release goldens for v0.12.0.
+
+## 0.11.0 — 2026-08-12
+
+### Breaking: v2-only audit contracts
+
+- Replaced the public v1 scan, SEO, and mobile command/route/tool facades with
+  the canonical `agentready audit --mode ...`, `/v2/...`, and v2 MCP surfaces.
+- Unified readiness, SEO, mobile, findings, remediation, and protocol report
+  schemas under explicit v2 contracts; unsupported v1 payloads are rejected.
+- Routed readiness rule execution through the v2 `AuditService` projection and
+  preserved bounded crawl coverage, run lineage, and baseline diff semantics.
+- Updated dashboard links, generated remediation commands, regression tests,
+  architecture contracts, and integration documentation.
+- Fixed canonical v2 CLI rendering, score gates, SEO check selection, filter
+  partitioning, credentials management, and release-manifest completeness.
+- Closed the remaining release gates: published v2 schema documents now match
+  serialized reports, all versioned HTTP routes are manifest-covered, and
+  readiness rule/crawl execution reuses a bounded per-run response cache.
+
 ## 0.10.0 — 2026-08-12
 
 - Refined the SEO/GEO AI assistant workspace to match the planned chat-first

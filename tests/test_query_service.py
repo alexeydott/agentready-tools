@@ -4,14 +4,21 @@ from agentready.audit_core.store import (
     MemorySiteStore,
     MetricRecord,
     PageRecord,
+    RedirectFact,
     RunRecord,
     RunUrlRecord,
     RunUrlState,
     SQLiteSiteStore,
 )
-from agentready.audit_core.store import RedirectFact
 from agentready.query_service import (
-    FindingQuery, LinkQuery, MetricQuery, PageQuery, QueryService, RedirectQuery, ResourceQuery, RunUrlQuery,
+    FindingQuery,
+    LinkQuery,
+    MetricQuery,
+    PageQuery,
+    QueryService,
+    RedirectQuery,
+    ResourceQuery,
+    RunUrlQuery,
     validate_query_spec,
 )
 
@@ -146,3 +153,17 @@ def test_redirect_and_finding_queries_have_cursor_filters_and_memory_sqlite_pari
         assert [item.finding_id for item in results[0][2] + results[0][3]] == ["f-a", "f-c"]
     finally:
         stores[1].close()
+
+
+def test_marketer_queries_support_allowlisted_filters_and_sorts():
+    store = _store()
+    store.put_page(PageRecord("run-1", "https://example.test/z", "https://example.test/z", status_code=404, depth=3, title="Product Z", locally_indexable=False))
+    service = QueryService(store)
+    pages = service.pages(PageQuery("run-1", locally_indexable=False, sort_by="depth", descending=True))
+    assert [item.url_key for item in pages.items] == ["https://example.test/z"]
+    store.put_link("run-1", "https://example.test/", "/docs", ordinal=3, target_key="https://example.test/docs", anchor_text="Docs", rel="nofollow")
+    links = service.links(LinkQuery("run-1", rel="nofollow", anchor_contains="doc", internal=True))
+    assert links.items[0].raw_href == "/docs"
+    store.put_metric(MetricRecord("run-1", "https://example.test/", "ga4", "sessions", 42, "count", "fixture", "1", "now"))
+    assert service.metrics(MetricQuery("run-1", min_value=40)).items[0].value == 42
+    assert service.summary(PageQuery("run-1"), group_by="status_code")["200"] == 3

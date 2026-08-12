@@ -7,29 +7,39 @@ import json
 import logging
 import os
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
-from .config import default_config_yaml, load_config
 from . import __version__
+from .accesslog import analyze_ai_bot_log_file
+from .audit_service import AuditRequest, AuditService
+from .config import default_config_yaml, load_config
+from .geo_rules import write_rules
+from .gitutils import audit_git_dates, changed_urls_from_git
+from .google_indexing import DEFAULT_MAX_NOTIFICATIONS, get_metadata
+from .google_indexing import publish_urls as publish_google_urls
 from .i18n import category_name, check_title, normalize_language, tr
-from .registry import AI_SEARCH_EXTRA_IDS, CHECKS
-from .report import render
+from .indexnow import (
+    PROVIDER_ENDPOINTS,
+    generate_key,
+    submit_urls,
+    verify_key_file,
+    write_key_file,
+)
+from .registry import CHECKS
+from .report_storage import save_report
+from .report_v2 import classify_finding_changes, diff_reports, render_audit_report
 from .seo_report import render_seo
 from .seo_scanner import audit_seo, compare_seo_baseline
-from .scanner import compare_baseline, scan
-from .google_indexing import DEFAULT_MAX_NOTIFICATIONS, get_metadata, publish_urls as publish_google_urls
-from .indexnow import PROVIDER_ENDPOINTS, generate_key, submit_urls, verify_key_file, write_key_file
-from .gitutils import audit_git_dates, changed_urls_from_git
-from .accesslog import analyze_ai_bot_log_file
-from .geo_rules import write_rules
-from .audit_service import AuditRequest, AuditService
 
 logger = logging.getLogger(__name__)
 
 _HELP_FORMATTER = argparse.RawDescriptionHelpFormatter
 _ROOT_EPILOG = """Examples:
-  # Run the default full Agent Readiness scan.
-  agentready scan https://example.com --preset all
+  # Run the canonical v2 readiness audit.
+  agentready audit https://example.com --mode readiness --preset all
   # List implemented checks as machine-readable JSON.
   agentready checks --json
   # Validate an IndexNow submission without sending it.
@@ -37,7 +47,7 @@ _ROOT_EPILOG = """Examples:
   # Preview deletion of an eligible Google Indexing URL notification.
   agentready google-indexing publish https://example.com/jobs/42 --type deleted --eligible-type job-posting
   # Write an HTML SEO optimization report.
-  agentready seo audit https://example.com --format html -o seo.html
+  agentready audit https://example.com --mode seo --format html -o seo.html
   # Create or replace the project configuration file.
   agentready init .agentready.yml --force
   # Generate the project GEO rules template.
@@ -60,56 +70,11 @@ def _add_command_parser(sub: argparse._SubParsersAction, name: str, **kwargs) ->
     return parser
 
 
-def _scan_parser(sub: argparse._SubParsersAction) -> None:
-    p = _add_command_parser(
-        sub,
-        "scan",
-        help="Scan a website",
-        epilog="""Examples:
-  # Run all protocol checks.
-  agentready scan https://example.com --preset all
-  # Generate a Markdown AI Search/GEO report.
-  agentready scan https://example.com --preset ai-search --with-ai-search --format markdown -o report.md
-  # Run one check and print JSON.
-  agentready scan https://example.com --only robots-txt --format json
-  # Enforce score and maturity thresholds in CI.
-  agentready scan https://example.com --ci --min-score 80 --min-level 3""",
-    )
-    p.add_argument("url", help="Website URL (scheme is optional; https is assumed)")
-    p.add_argument("--config", help="YAML config file; otherwise .agentready.yml/.yaml is searched upward")
-    p.add_argument("--no-config", action="store_true", help="Do not load a discovered config file")
-    p.add_argument("--preset", choices=["all", "content", "api", "ai-search"], default=None)
-    p.add_argument("--only", action="append", help="Run only one check; repeat for multiple checks")
-    p.add_argument("--include", action="append", help="Add a check to the selected preset; repeatable")
-    p.add_argument("--exclude", action="append", help="Remove a check from the selected preset; repeatable")
-    p.add_argument("--with-llms", action="store_true", help="Include supplemental llms.txt audit")
-    p.add_argument("--with-markdown-fallback", action="store_true", help="Include supplemental /index.md fallback audit")
-    p.add_argument("--with-markdown-efficiency", action="store_true", help="Compare Markdown vs HTML byte size")
-    p.add_argument("--with-ai-search", "--with-geo", dest="with_ai_search", action="store_true", help="Include AI Search/GEO checks inspired by the Tochki guide")
-    p.add_argument("--content-url", help="Page used for content negotiation instead of the input URL")
-    p.add_argument("--commerce-url", help="Real paid resource to probe read-only for x402/MPP")
-    p.add_argument("--verify-skill-digests", action="store_true")
-    p.add_argument("--timeout", type=float, default=None)
-    p.add_argument("--workers", type=int, default=None)
-    p.add_argument("--level-threshold", type=float, default=None, help="Sequential maturity-tier pass ratio, default 0.8")
-    p.add_argument("--recommendations", type=int, default=None, help="Maximum prioritized recommendations")
-    p.add_argument("--insecure", action="store_true", help="Disable TLS certificate verification")
-    p.add_argument("--block-private", action="store_true", help="Block loopback/RFC1918/ULA targets (recommended for services)")
-    p.add_argument("--format", choices=["console", "json", "markdown", "html"], default="console")
-    p.add_argument("--lang", "--language", dest="language", choices=["en", "ru"], default=None, help="Report/dashboard language (en or ru)")
-    p.add_argument("-o", "--output", help="Write report to a file")
-    p.add_argument("--baseline", help="Prior JSON report; regressions cause exit code 1")
-    p.add_argument("--ci", action="store_true", help="CI mode; use with min-score/min-level or config gates")
-    p.add_argument("--min-score", type=int, default=None, help="Exit 1 if score is below this value (0-100)")
-    p.add_argument("--min-level", type=int, default=None, help="Exit 1 if maturity level is below this value (0-5)")
-    p.add_argument("--min-ai-search-score", "--min-geo-score", dest="min_ai_search_score", type=int, default=None, help="Exit 1 if the separate AI Search/GEO score is below this value (0-100)")
-    p.add_argument("--fail-on-checks", action="store_true", help="Exit 1 when any scored check fails")
-
-
 def _audit_parser(sub: argparse._SubParsersAction) -> None:
     p = _add_command_parser(sub, "audit", help="Run the canonical v2 audit report")
-    p.add_argument("url")
-    p.add_argument("--format", choices=["json"], default="json")
+    p.add_argument("url", nargs="+")
+    p.add_argument("--mode", choices=["readiness", "seo", "mobile"], default="readiness")
+    p.add_argument("--format", choices=["console", "json", "markdown", "html"], default="json")
     p.add_argument("--preset", choices=["all", "content", "api", "ai-search"], default="all")
     p.add_argument("--profile", choices=["quick", "standard", "deep", "custom"], default="standard")
     p.add_argument("--max-pages", type=int, default=25)
@@ -123,98 +88,48 @@ def _audit_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--select-url", action="append", default=[], help="Restrict a child rescan to explicit same-origin URLs")
     p.add_argument("--render", action="store_true")
     p.add_argument("--provider")
+    p.add_argument("--checks", action="append", default=[])
+    p.add_argument("--crawl", action="store_true")
+    p.add_argument("--recommendations", type=int, default=10)
+    p.add_argument("--ga-property")
+    p.add_argument("--gsc-site")
+    p.add_argument("--min-score", type=int)
+    p.add_argument("--baseline")
+    p.add_argument("--output", "-o")
     p.add_argument("--lang", "--language", dest="language", choices=["en", "ru"], default="en")
     p.add_argument("--fail-on-checks", action="store_true", help="Exit 1 when a v2 finding fails")
 
 
-def _seo_parser(sub: argparse._SubParsersAction) -> None:
-    seo = _add_command_parser(
-        sub,
-        "seo",
-        help="Independent SEO optimization audit",
-        epilog="""Examples:
-  # Audit one page and its public crawler-discovery resources.
-  agentready seo audit https://example.com
-  # Save an HTML SEO report.
-  agentready seo audit https://example.com --format html -o seo.html
-  # Fail when the independent SEO score is below 80.
-  agentready seo audit https://example.com --format json --min-score 80""",
-    )
-    commands = seo.add_subparsers(dest="seo_command", required=True)
-    audit = _add_command_parser(
-        commands,
-        "audit",
-        help="Audit one page plus optional same-origin crawl and discovery resources",
-        epilog="""Examples:
-  # Save a basic independent SEO audit as HTML.
-  agentready seo audit https://example.com --format html -o seo.html
-  # Crawl and render up to 100 same-origin pages with analytics checks.
-  agentready seo audit https://example.com --crawl --max-pages 100 --render --ga-property 123456789 --format json -o seo.json""",
-    )
-    audit.add_argument("url", help="Page URL (scheme is optional; https is assumed)")
-    audit.add_argument("--format", choices=["console", "json", "markdown", "html"], default="console")
-    audit.add_argument("--lang", "--language", dest="language", choices=["en", "ru"], default="en")
-    audit.add_argument("--timeout", type=float, default=5.0)
-    audit.add_argument("--recommendations", type=int, default=10)
-    audit.add_argument("--insecure", action="store_true", help="Disable TLS certificate verification")
-    audit.add_argument("--block-private", action="store_true", help="Reject loopback/private targets")
-    audit.add_argument("-o", "--output", help="Write report to a file")
-    audit.add_argument("--min-score", type=int, help="Exit 1 when SEO score is below this value")
-    audit.add_argument("--baseline", help="Prior agentready.seo.v1 JSON report")
-    audit.add_argument("--crawl", action="store_true", help="Crawl same-origin pages for cross-page checks, including insecure HTTP links on affected pages")
-    audit.add_argument("--max-pages", type=int, default=25, help="Maximum pages to crawl with --crawl")
-    audit.add_argument("--render", action="store_true", help="Use headless browser rendering for JS-driven pages (requires Playwright)")
-    audit.add_argument("--ga-property", help="GA4 property ID for analytics checks (requires stored service account)")
-    audit.add_argument("--gsc-site", help="Search Console site URL for analytics checks (requires stored service account)")
+def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
+    inventory = _add_command_parser(sub, "inventory", help="Query or export a bounded v2 run inventory")
+    inventory.add_argument("run_id")
+    inventory.add_argument("kind", choices=["pages", "run-urls", "links", "resources", "redirects", "findings", "metrics"])
+    inventory.add_argument("--base-url", default="http://127.0.0.1:8765")
+    inventory.add_argument("--limit", type=int, default=100)
+    inventory.add_argument("--cursor")
+    inventory.add_argument("--search")
+    inventory.add_argument("--sort-by")
+    inventory.add_argument("--descending", action="store_true")
+    inventory.add_argument("--format", choices=["json", "jsonl", "csv", "markdown", "html"], default="json")
+    inventory.add_argument("--output", "-o")
 
-    creds = _add_command_parser(
-        commands,
-        "credentials",
-        help="Manage GA4/Search Console service-account credentials",
-        epilog="""Examples:
-  # Store a Google service-account JSON in the OS credential vault.
-  agentready seo credentials set service-account.json
-  # Show whether analytics credentials are configured.
-  agentready seo credentials status
-  # Remove the stored credential from the vault.
-  agentready seo credentials clear""",
-    )
-    creds.add_argument("action", choices=["set", "status", "clear"])
-    creds.add_argument("path", nargs="?", help="Service-account JSON file (required for set)")
+    view = _add_command_parser(sub, "view", help="List, inspect, or delete saved v2 inventory views")
+    view.add_argument("action", choices=["list", "get", "delete"])
+    view.add_argument("view_id", nargs="?")
+    view.add_argument("--base-url", default="http://127.0.0.1:8765")
 
+    rescan = _add_command_parser(sub, "rescan", help="Start a bounded same-origin v2 rescan")
+    rescan.add_argument("url")
+    rescan.add_argument("--base-url", default="http://127.0.0.1:8765")
+    rescan.add_argument("--rescan-of")
+    rescan.add_argument("--select-url", action="append", default=[])
+    rescan.add_argument("--max-pages", type=int, default=25)
 
-def _mobile_parser(sub: argparse._SubParsersAction) -> None:
-    mobile = _add_command_parser(
-        sub,
-        "mobile",
-        help="Audit mobile-friendliness of one or more pages",
-        epilog="""Examples:
-  # Audit a single page with static HTML/CSS checks.
-  agentready mobile audit https://example.com
-  # Audit multiple pages and save a Markdown report.
-  agentready mobile audit https://example.com https://example.com/about --format markdown -o mobile.md
-  # Include rendered mobile viewport checks (requires Playwright).
-  agentready mobile audit https://example.com --render --format html -o mobile.html
-  # Fail when the aggregate mobile score is below 80.
-  agentready mobile audit https://example.com --min-score 80""",
-    )
-    commands = mobile.add_subparsers(dest="mobile_command", required=True)
-    audit = _add_command_parser(
-        commands,
-        "audit",
-        help="Audit one or more pages for mobile-friendliness",
-        epilog="Example:\n  # Audit two pages with rendered checks and save HTML.\n  agentready mobile audit https://example.com https://example.com/about --render --format html -o mobile.html",
-    )
-    audit.add_argument("urls", nargs="+", help="One or more page URLs (scheme is optional; https is assumed)")
-    audit.add_argument("--render", action="store_true", help="Enable Playwright-rendered viewport checks")
-    audit.add_argument("--format", choices=["console", "json", "markdown", "html"], default="console")
-    audit.add_argument("--lang", "--language", dest="language", choices=["en", "ru"], default="en")
-    audit.add_argument("--timeout", type=float, default=5.0)
-    audit.add_argument("--recommendations", type=int, default=10)
-    audit.add_argument("--insecure", action="store_true", help="Disable TLS certificate verification")
-    audit.add_argument("--block-private", action="store_true", help="Reject loopback/private targets")
-    audit.add_argument("-o", "--output", help="Write report to a file")
-    audit.add_argument("--min-score", type=int, help="Exit 1 when mobile score is below this value")
+    compare = _add_command_parser(sub, "compare", help="Compare a v2 audit with a saved baseline")
+    compare.add_argument("url")
+    compare.add_argument("--baseline", required=True)
+    compare.add_argument("--base-url", default="http://127.0.0.1:8765")
+    compare.add_argument("--max-pages", type=int, default=25)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -228,9 +143,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
     _audit_parser(sub)
-    _scan_parser(sub)
-    _seo_parser(sub)
-    _mobile_parser(sub)
+    _workflow_parsers(sub)
     ai = _add_command_parser(
         sub,
         "ai",
@@ -301,6 +214,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     checks.add_argument("--json", action="store_true")
     checks.add_argument("--lang", "--language", dest="language", choices=["en", "ru"], default="en")
+
+    credentials = _add_command_parser(
+        sub,
+        "credentials",
+        help="Manage GA4/Search Console service-account credentials",
+        epilog="""Examples:
+  # Store a Google service-account JSON in the OS credential vault.
+  agentready credentials set service-account.json
+  # Show whether analytics credentials are configured.
+  agentready credentials status
+  # Remove the stored credential from the vault.
+  agentready credentials clear""",
+    )
+    credentials.add_argument("action", choices=["set", "status", "clear"])
+    credentials.add_argument("path", nargs="?", help="Service-account JSON file (required for set)")
 
     init = _add_command_parser(
         sub,
@@ -545,105 +473,32 @@ def _cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_scan(args: argparse.Namespace) -> int:
-    cfg, config_source = load_config(args.config, search=not args.no_config)
-    checks_cfg = cfg.get("checks") or {}
-    network_cfg = cfg.get("network") or {}
-    content_cfg = cfg.get("content") or {}
-    gates_cfg = cfg.get("gates") or {}
-    scoring_cfg = cfg.get("scoring") or {}
-    rec_cfg = cfg.get("recommendations") or {}
-    report_cfg = cfg.get("report") or {}
-
-    include = list(checks_cfg.get("include") or []) + list(args.include or [])
-    if args.with_llms:
-        include.append("llms-txt")
-    if args.with_markdown_fallback:
-        include.append("markdown-index-fallback")
-    if args.with_markdown_efficiency:
-        include.append("markdown-efficiency")
-    if args.with_ai_search:
-        include.extend(AI_SEARCH_EXTRA_IDS)
-    include = list(dict.fromkeys(include))
-    exclude = list(dict.fromkeys(list(checks_cfg.get("exclude") or []) + list(args.exclude or [])))
-
-    timeout = args.timeout if args.timeout is not None else float(network_cfg.get("timeout", 5.0))
-    workers = args.workers if args.workers is not None else int(network_cfg.get("workers", 8))
-    verify_tls = bool(network_cfg.get("verify_tls", True)) and not args.insecure
-    block_private = bool(network_cfg.get("block_private", False)) or args.block_private
-    level_threshold = args.level_threshold if args.level_threshold is not None else float(scoring_cfg.get("level_threshold", 0.8))
-    rec_limit = args.recommendations if args.recommendations is not None else int(rec_cfg.get("max_items", 10))
-    language = normalize_language(args.language or report_cfg.get("language", "en"))
-
-    report = scan(
-        args.url,
-        preset=args.preset or cfg.get("preset", "all"),
-        only=args.only,
-        include=include,
-        exclude=exclude,
-        content_url=args.content_url or content_cfg.get("content_url"),
-        commerce_url=args.commerce_url or content_cfg.get("commerce_url"),
-        verify_skill_digests=args.verify_skill_digests or bool(content_cfg.get("verify_skill_digests", False)),
-        timeout=timeout,
-        verify_tls=verify_tls,
-        allow_private=not block_private,
-        workers=workers,
-        level_threshold=level_threshold,
-        recommendation_limit=rec_limit,
-        config_source=config_source,
-        language=language,
+def _cmd_credentials(args: argparse.Namespace) -> int:
+    from .credentials import (
+        CredentialsError,
+        clear_service_account,
+        credential_status,
+        store_service_account,
     )
-    output = render(report, args.format, language)
-    if args.output:
-        Path(args.output).write_text(output, encoding="utf-8")
-    else:
-        print(output, end="")
 
-    exit_code = 0
-    if args.baseline:
-        prior = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
-        regressions, improvements, warnings = compare_baseline(prior, report)
-        stream = sys.stderr
-        if improvements:
-            print(f"{tr(language, 'baseline_improvements')}: ", file=stream)
-            for x in improvements:
-                print(f"  + {x}", file=stream)
-        if warnings:
-            print(f"{tr(language, 'baseline_warnings')}: ", file=stream)
-            for x in warnings:
-                print(f"  ! {x}", file=stream)
-        if regressions:
-            print(f"{tr(language, 'baseline_regressions')}: ", file=stream)
-            for x in regressions:
-                print(f"  - {x}", file=stream)
-            exit_code = 1
-
-    min_score = args.min_score if args.min_score is not None else (gates_cfg.get("min_score") if args.ci else None)
-    min_level = args.min_level if args.min_level is not None else (gates_cfg.get("min_level") if args.ci else None)
-    min_ai_search_score = args.min_ai_search_score if args.min_ai_search_score is not None else (gates_cfg.get("min_ai_search_score") if args.ci else None)
-    fail_checks = args.fail_on_checks or (args.ci and bool(gates_cfg.get("fail_on_checks", False)))
-    if min_score is not None and not 0 <= int(min_score) <= 100:
-        raise ValueError("min-score must be between 0 and 100")
-    if min_level is not None and not 0 <= int(min_level) <= 5:
-        raise ValueError("min-level must be between 0 and 5")
-    if min_ai_search_score is not None and not 0 <= int(min_ai_search_score) <= 100:
-        raise ValueError("min-ai-search-score must be between 0 and 100")
-    if min_score is not None and report.score < int(min_score):
-        print(tr(language, "gate_score_failed", actual=report.score, required=int(min_score)), file=sys.stderr)
-        exit_code = 1
-    if min_level is not None and report.level < int(min_level):
-        print(tr(language, "gate_level_failed", actual=report.level, required=int(min_level)), file=sys.stderr)
-        exit_code = 1
-    if min_ai_search_score is not None:
-        if report.ai_search_score is None:
-            print(tr(language, "gate_ai_search_unavailable"), file=sys.stderr)
-            exit_code = 1
-        elif report.ai_search_score < int(min_ai_search_score):
-            print(tr(language, "gate_ai_search_failed", actual=report.ai_search_score, required=int(min_ai_search_score)), file=sys.stderr)
-            exit_code = 1
-    if fail_checks and any(r.scored and r.status in {"fail", "error"} for r in report.checks):
-        exit_code = 1
-    return exit_code
+    try:
+        if args.action == "set":
+            if not args.path:
+                print("agentready credentials set requires a service-account JSON path", file=sys.stderr)
+                return 2
+            store_service_account(args.path)
+            print("GA/GSC credentials stored in the OS credential vault.")
+            return 0
+        if args.action == "status":
+            print(json.dumps(credential_status(), ensure_ascii=False, indent=2))
+            return 0
+        removed = clear_service_account()
+        print("GA/GSC credentials removed." if removed else "No stored GA/GSC credentials found.")
+        return 0
+    except CredentialsError as exc:
+        logger.error("[FIX:cli-contract] credentials operation failed: action=%s error=%s", args.action, exc)
+        print(f"credentials: {exc}", file=sys.stderr)
+        return 2
 
 
 def _cmd_indexnow(args: argparse.Namespace) -> int:
@@ -756,85 +611,10 @@ def _cmd_logs(args: argparse.Namespace) -> int:
     raise ValueError("unknown logs command")
 
 
-def _cmd_seo(args: argparse.Namespace) -> int:
-    if args.seo_command == "credentials":
-        return _cmd_seo_credentials(args)
-    if args.seo_command != "audit":
-        raise ValueError("unknown seo command")
-    report = audit_seo(
-        args.url,
-        timeout=args.timeout,
-        verify=not args.insecure,
-        allow_private=not args.block_private,
-        recommendation_limit=args.recommendations,
-        language=args.language,
-        crawl=args.crawl,
-        max_pages=args.max_pages,
-        render=args.render,
-        ga_property=args.ga_property,
-        gsc_site=args.gsc_site,
-    )
-    regressions = compare_seo_baseline(report, args.baseline) if args.baseline else []
-    output = render_seo(report, args.format, args.language)
-    if args.output:
-        Path(args.output).write_text(output, encoding="utf-8")
-    else:
-        print(output, end="" if output.endswith("\n") else "\n")
-    if regressions:
-        print("\n".join(f"baseline: {item}" for item in regressions), file=sys.stderr)
-    return 1 if regressions or (args.min_score is not None and report.score < args.min_score) else 0
-
-
-def _cmd_seo_credentials(args: argparse.Namespace) -> int:
-    from .credentials import CredentialsError, clear_service_account, credential_status, store_service_account
-
-    try:
-        if args.action == "set":
-            if not args.path:
-                print("agentready seo credentials set requires a service-account JSON path", file=sys.stderr)
-                return 2
-            store_service_account(args.path)
-            print("GA/GSC credentials stored in the OS credential vault.")
-            return 0
-        if args.action == "status":
-            print(json.dumps(credential_status(), ensure_ascii=False, indent=2))
-            return 0
-        removed = clear_service_account()
-        print("GA/GSC credentials removed." if removed else "No stored GA/GSC credentials found.")
-        return 0
-    except CredentialsError as exc:
-        logger.error("GA/GSC credentials operation failed: action=%s error=%s", args.action, exc)
-        print(f"credentials: {exc}", file=sys.stderr)
-        return 2
-
-
-def _cmd_mobile(args: argparse.Namespace) -> int:
-    if args.mobile_command != "audit":
-        raise ValueError("unknown mobile command")
-    from .mobile_report import render_mobile
-    from .mobile_scanner import audit_mobile
-
-    report = audit_mobile(
-        args.urls,
-        render=args.render,
-        timeout=args.timeout,
-        verify=not args.insecure,
-        allow_private=not args.block_private,
-        recommendation_limit=args.recommendations,
-        language=args.language,
-    )
-    output = render_mobile(report, args.format, args.language)
-    if args.output:
-        Path(args.output).write_text(output, encoding="utf-8")
-    else:
-        print(output, end="" if output.endswith("\n") else "\n")
-    return 1 if args.min_score is not None and report.score < args.min_score else 0
-
-
 def _cmd_ai(args: argparse.Namespace) -> int:
     from .ai_assistant import AIAssistant
     from .ai_context import load_report_file
-    from .ai_credentials import clear_api_key, api_key_status, store_api_key
+    from .ai_credentials import api_key_status, clear_api_key, store_api_key
     from .ai_models import AssistantRequest, ConversationMessage
     from .ai_provider import OpenAICompatibleProvider
     from .config import active_ai_provider
@@ -947,6 +727,77 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
     return 0
 
 
+def _http_json(base_url: str, path: str, *, method: str = "GET", payload: dict | None = None) -> dict:
+    url = base_url.rstrip("/") + path
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    request = urllib.request.Request(url, data=body, method=method, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
+
+
+def _write_cli_output(content: str, output: str | None) -> None:
+    if output:
+        Path(output).write_text(content, encoding="utf-8")
+    else:
+        print(content, end="" if content.endswith("\n") else "\n")
+
+
+def _cmd_inventory(args: argparse.Namespace) -> int:
+    params = {"limit": args.limit, "descending": str(args.descending).lower()}
+    if args.cursor:
+        params["cursor"] = args.cursor
+    if args.search:
+        params["search"] = args.search
+    if args.sort_by:
+        params["sort_by"] = args.sort_by
+    query = urllib.parse.urlencode(params)
+    page = _http_json(args.base_url, f"/v2/runs/{urllib.parse.quote(args.run_id, safe='')}/inventory/{args.kind}?{query}")
+    if args.format == "json":
+        content = json.dumps(page, ensure_ascii=False, indent=2)
+    else:
+        exported = _http_json(args.base_url, "/v2/export", method="POST", payload={"items": page.get("items", []), "format": args.format})
+        content = str(exported.get("content", ""))
+    _write_cli_output(content, args.output)
+    logger.info("CLI inventory query run_id=%s kind=%s limit=%d", args.run_id, args.kind, args.limit)
+    return 0
+
+
+def _cmd_view(args: argparse.Namespace) -> int:
+    if args.action != "list" and not args.view_id:
+        raise ValueError("view get/delete requires a view_id")
+    path = "/v2/saved-views" if args.action == "list" else f"/v2/saved-views/{urllib.parse.quote(args.view_id, safe='')}"
+    result = _http_json(args.base_url, path, method="DELETE" if args.action == "delete" else "GET")
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _cmd_rescan(args: argparse.Namespace) -> int:
+    payload = {
+        "url": args.url,
+        "preset": "all",
+        "profile": "standard",
+        "max_pages": args.max_pages,
+        "selected_urls": args.select_url,
+        "rescan_of": args.rescan_of,
+    }
+    print(json.dumps(_http_json(args.base_url, "/v2/rescan", method="POST", payload=payload), ensure_ascii=False, indent=2))
+    return 0
+
+
+def _cmd_compare(args: argparse.Namespace) -> int:
+    baseline = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+    payload = {
+        "request": {"url": args.url, "preset": "all", "profile": "standard", "max_pages": args.max_pages},
+        "baseline": baseline,
+    }
+    print(json.dumps(_http_json(args.base_url, "/v2/diff", method="POST", payload=payload), ensure_ascii=False, indent=2))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     try:
         for stream in (sys.stdout, sys.stderr):
@@ -965,18 +816,22 @@ def main(argv: list[str] | None = None) -> int:
             args.command,
             bool(getattr(sys, "frozen", False)),
         )
-        if args.command == "scan":
-            return _cmd_scan(args)
         if args.command == "audit":
             return _cmd_audit(args)
-        if args.command == "seo":
-            return _cmd_seo(args)
-        if args.command == "mobile":
-            return _cmd_mobile(args)
+        if args.command == "inventory":
+            return _cmd_inventory(args)
+        if args.command == "view":
+            return _cmd_view(args)
+        if args.command == "rescan":
+            return _cmd_rescan(args)
+        if args.command == "compare":
+            return _cmd_compare(args)
         if args.command == "ai":
             return _cmd_ai(args)
         if args.command == "checks":
             return _cmd_checks(args)
+        if args.command == "credentials":
+            return _cmd_credentials(args)
         if args.command == "init":
             return _cmd_init(args)
         if args.command == "indexnow":
@@ -994,13 +849,69 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("unknown command")
     except KeyboardInterrupt:
         return 130
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - CLI boundary converts failures to exit status 2.
         print(f"agentready: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     return 0
 
 
 def _cmd_audit(args: argparse.Namespace) -> int:
+    if args.min_score is not None and not 0 <= args.min_score <= 100:
+        logger.error("[FIX:cli-contract] invalid score gate: min_score=%s", args.min_score)
+        print("agentready: min-score must be between 0 and 100", file=sys.stderr)
+        return 2
+    urls = tuple(args.url)
+    if args.mode == "mobile":
+        from .mobile_report import render_mobile
+        from .mobile_scanner import audit_mobile
+
+        report = audit_mobile(
+            urls,
+            render=args.render,
+            timeout=args.timeout,
+            allow_private=False,
+            recommendation_limit=args.recommendations,
+            language=args.language,
+        )
+        output = render_mobile(report, args.format, args.language)
+        saved_path = save_report(output, target=urls[0], surface="cli-mobile", fmt=args.format)
+        logger.info("report saved path=%s", saved_path)
+        if args.output:
+            Path(args.output).write_text(output, encoding="utf-8")
+        else:
+            print(output, end="")
+        return 1 if args.min_score is not None and report.score < args.min_score else 0
+
+    if args.mode == "seo":
+        from .seo_checks import SEO_CHECKS_BY_ID
+        from .seo_crawler import CRAWL_CHECKS_BY_ID
+        known = set(SEO_CHECKS_BY_ID) | set(CRAWL_CHECKS_BY_ID)
+        unknown = [item for item in args.checks if item not in known]
+        if unknown:
+            raise ValueError(f"Unknown SEO check(s): {', '.join(unknown)}")
+        report = audit_seo(
+            urls[0],
+            checks=tuple(SEO_CHECKS_BY_ID[item] for item in args.checks if item in SEO_CHECKS_BY_ID),
+            crawl_checks=tuple(CRAWL_CHECKS_BY_ID[item] for item in args.checks if item in CRAWL_CHECKS_BY_ID),
+            timeout=args.timeout, allow_private=False,
+            recommendation_limit=args.recommendations, language=args.language,
+            crawl=args.crawl or bool(args.checks), max_pages=args.max_pages,
+            render=args.render, ga_property=args.ga_property, gsc_site=args.gsc_site,
+        )
+        output = render_seo(report, args.format, args.language)
+        saved_path = save_report(output, target=urls[0], surface="cli-seo", fmt=args.format)
+        logger.info("report saved path=%s", saved_path)
+        if args.output:
+            Path(args.output).write_text(output, encoding="utf-8")
+        else:
+            print(output, end="")
+        if args.baseline:
+            regressions = compare_seo_baseline(report, args.baseline)
+            if regressions:
+                print("\n".join(f"baseline: {item}" for item in regressions), file=sys.stderr)
+                return 1
+        return 1 if args.min_score is not None and report.score < args.min_score else 0
+
     limits = {
         key: value
         for key, value in {
@@ -1013,7 +924,7 @@ def _cmd_audit(args: argparse.Namespace) -> int:
     }
     result = AuditService().run(
         AuditRequest(
-            target=args.url,
+            target=urls[0],
             preset=args.preset,
             profile=args.profile,
             max_pages=args.max_pages,
@@ -1027,7 +938,23 @@ def _cmd_audit(args: argparse.Namespace) -> int:
             language=args.language,
         )
     )
-    print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    output = render_audit_report(result.report, args.format)
+    saved_path = save_report(output, target=urls[0], surface="cli-readiness", fmt=args.format)
+    logger.info("report saved path=%s", saved_path)
+    if args.output:
+        Path(args.output).write_text(output, encoding="utf-8")
+    else:
+        print(output)
+    if args.baseline:
+        baseline = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+        changes = classify_finding_changes(result.report, baseline)
+        if changes["regressed"]:
+            print("baseline regressions: " + ", ".join(changes["regressed"]), file=sys.stderr)
+            return 1
+        diff_reports(result.report, baseline)
+    if args.min_score is not None and result.report.score < args.min_score:
+        logger.warning("[FIX:cli-contract] readiness score gate failed: score=%d required=%d", result.report.score, args.min_score)
+        return 1
     return 1 if args.fail_on_checks and any(item.status.value == "fail" for item in result.report.findings) else 0
 
 
@@ -1035,7 +962,7 @@ def _configure_logging() -> None:
     level_name = os.environ.get("LOG_LEVEL", "WARNING").strip().upper()
     level = getattr(logging, level_name, None)
     if not isinstance(level, int):
-        raise ValueError(f"invalid LOG_LEVEL {level_name!r}; expected DEBUG, INFO, WARNING, or ERROR")
+        raise TypeError(f"invalid LOG_LEVEL {level_name!r}; expected DEBUG, INFO, WARNING, or ERROR")
     logging.basicConfig(
         level=level,
         format="%(levelname)s %(name)s: %(message)s",

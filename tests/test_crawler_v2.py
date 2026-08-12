@@ -1,22 +1,35 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+from dataclasses import replace
 
 import httpx
 import pytest
-from agentready.browser_pool import BrowserPool, BrowserPoolConfig, CapabilityUnavailableError
+
+from agentready.audit_core import (
+    AuditRunContext,
+    ContentRetention,
+    MemorySiteStore,
+    RunUrlState,
+    SQLiteSiteStore,
+)
+from agentready.browser_pool import (
+    BrowserPool,
+    BrowserPoolConfig,
+    CapabilityUnavailableError,
+)
 from agentready.crawl_profiles import resolve_profile
 from agentready.crawler import (
     AsyncCrawler,
     CrawlConfig,
     CrawlItem,
     CrawlItemState,
-    CrawlSeeds,
     CrawlScope,
+    CrawlSeeds,
     Frontier,
     ScopePolicy,
 )
-from agentready.audit_core import AuditRunContext, MemorySiteStore, RunUrlState
 from agentready.egress import EgressPolicy
 from agentready.page_parser import Representation, RepresentationSource, parse_page
 
@@ -328,7 +341,13 @@ def test_crawler_propagates_run_id_to_fetch_and_store_records() -> None:
             run_context=context,
         ).crawl()
         assert result.coverage.fetched == 1
-        assert [page.run_id for page in store.iter_pages("run-propagated")] == ["run-propagated"]
+        pages = list(store.iter_pages("run-propagated"))
+        assert [page.run_id for page in pages] == ["run-propagated"]
+        assert pages[0].title == ""
+        assert pages[0].content_hash == hashlib.sha256(
+            b'<a href="/child">one</a><a href="/child">two</a><img src="/asset.png"><img src="/asset.png"><p>ok</p>'
+        ).hexdigest()
+        assert pages[0].locally_indexable is True
         assert ("run-propagated", "https://example.test/", "/child") in store._links
         links = list(store.iter_link_occurrences("run-propagated"))
         assert [link.anchor_text for link in links] == ["one", "two"]
@@ -338,3 +357,131 @@ def test_crawler_propagates_run_id_to_fetch_and_store_records() -> None:
         assert store._runs["run-propagated"].finished_at is not None
 
     asyncio.run(run())
+
+
+def test_crawler_persists_redirect_inventory_from_fetch_result() -> None:
+    from agentready.fetcher import FetchResult, RedirectHop
+
+    class FakeFetcher:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, request, *, use_cache=True):
+            return FetchResult(
+                url=request.url,
+                status_code=200,
+                headers={"content-type": "text/html"},
+                body=b"<title>Final</title>",
+                redirects=("https://example.test/old",),
+                elapsed_ms=1,
+                redirect_records=(RedirectHop(
+                    from_url="https://example.test/old",
+                    status_code=301,
+                    location_raw="/",
+                    to_url="https://example.test/",
+                    cross_origin=False,
+                    downgrade_https_to_http=False,
+                ),),
+            )
+
+    async def run() -> None:
+        store = MemorySiteStore()
+        context = AuditRunContext.create(
+            "https://example.test/",
+            {"max_pages": 1},
+            tool_version="test",
+            rule_catalog_version="rules-1",
+            run_id="run-redirect-golden",
+        )
+        await AsyncCrawler(
+            CrawlScope(("https://example.test/",), allowed_origins=("https://example.test",)),
+            config=CrawlConfig(max_pages=1, min_request_interval_ms=0),
+            policy=EgressPolicy(allowed_origins=frozenset({"https://example.test"})),
+            fetcher_factory=FakeFetcher,
+            store=store,
+            run_context=context,
+        ).crawl()
+        assert list(store.iter_redirects("run-redirect-golden"))
+
+    asyncio.run(run())
+
+
+def test_crawler_projects_page_facts_and_redirects_with_memory_sqlite_parity(tmp_path) -> None:
+    body = (
+        b'<html><head><title>Home</title><meta name="robots" content="noindex,follow">'
+        b'<link rel="canonical" href="/preferred"></head><body>'
+        b'<a href="/child">Child</a><img src="/hero.png" alt="Hero"><p>Hello world</p></body></html>'
+    )
+
+    class FakeFetcher:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, request, *, use_cache=True):
+            from agentready.fetcher import FetchResult, RedirectHop
+
+            return FetchResult(
+                url=request.url,
+                status_code=200,
+                headers={"content-type": "text/html; charset=utf-8"},
+                body=body,
+                redirects=("https://example.test/old",),
+                elapsed_ms=1,
+                redirect_records=(RedirectHop(
+                    from_url="https://example.test/old",
+                    status_code=301,
+                    location_raw="/",
+                    to_url="https://example.test/",
+                    cross_origin=False,
+                    downgrade_https_to_http=False,
+                ),),
+            )
+
+    async def run(store, run_id: str) -> None:
+        context = AuditRunContext.create(
+            "https://example.test/",
+            {"max_pages": 1},
+            tool_version="test",
+            rule_catalog_version="rules-1",
+            run_id=run_id,
+        )
+        await AsyncCrawler(
+            CrawlScope(("https://example.test/",), allowed_origins=("https://example.test",)),
+            config=CrawlConfig(max_pages=1, min_request_interval_ms=0),
+            policy=EgressPolicy(allowed_origins=frozenset({"https://example.test"})),
+            fetcher_factory=FakeFetcher,
+            store=store,
+            run_context=context,
+        ).crawl()
+
+    memory = MemorySiteStore(retention=ContentRetention.FULL_CONTENT)
+    sqlite = SQLiteSiteStore(tmp_path / "crawler-projection.sqlite", retention=ContentRetention.FULL_CONTENT)
+    try:
+        asyncio.run(run(memory, "run-memory"))
+        asyncio.run(run(sqlite, "run-sqlite"))
+        memory_page = next(memory.iter_pages("run-memory"))
+        sqlite_page = next(sqlite.iter_pages("run-sqlite"))
+        assert memory_page.title == "Home"
+        assert memory_page.canonical == "https://example.test/preferred"
+        assert memory_page.locally_indexable is False
+        assert memory_page.content_hash == hashlib.sha256(body).hexdigest()
+        assert "Hello world" in (memory_page.content or "")
+        assert next(iter(memory.iter_redirects("run-memory"))).from_url == "https://example.test/old"
+        assert next(iter(memory.iter_link_occurrences("run-memory"))).resolved_url == "https://example.test/child"
+        resources = list(memory.iter_resource_occurrences("run-memory"))
+        assert next(resource for resource in resources if resource.resource_url == "/hero.png").resolved_url == "https://example.test/hero.png"
+        assert memory_page == replace(sqlite_page, run_id="run-memory")
+    finally:
+        sqlite.close()

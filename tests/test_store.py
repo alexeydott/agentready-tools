@@ -8,8 +8,8 @@ from agentready.audit_core.store import (
     ContentRetention,
     FetchFact,
     MemorySiteStore,
-    PageRecord,
     MetricRecord,
+    PageRecord,
     RedirectFact,
     RunRecord,
     RunUrlRecord,
@@ -109,7 +109,7 @@ def test_reopening_sqlite_marks_running_runs_interrupted_and_resumes(tmp_path: P
         assert second.resume_run("run-1").state == "running"
         assert second.begin_run(RunRecord("run-1", "other", "other", "other")).config_hash == "config"
         second.put_run_url(RunUrlRecord("run-1", "https://example.com/a", RunUrlState.FETCHED))
-        assert list(second.iter_run_urls("run-1"))[0].state is RunUrlState.FETCHED
+        assert next(iter(second.iter_run_urls("run-1"))).state is RunUrlState.FETCHED
     finally:
         second.close()
 
@@ -193,3 +193,18 @@ def test_sqlite_v2_migrates_occurrence_tables(tmp_path: Path):
         assert len(list(store.iter_metrics("run-migration"))) == 1
     finally:
         store.close()
+
+
+def test_sqlite_migration_is_idempotent_and_recovery_is_durable(tmp_path: Path):
+    path = tmp_path / "idempotent.sqlite"
+    first = SQLiteSiteStore(path)
+    first.begin_run(RunRecord("run-recovery", "config", "tool", "rules"))
+    first.close()
+    second = SQLiteSiteStore(path)
+    try:
+        assert second.recover_interrupted_runs() == 0
+        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert second._connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 1
+        assert second.resume_run("run-recovery").state == "running"
+    finally:
+        second.close()

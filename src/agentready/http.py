@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Self
 from urllib.parse import urljoin
 
 import httpx
@@ -97,7 +98,7 @@ class HttpClient:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> "HttpClient":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -106,7 +107,7 @@ class HttpClient:
     def get(self, url: str, headers: dict[str, str] | None = None, *, use_cache: bool = True) -> Fetched:
         headers = headers or {}
         try:
-            headers = self.egress_policy.validate_headers(headers, purpose="legacy-http-client")
+            headers = self.egress_policy.validate_headers(headers, purpose="bounded-http-client")
         except EgressPolicyError as exc:
             raise FetchError(str(exc)) from exc
         cache_key = (url, tuple(sorted((k.lower(), v) for k, v in headers.items())))
@@ -117,7 +118,7 @@ class HttpClient:
         chain: list[str] = []
         for hop in range(self.max_redirects + 1):
             try:
-                self.egress_policy.validate_request(current, purpose="legacy-http-client")
+                self.egress_policy.validate_request(current, purpose="bounded-http-client")
                 with self._client.stream("GET", current, headers=headers) as resp:
                     if resp.status_code in _REDIRECTS and resp.headers.get("location"):
                         if hop >= self.max_redirects:
@@ -128,7 +129,7 @@ class HttpClient:
                             current,
                             next_url,
                             hop + 1,
-                            purpose="legacy-http-client",
+                            purpose="bounded-http-client",
                         )
                         current = next_url
                         continue
@@ -151,3 +152,30 @@ class HttpClient:
                 self._cache[cache_key] = result
             return result
         raise FetchError("Redirect loop")
+
+    def cached(self, url: str, headers: dict[str, str] | None = None) -> Fetched | None:
+        """Return a response already collected by this bounded run, if present."""
+        cache_key = (url, tuple(sorted((k.lower(), v) for k, v in (headers or {}).items())))
+        return self._cache.get(cache_key)
+
+
+class CachedHttpTransport:
+    """Replay cached sync-client responses through an async HTTP boundary."""
+
+    def __init__(self, client: HttpClient) -> None:
+        self._client = client
+        self._fallback = httpx.AsyncHTTPTransport()
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        cached = self._client.cached(str(request.url), dict(request.headers))
+        if cached is not None:
+            return httpx.Response(
+                cached.status_code,
+                headers=cached.headers,
+                content=cached.body,
+                request=request,
+            )
+        return await self._fallback.handle_async_request(request)
+
+    async def aclose(self) -> None:
+        await self._fallback.aclose()

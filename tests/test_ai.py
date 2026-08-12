@@ -4,13 +4,20 @@ from types import SimpleNamespace
 
 import pytest
 
+from agentready.agentfindings import build_findings
 from agentready.ai_assistant import AIAssistant
 from agentready.ai_context import AIContextError, project_report
 from agentready.ai_i18n import ai_catalog, ai_catalog_keys, ai_text
 from agentready.ai_models import AssistantRequest
 from agentready.ai_prompts import ai_skill_catalog, build_prompts
-from agentready.ai_provider import AIProviderConfigurationError, OpenAICompatibleProvider, ProviderModel, ProviderResult, model_capabilities, validate_base_url
-from agentready.agentfindings import build_findings
+from agentready.ai_provider import (
+    AIProviderConfigurationError,
+    OpenAICompatibleProvider,
+    ProviderModel,
+    ProviderResult,
+    model_capabilities,
+    validate_base_url,
+)
 from agentready.config import active_ai_provider, load_config, save_ai_provider_config
 
 
@@ -27,7 +34,7 @@ class FakeProvider:
 
 def seo_report():
     return {
-        "schema": "agentready.seo.v1",
+        "schema": "agentready.seo.v2",
         "target": "https://example.com",
         "score": 50,
         "checks": [{
@@ -64,9 +71,9 @@ def test_ai_context_rejects_unsupported_schema():
         project_report({"schema": "unknown", "checks": []}, mode="seo", language="en")
 
 
-def test_ai_context_accepts_readiness_reports_without_schema():
-    projected = project_report({"target": "https://example.com", "checks": []}, mode="both", language="en")
-    assert projected["schema"] == "agentready.scan.v1"
+def test_ai_context_requires_canonical_readiness_schema():
+    projected = project_report({"schema": "agentready.audit.v2", "target": "https://example.com", "findings": []}, mode="both", language="en")
+    assert projected["schema"] == "agentready.audit.v2"
 
 
 def test_ai_context_projects_v2_evidence_and_coverage():
@@ -88,6 +95,8 @@ def test_ai_context_projects_v2_evidence_and_coverage():
         language="en",
     )
     assert projected["coverage"]["total_rules"] == 1
+    assert projected["inventory"] == {}
+    assert projected["provider_freshness"] == {}
     assert projected["checks"][0]["evidence"][0]["url"].endswith("/robots.txt")
     assert projected["finding_groups"][0]["root"] == "robots"
 
@@ -171,7 +180,7 @@ def test_catalog_keys_match_for_english_and_russian():
 
 
 def test_prompt_requires_current_interface_language():
-    system, _ = build_prompts(mode="seo", language="ru", context={"schema": "agentready.seo.v1"})
+    system, _ = build_prompts(mode="seo", language="ru", context={"schema": "agentready.seo.v2"})
     assert "MUST answer exclusively in the current interface language 'ru'" in system
     assert "structured evidence metrics" in system
     assert "page URL, resource URL" in system
@@ -181,7 +190,7 @@ def test_prompt_includes_selected_skills_mcp_context_and_attachments():
     _, user = build_prompts(
         mode="both",
         language="en",
-        context={"schema": "agentready.seo.v1"},
+        context={"schema": "agentready.seo.v2"},
         skills=("audit-analyst",),
         mcp_context={"tool": "agentready.seo_findings"},
         attachments=({"name": "notes.md", "content": "Check the canonical URL."},),
@@ -201,13 +210,13 @@ def test_seo_security_skill_is_localized_and_available():
     assert "possible SEO-spam injection" in build_prompts(
         mode="seo",
         language="en",
-        context={"schema": "agentready.seo.v1"},
+        context={"schema": "agentready.seo.v2"},
         skills=("seo-security-interpreter",),
     )[1]
     assert "возможное внедрение SEO-спама" in build_prompts(
         mode="seo",
         language="ru",
-        context={"schema": "agentready.seo.v1"},
+        context={"schema": "agentready.seo.v2"},
         skills=("seo-security-interpreter",),
     )[1]
 

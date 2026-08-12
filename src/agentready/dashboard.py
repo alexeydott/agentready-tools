@@ -5,7 +5,6 @@ from html import escape
 
 from .ai_prompts import ai_skill_catalog
 
-
 _TEXT = {
     "en": {
         "title": "AgentReady Tools",
@@ -18,7 +17,7 @@ _TEXT = {
         "preset_content": "Content site",
         "preset_api": "API / application",
         "preset_ai_search": "AI Search / GEO",
-        "preset_v2": "vNext bounded audit",
+        "preset_v2": "Bounded site audit",
         "preset_seo": "SEO audit",
         "preset_mobile": "Mobile-friendliness",
         "preset_hint_label": "What the selected audit profile checks",
@@ -26,16 +25,16 @@ _TEXT = {
         "profile_content": "Readiness profile for content sites: llms.txt, Markdown negotiation, content signals and agent-friendly content access.",
         "profile_api": "Readiness profile for APIs and applications: API catalogs, OAuth discovery, MCP/A2A cards and agent integration protocols.",
         "profile_ai_search": "AI Search / GEO profile: indexability, AI crawler access, structured data, dates and citation readiness.",
-        "profile_v2": "vNext bounded crawl through the AuditService pipeline: same-origin discovery under hard caps, page/link/resource inventory, redirect chains and rule-based findings.",
-        "v2_profile": "vNext profile",
-        "v2_profile_hint": "Crawl budget for the vNext bounded audit. Quick is shallow and fast, deep discovers more pages. Server hard caps always apply.",
+        "profile_v2": "Bounded crawl through the AuditService pipeline: same-origin discovery under hard caps, page/link/resource inventory, redirect chains and rule-based findings.",
+        "v2_profile": "Crawl profile",
+        "v2_profile_hint": "Crawl budget for the bounded audit. Quick is shallow and fast, deep discovers more pages. Server hard caps always apply.",
         "v2_profile_quick": "Quick",
         "v2_profile_standard": "Standard",
         "v2_profile_deep": "Deep",
-        "v2_max_pages": "vNext page limit",
-        "v2_max_pages_hint": "Maximum number of pages the vNext crawl may fetch (1-100).",
-        "v2_render": "vNext browser rendering",
-        "v2_render_hint": "Render pages in a headless browser during the vNext crawl. Slower, but captures client-rendered content.",
+        "v2_max_pages": "Page limit",
+        "v2_max_pages_hint": "Maximum pages to fetch (1-25,000). Use 0 for a full same-origin crawl up to the server safety cap.",
+        "v2_render": "Browser rendering",
+        "v2_render_hint": "Render pages in a headless browser during the crawl. Slower, but captures client-rendered content.",
         "profile_seo": "Independent SEO audit with optional same-origin crawl: metadata, indexability, links, canonical URL, robots/sitemap, favicon and JSON-LD.",
         "profile_mobile": "Mobile-friendliness audit based on Google Mobile-Friendly signals: viewport, responsive CSS, fixed widths, touch targets, font readability and indexability.",
         "language": "Language",
@@ -44,6 +43,7 @@ _TEXT = {
         "workers": "Workers",
         "threshold": "Level threshold",
         "recommendations": "Recommendation limit",
+        "check_limit": "Audit check limit",
         "verify": "Verify Agent Skills digests",
         "debug": "Debug results",
         "advanced_hint": "These settings narrow the audit scope and control request execution.",
@@ -53,6 +53,7 @@ _TEXT = {
         "workers_hint": "Number of parallel readiness checks. Higher values can finish faster but create more concurrent requests.",
         "threshold_hint": "Minimum maturity ratio required to advance to the next readiness level.",
         "recommendations_hint": "Maximum number of prioritized recommendations included in the report.",
+        "check_limit_hint": "Maximum number of checks evaluated in this audit (0 means all selected checks; range 0-500).",
         "verify_hint": "When enabled, validates Agent Skills digests instead of checking only their links.",
         "refresh_hint": "Reloads the localized list of checks available for the selected profile.",
         "health_hint": "Sends a lightweight request to confirm that the local audit service is responding.",
@@ -215,10 +216,13 @@ _TEXT = {
         "result": "Operation result",
         "ready": "Configure an audit and choose an operation.",
         "v2_inventory": "Run inventory",
-        "v2_inventory_hint": "Browse bounded server-side inventory for the latest vNext run.",
+        "v2_inventory_hint": "Browse bounded server-side inventory for the latest crawl.",
         "v2_inventory_load": "Load inventory",
-        "v2_inventory_empty": "Run the vNext audit to load inventory.",
+        "v2_inventory_empty": "Run the bounded audit to load inventory.",
+        "v2_kind_pages": "Pages", "v2_kind_links": "Links", "v2_kind_resources": "Resources", "v2_kind_redirects": "Redirects", "v2_kind_findings": "Findings", "v2_kind_metrics": "Metrics",
         "v2_inventory_error": "Unable to load inventory",
+        "v2_inventory_kind": "Inventory section", "v2_inventory_sort": "Sort", "v2_inventory_desc": "Descending",
+        "v2_inventory_compare": "Compare", "v2_inventory_rescan": "Rescan selected", "v2_inventory_job": "Run as job", "v2_inventory_cancel": "Cancel job",
         "loading": "Loading...",
         "progress_title": "Audit in progress",
         "progress_start": "Preparing audit request",
@@ -238,7 +242,7 @@ _TEXT = {
         "help_title": "Dashboard help",
         "skip_to_content": "Skip to main content",
         "noscript_title": "JavaScript is disabled",
-        "noscript_text": "Use the CLI or local API instead: agentready scan https://example.com --format html, or POST an audit request to /scan/dashboard.",
+        "noscript_text": "Use the CLI or local API instead: agentready audit https://example.com --format html, or POST an audit request to /v2/audit/dashboard.",
     },
     "ru": {
         "title": "AgentReady Tools",
@@ -251,7 +255,7 @@ _TEXT = {
         "preset_content": "Контентный сайт",
         "preset_api": "API / приложение",
         "preset_ai_search": "AI-поиск / GEO",
-        "preset_v2": "Ограниченный аудит vNext",
+        "preset_v2": "Ограниченный аудит сайта",
         "preset_seo": "SEO-аудит",
         "preset_mobile": "Мобильная дружественность",
         "preset_hint_label": "Что проверяет выбранный профиль аудита",
@@ -259,16 +263,16 @@ _TEXT = {
         "profile_content": "Профиль для контентных сайтов: llms.txt, Markdown-negotiation, content-сигналы и удобный для агентов доступ к контенту.",
         "profile_api": "Профиль для API и приложений: каталоги API, OAuth discovery, карточки MCP/A2A и протоколы интеграции агентов.",
         "profile_ai_search": "Профиль AI-поиска / GEO: индексируемость, доступ ИИ-краулеров, структурированные данные, даты и цитируемость.",
-        "profile_v2": "Ограниченный обход vNext через конвейер AuditService: обнаружение в пределах одного источника с жёсткими лимитами, инвентарь страниц/ссылок/ресурсов, цепочки редиректов и находки по правилам.",
-        "v2_profile": "Профиль vNext",
-        "v2_profile_hint": "Бюджет обхода для ограниченного аудита vNext. Quick — быстрый и поверхностный, deep обнаруживает больше страниц. Жёсткие лимиты сервера действуют всегда.",
+        "profile_v2": "Ограниченный обход через конвейер AuditService: обнаружение в пределах одного источника с жёсткими лимитами, инвентарь страниц/ссылок/ресурсов, цепочки редиректов и находки по правилам.",
+        "v2_profile": "Профиль обхода",
+        "v2_profile_hint": "Бюджет обхода для ограниченного аудита. Quick — быстрый и поверхностный, deep обнаруживает больше страниц. Жёсткие лимиты сервера действуют всегда.",
         "v2_profile_quick": "Быстрый",
         "v2_profile_standard": "Стандартный",
         "v2_profile_deep": "Глубокий",
-        "v2_max_pages": "Лимит страниц vNext",
-        "v2_max_pages_hint": "Максимальное число страниц, которые может загрузить обход vNext (1-100).",
-        "v2_render": "Браузерный рендеринг vNext",
-        "v2_render_hint": "Рендерить страницы в headless-браузере во время обхода vNext. Медленнее, но захватывает контент, отрисованный на клиенте.",
+        "v2_max_pages": "Лимит страниц",
+        "v2_max_pages_hint": "Максимальное число страниц (1–25 000). 0 — полный обход в пределах безопасного серверного лимита.",
+        "v2_render": "Браузерный рендеринг",
+        "v2_render_hint": "Рендерить страницы в headless-браузере во время обхода. Медленнее, но захватывает контент, отрисованный на клиенте.",
         "profile_seo": "Независимый SEO-аудит с дополнительным обходом сайта: метаданные, индексируемость, ссылки, canonical URL, robots/sitemap, favicon и JSON-LD.",
         "profile_mobile": "Аудит мобильной дружественности по сигналам Google Mobile-Friendly: viewport, адаптивный CSS, фиксированная ширина, мишени касания, читаемость шрифта и индексируемость.",
         "language": "Язык",
@@ -277,6 +281,7 @@ _TEXT = {
         "workers": "Параллельные задачи",
         "threshold": "Порог уровня",
         "recommendations": "Лимит рекомендаций",
+        "check_limit": "Ограничение аудита — проверки",
         "verify": "Проверять digest Agent Skills",
         "debug": "Отладка результатов",
         "advanced_hint": "Эти параметры ограничивают область аудита и управляют выполнением запросов.",
@@ -286,6 +291,7 @@ _TEXT = {
         "workers_hint": "Количество параллельных readiness-проверок. Большее значение ускоряет работу, но увеличивает число одновременных запросов.",
         "threshold_hint": "Минимальная доля выполненных требований для перехода на следующий уровень готовности.",
         "recommendations_hint": "Максимальное число приоритетных рекомендаций в отчёте.",
+        "check_limit_hint": "Максимальное число проверок в этом аудите (0 — все выбранные проверки; диапазон 0–500).",
         "verify_hint": "При включении проверяются digest Agent Skills, а не только ссылки на них.",
         "refresh_hint": "Заново загружает локализованный список проверок выбранного профиля.",
         "health_hint": "Выполняет лёгкий запрос и подтверждает, что локальный сервис аудита отвечает.",
@@ -448,10 +454,13 @@ _TEXT = {
         "result": "Результат операции",
         "ready": "Настройте аудит и выберите операцию.",
         "v2_inventory": "Инвентарь запуска",
-        "v2_inventory_hint": "Просмотр ограниченного серверного инвентаря последнего запуска vNext.",
+        "v2_inventory_hint": "Просмотр ограниченного серверного инвентаря последнего обхода.",
         "v2_inventory_load": "Загрузить инвентарь",
-        "v2_inventory_empty": "Запустите аудит vNext, чтобы загрузить инвентарь.",
+        "v2_inventory_empty": "Запустите ограниченный аудит, чтобы загрузить инвентарь.",
+        "v2_kind_pages": "Страницы", "v2_kind_links": "Ссылки", "v2_kind_resources": "Ресурсы", "v2_kind_redirects": "Редиректы", "v2_kind_findings": "Проверки", "v2_kind_metrics": "Метрики",
         "v2_inventory_error": "Не удалось загрузить инвентарь",
+        "v2_inventory_kind": "Раздел инвентаря", "v2_inventory_sort": "Сортировка", "v2_inventory_desc": "По убыванию",
+        "v2_inventory_compare": "Сравнить", "v2_inventory_rescan": "Повторно проверить выбранные", "v2_inventory_job": "Запустить как задачу", "v2_inventory_cancel": "Отменить задачу",
         "loading": "Загрузка...",
         "progress_title": "Аудит выполняется",
         "progress_start": "Подготовка запроса аудита",
@@ -471,7 +480,7 @@ _TEXT = {
         "help_title": "Справка по dashboard",
         "skip_to_content": "Перейти к основному содержимому",
         "noscript_title": "JavaScript отключён",
-        "noscript_text": "Используйте CLI или локальный API: agentready scan https://example.com --format html или отправьте POST-запрос аудита на /scan/dashboard.",
+        "noscript_text": "Используйте CLI или локальный API: agentready audit https://example.com --format html или отправьте POST-запрос аудита на /v2/audit/dashboard.",
     },
 }
 
@@ -551,7 +560,7 @@ def render_dashboard(language: str = "en") -> str:
         f'<option value="{escape(item["id"])}" title="{escape(item["description"])}" data-label="{escape(item["title"])}">{escape(item["title"])} — {escape(item["description"])}</option>'
         for item in ai_skill_catalog(lang)
     )
-    return f"""<!doctype html>
+    return fr"""<!doctype html>
 <html lang="{lang}">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -724,10 +733,11 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div><label for="workers">{escape(text["workers"])} {_hint(text, "workers_hint")}</label><input id="workers" type="number" min="1" max="24" value="8"></div>
 <div><label for="threshold">{escape(text["threshold"])} {_hint(text, "threshold_hint")}</label><input id="threshold" type="text" inputmode="decimal" data-decimal min="0.01" max="1" step="0.01" value="0.8"></div>
 <div><label for="recommendations">{escape(text["recommendations"])} {_hint(text, "recommendations_hint")}</label><input id="recommendations" type="number" min="0" max="50" value="10"></div>
+<div><label for="check-limit">{escape(text["check_limit"])} {_hint(text, "check_limit_hint")}</label><input id="check-limit" type="number" min="0" max="500" value="0" inputmode="numeric"></div>
 <label><input id="verify" type="checkbox" style="width:auto;margin-right:8">{escape(text["verify"])} {_hint(text, "verify_hint")}</label>
 </div><div class="form-grid three" style="margin-top:14px">
 <div><label for="v2-profile">{escape(text["v2_profile"])} {_hint(text, "v2_profile_hint")}</label><select id="v2-profile"><option value="quick">{escape(text["v2_profile_quick"])}</option><option value="standard">{escape(text["v2_profile_standard"])}</option><option value="deep">{escape(text["v2_profile_deep"])}</option></select></div>
-<div><label for="v2-max-pages">{escape(text["v2_max_pages"])} {_hint(text, "v2_max_pages_hint")}</label><input id="v2-max-pages" type="number" min="1" max="100" value="3"></div>
+<div><label for="v2-max-pages">{escape(text["v2_max_pages"])} {_hint(text, "v2_max_pages_hint")}</label><input id="v2-max-pages" type="number" min="0" max="25000" value="3"></div>
 <label><input id="v2-render" type="checkbox" style="width:auto;margin-right:8">{escape(text["v2_render"])} {_hint(text, "v2_render_hint")}</label>
 </div></details>
 <div class="advanced-links"><div class="advanced-link-row"><a href="#" class="text-link" onclick="loadChecks(); return false;">{escape(text["checks"])}</a>{_hint(text, "refresh_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="runHealth(); return false;">{escape(text["health"])}</a>{_hint(text, "health_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="openAiCredentials(); return false;">{escape(text["ai_credentials"])}</a>{_hint(text, "ai_credentials_hint")}</div><div class="advanced-link-row"><label style="font-weight:700;margin:0"><input id="debug" type="checkbox" style="width:auto;margin-right:6px">{escape(text["debug"])}</label>{_hint(text, "debug_hint")}</div></div>
@@ -741,12 +751,24 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <h2 id="v2-inventory-title">{escape(text["v2_inventory"])} {_hint(text, "v2_inventory_hint")}</h2>
 <div class="actions">
 <button type="button" class="secondary" onclick="loadV2Inventory()">{escape(text["v2_inventory_load"])}</button>
+<label for="v2-inventory-kind">{escape(text["v2_inventory_kind"])}</label>
+<select id="v2-inventory-kind" onchange="loadV2Inventory(this.value)"><option value="pages">{escape(text["v2_kind_pages"])}</option><option value="links">{escape(text["v2_kind_links"])}</option><option value="resources">{escape(text["v2_kind_resources"])}</option><option value="redirects">{escape(text["v2_kind_redirects"])}</option><option value="findings">{escape(text["v2_kind_findings"])}</option><option value="metrics">{escape(text["v2_kind_metrics"])}</option></select>
 <label for="v2-inventory-limit">Rows</label>
 <select id="v2-inventory-limit" onchange="loadV2Inventory()"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option></select>
+<label for="v2-inventory-sort">{escape(text["v2_inventory_sort"])}</label><select id="v2-inventory-sort" onchange="loadV2Inventory()"><option value="url">URL</option><option value="status">Status</option><option value="depth">Depth</option><option value="title">Title</option><option value="anchor">Anchor</option></select>
+<label><input id="v2-inventory-desc" type="checkbox" style="width:auto;margin-right:6px" onchange="loadV2Inventory()">{escape(text["v2_inventory_desc"])}</label>
 <label for="v2-inventory-filter">Filter</label>
 <input id="v2-inventory-filter" type="search" placeholder="Find in loaded rows" oninput="filterV2Inventory()">
+<label for="v2-inventory-columns">Columns</label><select id="v2-inventory-columns" multiple size="3" aria-label="Columns"><option value="url" selected>URL</option><option value="status" selected>Status</option><option value="title" selected>Title</option><option value="depth">Depth</option><option value="anchor">Anchor</option></select>
 <button id="v2-inventory-next" type="button" class="secondary" onclick="loadNextV2Inventory()" hidden>Next page</button>
 <button type="button" class="secondary" onclick="saveV2InventoryView()">Save view</button>
+<label for="v2-saved-view">Saved view</label><select id="v2-saved-view" onchange="loadSavedV2View(this.value)"><option value="">—</option></select>
+<button type="button" class="secondary" onclick="deleteSavedV2View()">Delete view</button>
+<button type="button" class="secondary" onclick="exportSavedV2View()">Export view</button>
+<button type="button" class="secondary" onclick="compareV2Inventory()">{escape(text["v2_inventory_compare"])}</button>
+<button type="button" class="secondary" onclick="rescanV2Selection()">{escape(text["v2_inventory_rescan"])}</button>
+<button type="button" class="secondary" onclick="runV2InventoryJob()">{escape(text["v2_inventory_job"])}</button>
+<button type="button" class="secondary" onclick="cancelV2InventoryJob()">{escape(text["v2_inventory_cancel"])}</button>
 </div>
 <div id="v2-inventory-status" role="status" aria-live="polite"></div>
 <div id="v2-inventory" role="region" aria-live="polite">{escape(text["v2_inventory_empty"])}</div>
@@ -779,9 +801,9 @@ helpToggle.onclick = () => {{
   (visible ? helpContent : helpToggle).focus();
   console.info("Dashboard help toggled", {{visible, language:language.value}});
 }};
-const dashboardStateKey = "agentready.dashboard.state.v1";
-const dashboardReportKey = "agentready.dashboard.report.v1";
-const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","verify","debug","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only"];
+const dashboardStateKey = "agentready.dashboard.state.v2";
+const dashboardReportKey = "agentready.dashboard.report.v2";
+const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-max-pages","v2-render","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only"];
 function readDashboardState() {{
   try {{
     const raw = localStorage.getItem(dashboardStateKey);
@@ -932,11 +954,13 @@ function scanPayload() {{
   const preset = document.getElementById("preset").value;
   const applicable = catalog.filter(item => item.presets.includes(preset)).map(item => item.id);
   const selected = selectedChecks();
-  const payload = {{url:document.getElementById("url").value, preset, language:language.value,
+  const payload = {{url:document.getElementById("url").value, preset, profile:document.getElementById("v2-profile").value,
+    max_pages:selectedV2MaxPages(), language:language.value,
     content_url:document.getElementById("content-url").value || null, commerce_url:document.getElementById("commerce-url").value || null,
     include:selected.filter(id => !applicable.includes(id)), exclude:applicable.filter(id => !selected.includes(id)),
     timeout:Number(document.getElementById("timeout").value), workers:Number(document.getElementById("workers").value),
     level_threshold:decimalValue("threshold", .8), recommendation_limit:Number(document.getElementById("recommendations").value),
+    limits:{{check_limit:Number(document.getElementById("check-limit").value) || 0}},
     verify_skill_digests:document.getElementById("verify").checked}};
   return payload;
 }}
@@ -957,6 +981,20 @@ function createReportActions(reportText, frame) {{
   const print = document.createElement("a"); print.href = "#"; print.textContent = translations[language.value].print_report; print.onclick = (event) => {{ event.preventDefault(); console.info("Printing audit report", {{language:language.value}}); frame.contentWindow.print(); }};
   actions.append(download, hintIcon(translations[language.value].download_hint), print, hintIcon(translations[language.value].print_hint));
   return actions;
+}}
+const v2ProfileDefaults = {{quick:3, standard:25, deep:100}};
+let v2LastProfile = document.getElementById("v2-profile").value;
+function selectedV2MaxPages() {{ const value = Number(document.getElementById("v2-max-pages").value); return Number.isFinite(value) && value >= 0 ? value : 3; }}
+function syncV2ProfileBudget() {{
+  const profile = document.getElementById("v2-profile").value;
+  const pageLimit = document.getElementById("v2-max-pages");
+  const previousDefault = v2ProfileDefaults[v2LastProfile];
+  if (Number(pageLimit.value) === previousDefault || !pageLimit.value) {{
+    pageLimit.value = String(v2ProfileDefaults[profile] || 25);
+    saveDashboardState();
+    console.info("[FIX:dashboard-crawl] Profile budget synchronized", {{profile, max_pages:Number(pageLimit.value)}});
+  }}
+  v2LastProfile = profile;
 }}
 function createReportFrame(reportText) {{
   const frame = document.createElement("iframe");
@@ -1020,6 +1058,13 @@ function restoreReportState() {{
     if (!raw) return false;
     const state = JSON.parse(raw);
     if (!state || typeof state.html !== "string" || !state.html.includes("<html")) return false;
+    // Invalidate reports generated before the Russian inventory heading was
+    // localized; otherwise localStorage would keep showing stale report HTML.
+    if (state.html.includes("Сводка инвентаря")) {{
+      localStorage.removeItem(dashboardReportKey);
+      console.info("[FIX:dashboard-report] Removed stale localized report", {{reason:"legacy inventory heading"}});
+      return false;
+    }}
     window.agentreadyV2Report = state.v2Report || null;
     renderReport(state.html, false);
     const contextReady = state.preset !== "v2" || Boolean(window.agentreadyV2Report);
@@ -1064,13 +1109,13 @@ async function runScan() {{
   if (preset === "seo") {{ await runSeo(); return; }}
   if (preset === "mobile") {{ await runMobile(); return; }}
   if (preset === "v2") {{ await runV2(); return; }}
-  try {{ await request("/scan/dashboard","POST",scanPayload(),true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
+  try {{ await request("/v2/audit/dashboard","POST",scanPayload(),true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
 async function runV2() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
   window.agentreadyV2Report = null;
   try {{
-    await request("/v2/audit/dashboard","POST",{{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:Number(document.getElementById("v2-max-pages").value)||3,render:document.getElementById("v2-render").checked,timeout:Number(document.getElementById("timeout").value),language:language.value}},true);
+    await request("/v2/audit/dashboard","POST",{{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:selectedV2MaxPages(),render:document.getElementById("v2-render").checked,timeout:Number(document.getElementById("timeout").value),language:language.value}},true);
     await loadV2Inventory();
     setAiAvailability(true);
   }} catch (error) {{
@@ -1091,17 +1136,22 @@ async function loadV2Inventory(kind=null, cursor=null) {{
   try {{
     const overview = await (await fetch("/v2/runs/" + encodeURIComponent(runId) + "/overview")).json();
     v2InventoryCounts = overview.inventory || {{}};
-    if (kind) {{ v2InventoryKind = kind; v2InventoryCursor = null; }}
+    if (kind) {{ v2InventoryKind = kind; document.getElementById("v2-inventory-kind").value = kind; v2InventoryCursor = null; }}
     if (cursor !== null) v2InventoryCursor = cursor;
     const limit = Number(document.getElementById("v2-inventory-limit").value) || 100;
-    const query = new URLSearchParams({{limit:String(limit)}});
+    const query = new URLSearchParams({{limit:String(limit),sort_by:document.getElementById("v2-inventory-sort").value,descending:String(document.getElementById("v2-inventory-desc").checked)}});
+    const search = document.getElementById("v2-inventory-filter").value.trim();
+    if (search) query.set("search", search);
     if (v2InventoryCursor) query.set("cursor", v2InventoryCursor);
     const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/inventory/" + encodeURIComponent(v2InventoryKind) + "?" + query);
     if (!response.ok) throw new Error("HTTP " + response.status);
     const page = await response.json();
     v2InventoryItems = page.items || [];
     const counts = Object.entries(v2InventoryCounts).map(([name, count]) => `<button type="button" class="secondary" onclick="loadV2Inventory('${{name.replace('_','-')}}')">${{name}} (${{count}})</button>`).join(" ");
-    container.innerHTML = `<p>${{counts}}</p><table><thead><tr><th>${{v2InventoryKind}}</th></tr></thead><tbody>${{v2InventoryItems.map((item, index) => `<tr data-v2-inventory-row="${{index}}"><td><code>${{escapeHtml(JSON.stringify(item))}}</code></td></tr>`).join("")}}</tbody></table>`;
+    const selectedColumns = [...document.getElementById("v2-inventory-columns").selectedOptions].map(option => option.value);
+    const availableColumns = [...new Set(v2InventoryItems.flatMap(item => Object.keys(item)))];
+    const columns = (selectedColumns.length ? selectedColumns : availableColumns).filter(column => availableColumns.includes(column)).slice(0, 12);
+    container.innerHTML = `<p>${{counts}}</p><table><thead><tr>${{columns.map(column => `<th scope="col">${{escapeHtml(column)}}</th>`).join("")}}</tr></thead><tbody>${{v2InventoryItems.map((item, index) => `<tr data-v2-inventory-row="${{index}}">${{columns.map(column => `<td>${{escapeHtml(typeof item[column] === "object" ? JSON.stringify(item[column]) : (item[column] ?? ""))}}</td>`).join("")}}</tr>`).join("")}}</tbody></table>`;
     const next = document.getElementById("v2-inventory-next");
     next.hidden = !page.next_cursor;
     next.dataset.cursor = page.next_cursor || "";
@@ -1127,9 +1177,10 @@ async function saveV2InventoryView() {{
   if (!runId) {{ status.textContent = translations[language.value].v2_inventory_empty; return; }}
   const viewId = "dashboard-" + v2InventoryKind + "-" + runId.slice(0, 12);
   try {{
-    const response = await fetch("/v2/saved-views", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{id:viewId,name:"Dashboard " + v2InventoryKind,run_id:runId,kind:v2InventoryKind,limit:Number(document.getElementById("v2-inventory-limit").value)||100}})}});
+    const response = await fetch("/v2/saved-views", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{id:viewId,name:"Dashboard " + v2InventoryKind,run_id:runId,kind:v2InventoryKind,limit:Number(document.getElementById("v2-inventory-limit").value)||100,search:document.getElementById("v2-inventory-filter").value.trim(),sort_by:document.getElementById("v2-inventory-sort").value,descending:document.getElementById("v2-inventory-desc").checked}})}});
     if (!response.ok) throw new Error("HTTP " + response.status);
     status.textContent = "Saved view: " + viewId;
+    await loadSavedV2Views();
   }} catch (error) {{
     status.textContent = translations[language.value].v2_inventory_error + ": " + error.message;
   }}
@@ -1176,9 +1227,9 @@ async function runAll() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
   window.agentreadyV2Report = null;
   try {{
-    const geoFrame = await request("/scan/dashboard","POST",scanPayload(),true);
+    const geoFrame = await request("/v2/audit/dashboard","POST",scanPayload(),true);
     const geoText = geoFrame.srcdoc;
-    const seoFrame = await request("/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,language:language.value,checks:null,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true);
+    const seoFrame = await request("/v2/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,profile:document.getElementById("v2-profile").value,crawl:true,max_pages:selectedV2MaxPages(),language:language.value,checks:null,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value),limits:{{check_limit:Number(document.getElementById("check-limit").value)||0}}}},true);
     const combined = combinedReportDocument(geoText, seoFrame.srcdoc);
     renderReport(combined); setAiAvailability(true);
   }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
@@ -1186,13 +1237,13 @@ async function runAll() {{
 async function runSeo() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
   window.agentreadyV2Report = null;
-  try {{ await request("/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,language:language.value,checks:selectedChecks(),timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
+  try {{ await request("/v2/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,profile:document.getElementById("v2-profile").value,crawl:true,max_pages:selectedV2MaxPages(),language:language.value,checks:selectedChecks(),timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value),limits:{{check_limit:Number(document.getElementById("check-limit").value)||0}}}},true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
 async function runMobile() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
   window.agentreadyV2Report = null;
   console.info("Running mobile audit from dashboard", {{url:document.getElementById("url").value}});
-  try {{ await request("/mobile/audit/dashboard","POST",{{urls:[document.getElementById("url").value],language:language.value,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
+  try {{ await request("/v2/mobile/audit/dashboard","POST",{{urls:[document.getElementById("url").value],language:language.value,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
 async function runHealth() {{ try {{ await request("/healthz", "GET", null, false, true, translations[language.value].health_ok); }} catch (error) {{ showResult(); result.textContent = error.message; }} }}
 async function openAiCredentials() {{
@@ -1353,6 +1404,92 @@ function applyPrompt() {{
   updateAiModeHint();
   saveDashboardState();
 }}
+async function loadSavedV2Views() {{
+  const select = document.getElementById("v2-saved-view");
+  if (!select) return;
+  try {{
+    const response = await fetch("/v2/saved-views");
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const views = await response.json();
+    select.innerHTML = '<option value="">—</option>' + views.map(view => `<option value="${{escapeHtml(view.id)}}">${{escapeHtml(view.name)}}</option>`).join("");
+  }} catch (error) {{ console.warn("Unable to load saved views", {{error:String(error)}}); }}
+}}
+async function loadSavedV2View(viewId) {{
+  if (!viewId) return;
+  const response = await fetch("/v2/saved-views/" + encodeURIComponent(viewId));
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  const payload = await response.json();
+  const query = payload.query || {{}};
+  const kind = {{PageQuery:"pages",LinkQuery:"links",ResourceQuery:"resources",RedirectQuery:"redirects",FindingQuery:"findings",MetricQuery:"metrics"}}[query.query] || v2InventoryKind;
+  const filters = query.filters || {{}};
+  document.getElementById("v2-inventory-kind").value = kind;
+  document.getElementById("v2-inventory-filter").value = filters.search || "";
+  document.getElementById("v2-inventory-sort").value = filters.sort_by || "url";
+  document.getElementById("v2-inventory-desc").checked = Boolean(filters.descending);
+  loadV2Inventory(document.getElementById("v2-inventory-kind").value);
+}}
+async function deleteSavedV2View() {{
+  const viewId = document.getElementById("v2-saved-view").value;
+  if (!viewId) return;
+  const response = await fetch("/v2/saved-views/" + encodeURIComponent(viewId), {{method:"DELETE"}});
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  await loadSavedV2Views();
+}}
+async function exportSavedV2View() {{
+  const viewId = document.getElementById("v2-saved-view").value;
+  if (!viewId) return;
+  const response = await fetch("/v2/saved-views/" + encodeURIComponent(viewId) + "/export?format=json");
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  const payload = await response.json();
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([payload.content], {{type:"application/json"}}));
+  link.download = viewId + ".json";
+  link.click();
+  URL.revokeObjectURL(link.href);
+}}
+function selectedV2Urls() {{
+  return v2InventoryItems.map(item => item.url_key || item.url || item.source_key).filter(Boolean).slice(0, 100);
+}}
+async function compareV2Inventory() {{
+  const report = window.agentreadyV2Report;
+  const status = document.getElementById("v2-inventory-status");
+  if (!report) {{ status.textContent = translations[language.value].v2_inventory_empty; return; }}
+  const baseline = localStorage.getItem("agentready.dashboard.compare.v2");
+  if (!baseline) {{ localStorage.setItem("agentready.dashboard.compare.v2", JSON.stringify(report)); status.textContent = "Baseline saved"; return; }}
+  try {{
+    const response = await fetch("/v2/diff", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{request:{{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:selectedV2MaxPages()}},baseline:JSON.parse(baseline)}})}});
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    status.textContent = "Comparison complete";
+  }} catch (error) {{ status.textContent = translations[language.value].v2_inventory_error + ": " + error.message; }}
+}}
+async function rescanV2Selection() {{
+  const urls = selectedV2Urls();
+  const status = document.getElementById("v2-inventory-status");
+  if (!urls.length) {{ status.textContent = translations[language.value].v2_inventory_empty; return; }}
+  try {{
+    const report = window.agentreadyV2Report;
+    const response = await fetch("/v2/rescan", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:urls.length,selected_urls:urls,rescan_of:report && report.run ? report.run.id : null}})}});
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    status.textContent = "Rescan complete";
+  }} catch (error) {{ status.textContent = translations[language.value].v2_inventory_error + ": " + error.message; }}
+}}
+async function runV2InventoryJob() {{
+  const status = document.getElementById("v2-inventory-status");
+  try {{
+    const response = await fetch("/v2/jobs", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:selectedV2MaxPages()}})}});
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const job = await response.json(); window.v2InventoryJobId = job.job_id; status.textContent = "Job " + job.job_id + " started";
+  }} catch (error) {{ status.textContent = translations[language.value].v2_inventory_error + ": " + error.message; }}
+}}
+async function cancelV2InventoryJob() {{
+  const status = document.getElementById("v2-inventory-status");
+  if (!window.v2InventoryJobId) {{ status.textContent = "No active job"; return; }}
+  try {{
+    const response = await fetch("/v2/jobs/" + encodeURIComponent(window.v2InventoryJobId) + "/cancel", {{method:"POST"}});
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const job = await response.json(); status.textContent = "Job " + job.job_id + ": " + job.status;
+  }} catch (error) {{ status.textContent = translations[language.value].v2_inventory_error + ": " + error.message; }}
+}}
 function openPromptEditor() {{
   let dialog = document.getElementById("ai-prompt-edit-dialog");
   if (!dialog) {{
@@ -1390,6 +1527,7 @@ function setupPromptComposer() {{
   const row = document.createElement("div");
   row.className = "ai-prompt-composer-row";
   select.size = 1;
+  select.classList.remove("ai-hidden-compatible");
   select.title = translations[language.value].ai_prompt_library;
   select.setAttribute("aria-label", translations[language.value].ai_prompt_library);
   row.append(select);
@@ -1409,6 +1547,7 @@ function setupPromptComposer() {{
   row.append(edit);
   const management = document.createElement("div");
   management.className = "ai-prompt-management";
+  title.classList.remove("ai-hidden-compatible");
   title.classList.add("ai-prompt-edit-field");
   title.type = "text";
   title.placeholder = translations[language.value].ai_prompt_title;
@@ -1706,7 +1845,7 @@ let aiSessionUsage = {{prompt_tokens:0, completion_tokens:0, total_tokens:0, inp
 let aiConversationHistory = [];
 let aiAttachments = [];
 let aiLastUserMessage = "";
-const aiChatStateKey = "agentready.ai.chat.v1";
+const aiChatStateKey = "agentready.ai.chat.v2";
 function saveAiChatState() {{
   try {{
     localStorage.setItem(aiChatStateKey, JSON.stringify({{history:aiConversationHistory.slice(-40), usage:aiSessionUsage}}));
@@ -2133,8 +2272,10 @@ document.getElementById("ai-chat-search").addEventListener("input", event => {{
   console.info("[AI-UX] Saved chat search", {{hasQuery:Boolean(needle)}});
 }});
 document.getElementById("preset").onchange = () => {{ setAiAvailability(false); updatePresetHint(); loadChecks(); }};
+document.getElementById("v2-profile").addEventListener("change", syncV2ProfileBudget);
 updatePresetHint(); updateAiModeHint(); setAiAvailability(false); loadChecks(false);
 restoreReportState();
+loadSavedV2Views();
 refreshAiProviders().catch(error => console.warn("Unable to initialize AI providers", {{error:String(error)}}));
 loadAiTools();
 updateAiContextChips();

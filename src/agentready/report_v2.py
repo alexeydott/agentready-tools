@@ -7,9 +7,11 @@ import hashlib
 import io
 import json
 import logging
-from dataclasses import dataclass, field
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Iterable, Mapping
+from html import escape
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +40,8 @@ class AuditConfig:
         file_values: Mapping[str, Any] | None = None,
         environment: Mapping[str, str] | None = None,
         cli_values: Mapping[str, Any] | None = None,
-    ) -> "AuditConfig":
-        """Merge CLI over environment over legacy/current config file values."""
+    ) -> AuditConfig:
+        """Merge CLI over environment over previous/current config values."""
         file_values = file_values or {}
         environment = environment or {}
         cli_values = cli_values or {}
@@ -175,6 +177,18 @@ class AuditReport:
     evidence: tuple[FindingEvidence, ...] = ()
     run_id: str | None = None
 
+    @property
+    def score(self) -> int:
+        """Return a deterministic score for evaluated v2 findings."""
+        evaluated = [item for item in self.findings if item.status not in {FindingStatus.SKIP, FindingStatus.UNAVAILABLE}]
+        if not evaluated:
+            return 100
+        points = sum(
+            100 if item.status is FindingStatus.PASS else 50 if item.status is FindingStatus.WARN else 0
+            for item in evaluated
+        )
+        return round(points / len(evaluated))
+
     def to_dict(self) -> dict[str, Any]:
         result = {
             "schema": SCHEMA,
@@ -183,10 +197,47 @@ class AuditReport:
             "coverage": self.coverage.to_dict(),
             "evidence": [item.to_dict() for item in self.evidence],
             "findings": [item.to_dict() for item in self.findings],
+            "score": self.score,
         }
         if self.run_id is not None:
             result["run_id"] = self.run_id
         return result
+
+
+def render_audit_report(report: AuditReport, output_format: str = "json") -> str:
+    """Render the canonical v2 report without re-entering any scanner."""
+    payload = report.to_dict()
+    if output_format == "json":
+        return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+    if output_format == "console":
+        lines = [f"Audit: {report.target}", f"Score: {report.score}/100", ""]
+        lines.extend(
+            f"[{finding.status.value}] {finding.id}: {finding.reason}"
+            for finding in report.findings
+        )
+        return "\n".join(lines).rstrip() + "\n"
+    if output_format == "markdown":
+        lines = [f"# Audit report: {report.target}", "", f"Score: **{report.score}/100**", "", "## Findings", ""]
+        lines.extend(
+            f"- **{finding.status.value}** `{finding.id}` — {finding.reason}"
+            for finding in report.findings
+        )
+        return "\n".join(lines).rstrip() + "\n"
+    if output_format == "html":
+        rows = "".join(
+            "<tr><td>"
+            f"{escape(item.status.value)}</td><td>{escape(item.id)}</td><td>{escape(item.reason)}</td></tr>"
+            for item in report.findings
+        )
+        target = escape(report.target)
+        return (
+            "<!doctype html><html><head><meta charset=\"utf-8\"><title>AgentReady v2 report</title>"
+            "<style>body{font:16px system-ui;margin:2rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.5rem}</style>"
+            f"</head><body><h1>Audit report</h1><p>{target}</p><p>Score: {report.score}/100</p>"
+            f"<table><thead><tr><th>Status</th><th>ID</th><th>Reason</th></tr></thead><tbody>{rows}</tbody></table>"
+            "</body></html>\n"
+        )
+    raise ValueError(f"unsupported audit format: {output_format}")
 
 
 def report_from_checks(target: str, checks: Iterable[Any]) -> AuditReport:
@@ -236,24 +287,6 @@ def report_from_dict(payload: Mapping[str, Any]) -> AuditReport:
     return AuditReport(payload["target"], findings, coverage, payload.get("version", REPORT_VERSION))
 
 
-def adapt_legacy_baseline(payload: Mapping[str, Any]) -> AuditReport:
-    """Convert a v1 report to a comparable v2-shaped baseline without guessing evidence."""
-    if payload.get("schema") not in {"agentready.audit.v1", "agentready.seo.v1"}:
-        raise ValueError("baseline is not a supported v1 report")
-    checks = payload.get("checks", ())
-    findings = tuple(
-        Finding(
-            item.get("id", "legacy"),
-            item.get("title", item.get("id", "legacy")),
-            FindingStatus("unavailable" if item.get("status") == "error" else item.get("status", "unavailable")),
-            item.get("details", "legacy baseline"),
-        )
-        for item in checks
-        if isinstance(item, Mapping)
-    )
-    return AuditReport(payload.get("target", ""), findings, Coverage(len(findings), len(findings), len(findings), 0))
-
-
 @dataclass(frozen=True, slots=True)
 class BaselineDiff:
     comparable: bool
@@ -301,10 +334,9 @@ def classify_finding_changes(
         if old_state_hash is None and old_fingerprint is not None and old_fingerprint == current.fingerprint:
             unchanged.append(finding_id)
             continue
-        if old_state_hash is None and old_fingerprint is None:
-            if old_item.get("status") == current.status.value:
-                unchanged.append(finding_id)
-                continue
+        if old_state_hash is None and old_fingerprint is None and old_item.get("status") == current.status.value:
+            unchanged.append(finding_id)
+            continue
         before = severity.get(str(old_item.get("status", "unavailable")), 1)
         after = severity.get(current.status.value, 1)
         if after > before:

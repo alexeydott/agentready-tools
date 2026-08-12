@@ -79,7 +79,7 @@ async def check_rendered_layout_overflow_async(url: str, pool: BrowserPoolBounda
     )
     remediation = _remediation(
         "Fix content wider than the mobile viewport so no horizontal scrolling is required.",
-        f"agentready mobile audit {url!r} --render",
+        f"agentready audit {url!r} --mode mobile --render",
         [_GOOGLE_MOBILE],
     ) if overflow else None
     return _result("rendered-layout-overflow", "Rendered layout overflow", "layout", "fail" if overflow else "pass", True, detail, started, evidence, remediation)
@@ -121,7 +121,7 @@ async def check_rendered_tap_targets_async(url: str, pool: BrowserPoolBoundary) 
     )
     remediation = _remediation(
         "Increase tap target size to at least 48×48 CSS px and add spacing between adjacent targets.",
-        f"agentready mobile audit {url!r} --render",
+        f"agentready audit {url!r} --mode mobile --render",
         [_GOOGLE_TAP, _GOOGLE_MOBILE],
     ) if too_many_small else None
     return _result("rendered-tap-targets", "Rendered tap targets", "usability", "fail" if too_many_small else "pass", True, detail, started, evidence, remediation)
@@ -158,7 +158,7 @@ async def check_rendered_font_readability_async(url: str, pool: BrowserPoolBound
     detail = "computed font size is readable and user scaling is allowed" if ok else "; ".join(issues)
     remediation = _remediation(
         "Set base font size to at least 16 CSS px and allow user scaling.",
-        f"agentready mobile audit {url!r} --render",
+        f"agentready audit {url!r} --mode mobile --render",
         [_GOOGLE_MOBILE],
     ) if not ok else None
     return _result("rendered-font-readability", "Rendered font readability", "content", "pass" if ok else "fail", True, detail, started, evidence, remediation)

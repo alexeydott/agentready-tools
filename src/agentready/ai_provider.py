@@ -33,7 +33,7 @@ class AISchemaError(AIProviderError):
 
 
 class AIProvider(Protocol):
-    async def complete(self, *, system: str, user: str, model: str, language: str) -> "ProviderResult":
+    async def complete(self, *, system: str, user: str, model: str, language: str) -> ProviderResult:
         ...
 
 
@@ -239,7 +239,7 @@ class OpenAICompatibleProvider:
             owned_by = getattr(item, "owned_by", None)
             if owned_by is None and isinstance(item, dict):
                 owned_by = item.get("owned_by")
-            metadata = item if isinstance(item, dict) else getattr(item, "model_dump", lambda: {})()
+            metadata = item if isinstance(item, dict) else getattr(item, "model_dump", dict)()
             models.append(ProviderModel(model_id, model_capabilities(model_id, metadata), owned_by))
         models.sort(key=lambda item: item.id.lower())
         logger.info("Loaded AI model catalog count=%d source=%s", len(models), source)

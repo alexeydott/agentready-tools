@@ -1,18 +1,16 @@
+from agentready import __version__
 from agentready.checks import (
-    _decode_b64_json,
     _index_md_url,
     _parse_content_signal,
     _robots_user_agents,
     _valid_skill_entry,
 )
-from agentready import __version__
 from agentready.http import HttpClient
 from agentready.models import CheckResult
-from agentready.recommendations import generate_recommendations
-from agentready.remediation import remediation_for
 from agentready.registry import BY_ID
-from agentready.scoring import maturity_level, overall_score
+from agentready.remediation import remediation_for
 from agentready.scanner import detect_commerce
+from agentready.scoring import maturity_level, overall_score
 
 
 def row(cid: str, status: str, scored: bool = True, category: str = "x") -> CheckResult:
@@ -20,7 +18,7 @@ def row(cid: str, status: str, scored: bool = True, category: str = "x") -> Chec
 
 
 def test_content_signal():
-    ok, values, why = _parse_content_signal("search=yes, ai-input=yes, ai-train=no")
+    ok, values, _why = _parse_content_signal("search=yes, ai-input=yes, ai-train=no")
     assert ok and values["ai-train"] == "no"
     ok, _, _ = _parse_content_signal("ai-train=maybe")
     assert not ok

@@ -39,14 +39,14 @@ def test_dashboard_accessibility_foundation_is_localized_and_live():
     assert 'id="help-toggle"' in html and 'aria-controls="help-content"' in html
     assert '(visible ? helpContent : helpToggle).focus()' in html
     assert '<noscript><section class="noscript-notice"' in html
-    assert "agentready scan https://example.com --format html" in html
+    assert "agentready audit https://example.com --format html" in html
     assert "min-height:44px" in html
 
 
 def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
     for language, profile_hint, budget_label in (
-        ("en", "vNext bounded crawl", "vNext page limit"),
-        ("ru", "Ограниченный обход vNext", "Лимит страниц vNext"),
+        ("en", "Bounded crawl through the AuditService pipeline", "Page limit"),
+        ("ru", "Ограниченный обход через конвейер AuditService", "Лимит страниц"),
     ):
         html = render_dashboard(language)
 
@@ -55,17 +55,49 @@ def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
         assert budget_label in html
         assert 'id="v2-profile"' in html
         assert 'id="v2-max-pages"' in html
+        assert 'const v2ProfileDefaults' in html
+        assert 'Profile budget synchronized' in html
         assert 'id="v2-render"' in html
         assert 'profile:document.getElementById("v2-profile").value' in html
-        assert 'max_pages:Number(document.getElementById("v2-max-pages").value)' in html
+        assert 'max_pages:selectedV2MaxPages()' in html
+        assert '0 — полный обход' in html or '0 for a full same-origin crawl' in html
         assert 'render:document.getElementById("v2-render").checked' in html
+        assert 'crawl:true,max_pages:selectedV2MaxPages()' in html
         assert 'id="v2-inventory-panel"' in html
+        assert 'Сводка инвентаря' in html
+        assert 'Removed stale localized report' in html
         assert 'async function loadV2Inventory' in html
         assert '/v2/runs/" + encodeURIComponent(runId) + "/overview' in html
         assert 'id="v2-inventory-limit"' in html
         assert 'loadNextV2Inventory' in html
         assert 'filterV2Inventory' in html
         assert 'saveV2InventoryView' in html
+
+
+def test_dashboard_exposes_localized_unlimited_audit_check_limit():
+    for language, label, hint in (
+        ("en", "Audit check limit", "0 means all selected checks"),
+        ("ru", "Ограничение аудита — проверки", "0 — все выбранные проверки"),
+    ):
+        html = render_dashboard(language)
+        assert 'id="check-limit"' in html
+        assert label in html
+        assert hint in html
+        assert 'limits:{check_limit:Number(document.getElementById("check-limit").value) || 0}' in html
+
+
+def test_dashboard_localizes_inventory_kind_options():
+    html = render_dashboard("ru")
+    assert '<option value="links">Ссылки</option>' in html
+    assert '<option value="resources">Ресурсы</option>' in html
+    assert '<option value="findings">Проверки</option>' in html
+
+
+def test_dashboard_prompt_library_control_is_visible_after_composer_mount():
+    html = render_dashboard("ru")
+
+    assert 'select.classList.remove("ai-hidden-compatible")' in html
+    assert 'title.classList.remove("ai-hidden-compatible")' in html
 
 
 def test_dashboard_noscript_guidance_is_localized():
@@ -175,7 +207,7 @@ def test_dashboard_report_actions_are_shared_by_single_and_combined_exports():
     assert "function renderReport(reportText, persist=true)" in html
     assert html.count("createReportActions(reportText, frame)") == 2
     assert "renderReport(combined)" in html
-    assert "dashboardReportKey = \"agentready.dashboard.report.v1\"" in html
+    assert "dashboardReportKey = \"agentready.dashboard.report.v2\"" in html
     assert "boundedV2ReportForStorage" in html
     assert "window.agentreadyV2Report = state.v2Report || null" in html
     assert "state.preset !== \"v2\" || Boolean(window.agentreadyV2Report)" in html

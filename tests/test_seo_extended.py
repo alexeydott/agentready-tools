@@ -1,13 +1,17 @@
-from agentready.seo_checks import SEO_CHECKS_BY_ID, SeoHtmlParser
+from typing import ClassVar
+
+import pytest
+
 from agentready.agentfindings import build_findings
 from agentready.browser_pool import CapabilityUnavailableError
+from agentready.seo_checks import SEO_CHECKS_BY_ID, SeoHtmlParser
 from agentready.seo_crawler import (
     CRAWL_CHECK_METADATA,
     CrawledPage,
     check_broken_links,
     check_duplicate_metadata,
-    check_internal_nofollow,
     check_insecure_links_pages,
+    check_internal_nofollow,
     check_link_counts,
     check_redirect_chains,
     crawl_site,
@@ -150,7 +154,7 @@ def test_seo_ai_findings_include_page_or_resource_url():
 
     result = run_check("image-alt", '<img src="/img/problem.jpg">', "https://example.com/products")
     report = SeoReport(
-        schema="agentready.seo.v1",
+        schema="agentready.seo.v2",
         target="https://example.com/products",
         origin="https://example.com",
         checks=[result],
@@ -256,7 +260,6 @@ def test_crawl_site_stays_same_origin(monkeypatch):
             self.body = self.text.encode()
             self.redirected_from = []
 
-    from agentready import http as http_module
 
     class FakeHttpClient:
         def __init__(self, **kwargs):
@@ -276,6 +279,76 @@ def test_crawl_site_stays_same_origin(monkeypatch):
     pages = crawl_site("https://example.com/", max_pages=5)
     assert all(page.url.startswith("https://example.com") for page in pages)
     assert len(pages) == 2  # start + /internal, external link not followed
+
+
+@pytest.mark.xfail(strict=True, reason="WP2: legacy crawler must preserve trailing-slash URL identity")
+def test_legacy_crawler_preserves_trailing_slash_identity(monkeypatch):
+    class CrawlResponse:
+        def __init__(self, url):
+            self.url = url
+            self.status_code = 200
+            self.content_type = "text/html"
+            self.text = "<title>Slash</title>"
+            self.body = self.text.encode()
+            self.redirected_from = []
+
+    class FakeHttpClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def get(self, url):
+            return CrawlResponse(url)
+
+    monkeypatch.setattr("agentready.seo_crawler.HttpClient", FakeHttpClient)
+    pages = crawl_site("https://example.com/foo/", max_pages=1)
+    assert pages[0].url == "https://example.com/foo/"
+
+
+@pytest.mark.xfail(strict=True, reason="WP2: resolve legacy links against the final response URL")
+def test_legacy_crawler_resolves_relative_links_from_redirected_response(monkeypatch):
+    seen: list[str] = []
+
+    class CrawlResponse:
+        def __init__(self, requested):
+            self.url = "https://example.com/dir/" if requested == "https://example.com/start" else requested
+            self.status_code = 200
+            self.content_type = "text/html"
+            self.text = '<a href="child">child</a>' if requested == "https://example.com/start" else "<title>Child</title>"
+            self.body = self.text.encode()
+            self.redirected_from = []
+
+    class FakeHttpClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def get(self, url):
+            seen.append(url)
+            return CrawlResponse(url)
+
+    monkeypatch.setattr("agentready.seo_crawler.HttpClient", FakeHttpClient)
+    crawl_site("https://example.com/start", max_pages=2)
+    assert seen == ["https://example.com/start", "https://example.com/dir/child"]
+
+
+@pytest.mark.xfail(strict=True, reason="WP2: internal nofollow must exclude external targets")
+def test_internal_nofollow_excludes_external_targets():
+    parser = SeoHtmlParser()
+    parser.feed('<a href="/internal" rel="nofollow">internal</a><a href="https://other.example/out" rel="nofollow">external</a>')
+    parser.close()
+    page = CrawledPage("https://example.com/", 200, parser, [], 1)
+    assert check_internal_nofollow([page], "https://example.com/").status == "pass"
 
 
 def test_rendered_crawl_reuses_one_browser_pool(monkeypatch):
@@ -310,7 +383,7 @@ def test_rendered_crawl_reuses_one_browser_pool(monkeypatch):
             return [{"href": "https://example.com/rendered", "nofollow": True}]
 
     class FakeBrowserPool:
-        instances = []
+        instances: ClassVar[list["FakeBrowserPool"]] = []
 
         def __init__(self, policy):
             self.started = 0

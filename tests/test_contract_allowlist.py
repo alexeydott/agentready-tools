@@ -1,6 +1,6 @@
 import ast
-from pathlib import Path
 import warnings
+from pathlib import Path
 
 
 def test_finding_evidence_status_contracts_use_explicit_allowlist():

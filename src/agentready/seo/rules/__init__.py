@@ -3,4 +3,4 @@
 from .builtin import SEO_ATOMIC_RULES
 from .models import AtomicFinding, RuleKind, SeoRuleSpec
 
-__all__ = ["AtomicFinding", "RuleKind", "SEO_ATOMIC_RULES", "SeoRuleSpec"]
+__all__ = ["SEO_ATOMIC_RULES", "AtomicFinding", "RuleKind", "SeoRuleSpec"]

@@ -1,5 +1,7 @@
 import time
 
+import pytest
+
 from agentready.jobs_v2 import AuditJobManager, JobStatus
 from agentready.report_v2 import (
     AuditConfig,
@@ -8,12 +10,12 @@ from agentready.report_v2 import (
     Finding,
     FindingEvidence,
     FindingStatus,
-    diff_reports,
     classify_finding_changes,
-    export_inventory,
-    adapt_legacy_baseline,
-    paginate_inventory,
     diff_inventory,
+    diff_reports,
+    export_inventory,
+    paginate_inventory,
+    render_audit_report,
 )
 
 
@@ -44,6 +46,19 @@ def test_report_fingerprint_and_diff_are_stable():
     }
 
 
+def test_html_report_escapes_target_and_finding_text():
+    report = AuditReport(
+        "https://example.test/?q=<script>",
+        (Finding("<rule>", "Rule", FindingStatus.FAIL, "<script>alert(1)</script>"),),
+        Coverage(1, 1, 1, 1),
+    )
+
+    rendered = render_audit_report(report, "html")
+
+    assert "&lt;script&gt;" in rendered
+    assert "<script>alert(1)</script>" not in rendered
+
+
 def test_finding_state_hash_ignores_localized_prose():
     first = Finding("rule", "Title EN", FindingStatus.FAIL, "Reason EN", (FindingEvidence("evidence", "EN", "https://example.test"),))
     second = Finding("rule", "Title RU", FindingStatus.FAIL, "Причина", (FindingEvidence("evidence", "RU", "https://example.test"),))
@@ -72,7 +87,7 @@ def test_classify_finding_changes_uses_state_hash_and_status_direction():
     assert changes["regressed"] == ("regress",)
 
 
-def test_legacy_baseline_without_state_hash_uses_fingerprint_compatibility():
+def test_baseline_without_state_hash_uses_fingerprint_compatibility():
     current = _report()
     baseline = {
         "schema": "agentready.audit.v2",
@@ -139,7 +154,7 @@ def test_classify_finding_changes_reports_resolved_added_removed_and_unchanged()
     assert changes["unchanged"] == ("stable",)
 
 
-def test_config_precedence_and_legacy_adapter():
+def test_config_precedence_rejects_legacy_adapter():
     config = AuditConfig.from_sources(
         target="https://example.com",
         file_values={"network": {"timeout": 4}, "preset": "content"},
@@ -148,8 +163,8 @@ def test_config_precedence_and_legacy_adapter():
     )
     assert config.timeout == 7
     assert config.preset == "content"
-    legacy = adapt_legacy_baseline({"schema": "agentready.audit.v1", "target": "https://example.com", "checks": []})
-    assert legacy.version == "v2"
+    with pytest.raises(ValueError, match="agentready.audit.v2"):
+        diff_reports(_report(), {"schema": "agentready.audit.v1", "target": "https://example.com", "findings": []})
 
 
 def test_inventory_pagination_and_exports():

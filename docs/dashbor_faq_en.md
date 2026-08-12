@@ -123,3 +123,11 @@ system credential store rather than in ordinary dashboard text.
 - [Getting Started](getting-started.md) — installation and first run
 - [Reporting](reporting.md) — report formats and evidence
 - [Configuration & CI](configuration-and-ci.md) — project settings
+# SEO marketer workspace
+
+The v2 inventory panel reuses the same bounded query contract as the API. Use
+Pages, Links, Resources, Redirects, Findings, or Metrics, then filter, sort,
+paginate, save, reopen, export, compare, rescan selected URLs, or cancel a
+long-running job. Partial crawls are explicitly uncertain outside observed
+coverage. Internal authority is a deterministic prioritization signal, not
+search-engine PageRank.

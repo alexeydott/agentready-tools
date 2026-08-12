@@ -6,7 +6,7 @@ import pytest
 
 from agentready.audit_core.store import MemorySiteStore, RunUrlRecord, RunUrlState
 from agentready.query_service import PageQuery, QueryService, RunUrlQuery
-from agentready.saved_views import SavedView, SavedViewRegistry
+from agentready.saved_views import SAVED_VIEW_SCHEMA, SavedView, SavedViewRegistry
 
 
 def test_saved_views_are_bounded_and_deterministically_listed():
@@ -77,3 +77,26 @@ def test_saved_view_export_preserves_filters_cursor_sorting_and_limit_in_json_an
 
     bounded = json.loads(registry.export("parsed-after-b", query_service, format="json", limit=1))
     assert [row["url_key"] for row in bounded] == ["https://example.test/c"]
+
+
+def test_saved_view_metadata_is_typed_and_bounded():
+    view = SavedView("pages", "Pages", PageQuery("run-1", status_code=404, title_contains="missing"))
+    metadata = view.to_dict()
+    assert metadata["query"] == "PageQuery"
+    assert metadata["filters"] == {"status_code": 404, "title_contains": "missing"}
+
+
+def test_saved_views_snapshot_restore_preserves_typed_query_and_rejects_unknown_schema():
+    registry = SavedViewRegistry()
+    registry.save(SavedView("pages", "Pages", PageQuery("run-1", status_code=404, cursor="a", limit=3)))
+    restored = SavedViewRegistry()
+    assert restored.restore(registry.snapshot()) == 1
+    query = restored.get("pages").query
+    assert query.status_code == 404
+    assert query.cursor == "a"
+    assert query.limit == 3
+    payload = json.loads(registry.snapshot()[0])
+    assert payload["schema"] == SAVED_VIEW_SCHEMA
+    payload["schema"] = "agentready.saved-view.v99"
+    with pytest.raises(ValueError, match="unsupported saved view schema"):
+        SavedView.from_dict(payload)

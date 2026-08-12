@@ -1,8 +1,8 @@
 """Bounded sitemap/crawl inventory reconciliation and export helpers."""
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
 from collections.abc import Mapping
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
@@ -114,8 +114,8 @@ def generate_sitemap_documents(
 
 
 def generate_sitemap_from_query(
-    query_service: "QueryService",
-    query: "QuerySpec",
+    query_service: QueryService,
+    query: QuerySpec,
     *,
     chunk_size: int = 50_000,
     limit: int = 100_000,

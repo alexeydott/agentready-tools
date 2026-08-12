@@ -30,9 +30,9 @@ src/
     robots.py                 # RFC 9309 and provider-specific robots policies
     sitemap.py                # Bounded secure sitemap/index parsing and scope
     seo/                      # Shared SEO evidence and atomic-rule engine
-    report_v2.py              # Additive v2 evidence/coverage report contract
+    report_v2.py              # Canonical v2 evidence/coverage report contract
     jobs_v2.py                # Bounded asynchronous audit jobs
-    compatibility.py          # v1/v2 compatibility manifest
+    compatibility.py          # v2 contract manifest
     fetcher.py                # Shared bounded fetch/storage boundary
     egress.py                 # Public-target egress policy
     interaction.py            # Offline semantic interaction findings
@@ -67,11 +67,11 @@ requirements.txt              # Runtime dependency pins
 | `src/agentready/jobs_v2.py` | Bounded asynchronous job lifecycle used by v2 endpoints. |
 | `src/agentready/dashboard.py` | Localized browser dashboard and client-side audit/AI interactions. |
 | `src/agentready/i18n.py` | Shared language normalization and EN/RU translation catalog. |
-| `src/agentready/mcp_server.py` | Optional MCP surface for scan operations. |
+| `src/agentready/mcp_server.py` | Optional MCP surface for canonical v2 audit, findings, remediation, mobile, and AI operations. |
 | `scripts/dashboard-interactive.py` | Headed Playwright/DevTools acceptance runner for dashboard, AI, persistence, and live-site checks. |
 | `src/agentready/agentfindings.py` | Agent-facing findings and remediation-plan builders for coding agents. |
-| `src/agentready/mobile_scanner.py` | Multi-page mobile-friendliness audit orchestration (`agentready mobile`). |
-| `src/agentready/seo_crawler.py` | Bounded same-origin crawler with cross-page SEO checks (`seo audit --crawl`). |
+| `src/agentready/mobile_scanner.py` | Multi-page mobile-friendliness audit orchestration (`agentready audit --mode mobile`). |
+| `src/agentready/seo_crawler.py` | Bounded same-origin crawler with cross-page SEO checks (`audit --mode seo --crawl`). |
 | `src/agentready/crawler.py` | v2 deterministic frontier, scope, coverage, and bounded async crawl engine. |
 | `src/agentready/audit_core/run_context.py` | Immutable run context and explicit lifecycle transitions. |
 | `src/agentready/audit_service.py` | Shared v2 AuditRequest/AuditService execution boundary. |
@@ -83,7 +83,7 @@ requirements.txt              # Runtime dependency pins
 | `src/agentready/browser_pool.py` | Optional one-process-per-run Playwright pool with shared egress interception. |
 | `src/agentready/robots.py` | RFC 9309 baseline, provider interpretation, and virtual robots simulation. |
 | `src/agentready/sitemap.py` | Bounded XML sitemap/index parser and ownership-aware scope classification. |
-| `src/agentready/seo/` | Shared page evidence, atomic SEO rules, fingerprints, and v1 aggregation adapter. |
+| `src/agentready/seo/` | Shared page evidence, atomic SEO rules, fingerprints, and v2 aggregation. |
 | `src/agentready/protocols/` | Versioned protocol profiles, passive document auditing, evidence locators, and agent/MCP adapters. |
 | `src/agentready/crawler_identity.py` | Crawler intent, observed/verified identity confidence, and provider evidence model. |
 | `src/agentready/interaction.py` | Offline accessibility-tree and semantic interaction findings. |
@@ -103,6 +103,7 @@ requirements.txt              # Runtime dependency pins
 | Integrations | `docs/integrations.md` | HTTP API and MCP usage. |
 | Safety | `docs/safety.md` | Network and commerce safety limits. |
 | Development | `docs/development.md` | Layout and validation commands. |
+| Yandex provider decision | `docs/yandex-provider-decision-2026-08-12.md` | Official-source provider scope, quotas, and deferral. |
 | Dashboard FAQ (RU) | `docs/dashbord_faq_ru.md` | Beginner guide to the dashboard in Russian. |
 | Dashboard FAQ (EN) | `docs/dashbor_faq_en.md` | Beginner guide to the dashboard in English. |
 | Changelog | `CHANGELOG.md` | Versioned change history. |
@@ -122,9 +123,10 @@ configuration and chat history may be restored from browser `localStorage`, but
 credential values are restored only as redacted OS-vault status metadata.
 Localized prompt edits carry a stable prompt ID and update only the selected
 language variant.
-The v2 dashboard preset is an `AuditService`-backed projection; completed
+The dashboard preset is an `AuditService`-backed v2 projection; completed
 v2 runs expose bounded typed inventory through the `/v2/runs/{run_id}/...`
-endpoints rather than arbitrary query parameters.
+endpoints rather than arbitrary query parameters. Product v1 routes, schemas,
+and MCP aliases are removed and must not be reintroduced.
 
 ## Agent Rules
 - Split shell workflows into explicit sequential commands instead of a single chained command when clarity or recovery matters.

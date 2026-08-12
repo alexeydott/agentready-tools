@@ -31,7 +31,6 @@ scoring:
 
 gates:
   min_score: 80
-  min_level: 3
   fail_on_checks: false
 
 report:
@@ -69,10 +68,11 @@ is created automatically.
 
 ## Discovery and Overrides
 
-- CLI auto-searches upward for `.agentready.yml` / `.agentready.yaml`.
-- CLI flags override config values.
-- Use explicit config: `--config ./ci/agentready.yml`
-- Disable discovery: `--no-config`
+- `.agentready.yml` / `.agentready.yaml` is used by configuration-aware
+  library, AI, and serve integrations. The canonical `audit` CLI takes its
+  bounded execution options explicitly so its request is reproducible from
+  the command line.
+- `agentready init` creates the documented configuration template.
 
 ## Indexing Integration Environment
 
@@ -93,36 +93,35 @@ CLI `--credentials` overrides `GOOGLE_APPLICATION_CREDENTIALS` for one command. 
 
 ## CI Gates
 
-The additive v2 audit surface uses the same bounded controls from CLI, API,
+The canonical v2 audit surface uses the same bounded controls from CLI, API,
 and MCP projections. `profile`, `max_pages`, `limits`, `include`, `exclude`,
 `render`, `provider`, and `language` are included in the deterministic
 execution plan; provider names describe optional enrichment capabilities and
 do not cause remote provider calls during the core crawl.
 
-Command-line gates without `--ci`:
+External provider jobs are separately bounded and opt-in. They can persist
+cached PageSpeed/GA4/GSC/URL Inspection observations with timestamps, but they
+cannot alter the deterministic audit score. Credentials remain CLI/OS-vault
+state and are not accepted by default HTTP/MCP audit requests.
+
+Canonical command-line gates:
 
 ```bash
-agentready scan https://example.com --min-score 80 --min-level 3
-```
-
-Use gate values from config:
-
-```bash
-agentready scan https://example.com --ci
+agentready audit https://example.com --mode readiness
 ```
 
 Additional options:
 
 ```bash
-agentready scan https://example.com --fail-on-checks
-agentready scan https://example.com --preset ai-search --ci --min-ai-search-score 80
+agentready audit https://example.com --mode readiness --fail-on-checks
+agentready audit https://example.com --mode readiness --preset ai-search
 ```
 
 ## Localization Controls
 
 ```bash
-agentready scan https://example.com --lang ru
-agentready scan https://example.com --language en
+agentready audit https://example.com --mode readiness --lang ru
+agentready audit https://example.com --mode readiness --language en
 ```
 
 Language applies to human-facing fields while stable machine identifiers remain unchanged.
@@ -132,3 +131,15 @@ Language applies to human-facing fields while stable machine identifiers remain 
 - [Reporting](reporting.md) — output files and dashboard behavior
 - [Checks & Methodology](checks-and-methodology.md) — scoring and maturity details
 - [GEO & IndexNow](geo-and-indexnow.md) — publisher commands and safety limits
+## Optional durable v2 serve history
+
+The HTTP server keeps bounded in-process history by default. Set
+`AGENTREADY_SERVE_SQLITE=1` and configure the serve data directory to enable
+the existing `SQLiteSiteStore` at `audit.sqlite3`; WAL transactions, schema
+migrations, interrupted-run recovery, and newer-schema rejection are then
+handled by the store. Back up the SQLite file while the server is stopped (or
+use a consistent SQLite backup), retain only the required audit window, and
+remove expired database files according to the deployment retention policy.
+Saved-view snapshots are stored as `saved-views.jsonl` beside the database;
+unknown snapshot schemas are rejected and logged without dropping valid
+records. Test a restore on a copy before replacing a production file.

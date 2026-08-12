@@ -4,7 +4,6 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 from . import __version__
-
 from .models import Evidence, Remediation
 
 SeoStatus = Literal["pass", "fail", "warn", "skip", "error"]
@@ -61,6 +60,18 @@ class SeoReport:
     finished_at: str
     language: str = "en"
     tool_version: str = __version__
+    run_id: str | None = None
+    config_hash: str | None = None
+    coverage: dict[str, Any] = field(default_factory=dict)
+    inventory: dict[str, Any] = field(default_factory=dict)
+    provider_freshness: dict[str, Any] = field(default_factory=dict)
+    comparison: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        # Keep legacy JSON golden/consumer shape when optional marketer
+        # projections are not populated; populated v2 runs emit them.
+        for key in ("run_id", "config_hash", "coverage", "inventory", "provider_freshness", "comparison"):
+            if payload.get(key) in (None, {}, []):
+                payload.pop(key, None)
+        return payload

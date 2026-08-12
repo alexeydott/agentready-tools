@@ -1,28 +1,33 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import json
+import logging
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html.parser import HTMLParser
+from typing import Any
 from urllib import robotparser
-from typing import Any, Callable
 from urllib.parse import urljoin, urlsplit
 
 import dns.exception
 import dns.resolver
 
-from .http import FetchError, Fetched, HttpClient
+from .http import Fetched, FetchError, HttpClient
 from .models import CheckResult, Evidence
-from .registry import BY_ID, CheckSpec
+from .registry import CheckSpec
 from .remediation import remediation_for
 from .structured_data import article_nodes as _article_nodes
 from .structured_data import node_types as _types
 from .structured_data import parse_jsonld_blocks
 from .target import Target, ip_is_non_public, resolved_ips
+
+logger = logging.getLogger(__name__)
 
 AI_BOTS = {
     "gptbot",
@@ -158,7 +163,7 @@ def check_sitemap(ctx: CheckContext, spec: CheckSpec) -> CheckResult:
             continue
         evidence.append(r.evidence("fetch sitemap"))
         body = r.text.lstrip().lower()
-        xmlish = body.startswith("<?xml") or body.startswith("<urlset") or body.startswith("<sitemapindex")
+        xmlish = body.startswith(("<?xml", "<urlset", "<sitemapindex"))
         ctype = r.content_type in {"application/xml", "text/xml", "application/rss+xml"} or r.content_type.endswith("+xml")
         if r.status_code == 200 and ctype and xmlish:
             return _result(spec, ctx.target.url, "pass", f"valid sitemap found at {r.url}", start, evidence)
@@ -172,7 +177,7 @@ def check_link_headers(ctx: CheckContext, spec: CheckSpec) -> CheckResult:
     except FetchError as exc:
         return _fetch_failure(spec, ctx, start, "fetch target for Link headers", exc)
     raw = r.headers.get("link", "")
-    relations = re.findall(r"<([^>]+)>\s*;[^,]*?\brel\s*=\s*(?:\"([^\"]+)\"|([^;,\s]+))", raw, flags=re.I)
+    relations = re.findall(r"<([^>]+)>\s*;[^,]*?\brel\s*=\s*(?:\"([^\"]+)\"|([^;,\s]+))", raw, flags=re.IGNORECASE)
     recognized: list[str] = []
     for href, quoted, bare in relations:
         rels = (quoted or bare).lower().split()
@@ -190,8 +195,14 @@ def check_dns_aid(ctx: CheckContext, spec: CheckSpec) -> CheckResult:
         ips = resolved_ips(ctx.target.hostname, ctx.target.port)
         if ips and all(ip_is_non_public(ip) for ip in ips):
             return _result(spec, ctx.target.url, "skip", "DNS-AID skipped for local/private target", start)
-    except Exception:
-        pass
+    except OSError as exc:
+        # DNS-AID is supplemental: resolver failures must not prevent the
+        # regular DNS record checks from running, but remain diagnosable.
+        logger.debug(
+            "DNS-AID private-target probe failed hostname=%s error=%s",
+            ctx.target.hostname,
+            type(exc).__name__,
+        )
     qname = f"_index._agents.{ctx.target.hostname.rstrip('.')}"
     findings: list[str] = []
     evidence: list[Evidence] = []
@@ -382,7 +393,7 @@ def check_mcp_card(ctx: CheckContext, spec: CheckSpec) -> CheckResult:
         and isinstance(info, dict)
         and isinstance(info.get("name"), str)
         and bool(info["name"].strip())
-        and (isinstance(transport, str) or isinstance(transport, dict))
+        and isinstance(transport, (str, dict))
     )
     detail = f"MCP server card for {info.get('name') if isinstance(info, dict) else '?'}" if ok else f"invalid MCP Server Card: {err or 'requires serverInfo.name and transport'}"
     return _result(spec, ctx.target.url, "pass" if ok else "fail", detail, start, [r.evidence("fetch MCP Server Card")])
@@ -533,7 +544,12 @@ def _decode_b64_json(value: str) -> Any | None:
     for decoder in (base64.b64decode, base64.urlsafe_b64decode):
         try:
             return json.loads(decoder(raw + padding).decode("utf-8"))
-        except Exception:
+        except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            logger.debug(
+                "x402 token decode attempt failed decoder=%s error=%s",
+                decoder.__name__,
+                type(exc).__name__,
+            )
             continue
     return None
 
@@ -562,7 +578,7 @@ def check_mpp(ctx: CheckContext, spec: CheckSpec) -> CheckResult:
     except FetchError as exc:
         return _fetch_failure(spec, ctx, start, "probe MPP resource without payment", exc)
     challenge = r.headers.get("www-authenticate", "")
-    ok = r.status_code == 402 and bool(re.search(r"(?:^|,)\s*Payment(?:\s|$)", challenge, flags=re.I))
+    ok = r.status_code == 402 and bool(re.search(r"(?:^|,)\s*Payment(?:\s|$)", challenge, flags=re.IGNORECASE))
     detail = "HTTP 402 Payment authentication challenge found" if ok else "expected HTTP 402 with WWW-Authenticate: Payment challenge"
     return _result(spec, ctx.target.url, "pass" if ok else "fail", detail, start, [r.evidence("probe MPP resource without payment", preview=False)])
 
@@ -834,9 +850,7 @@ def _author_is_linked(article: dict[str, Any], nodes: list[dict[str, Any]]) -> t
                     linked = True
         if person is not None:
             same_as = person.get("sameAs")
-            if isinstance(same_as, str) and same_as.strip():
-                has_same_as = True
-            elif isinstance(same_as, list) and any(isinstance(x, str) and x.strip() for x in same_as):
+            if isinstance(same_as, str) and same_as.strip() or isinstance(same_as, list) and any(isinstance(x, str) and x.strip() for x in same_as):
                 has_same_as = True
     return linked, has_same_as
 
@@ -847,7 +861,15 @@ def _robots_can_fetch(text: str, user_agent: str, url: str) -> bool:
     rp.parse(text.splitlines())
     try:
         return rp.can_fetch(user_agent, url)
-    except Exception:
+    except (KeyError, ValueError) as exc:
+        # A malformed robots document should not turn indexability into a
+        # hard failure; preserve the historical fail-open behavior and make
+        # the assumption visible to operators.
+        logger.warning(
+            "robots parser failed; allowing fetch user_agent=%s error=%s",
+            user_agent,
+            type(exc).__name__,
+        )
         return True
 
 
@@ -872,7 +894,7 @@ def check_search_indexability(ctx: CheckContext, spec: CheckSpec) -> CheckResult
     directives.extend(parser.meta_robots)
     if r.headers.get("x-robots-tag"):
         directives.append(r.headers["x-robots-tag"])
-    noindex = any(re.search(r"(?:^|[,;\s])noindex(?:$|[,;\s])", x, re.I) for x in directives)
+    noindex = any(re.search(r"(?:^|[,;\s])noindex(?:$|[,;\s])", x, re.IGNORECASE) for x in directives)
 
     canonicals = [urljoin(r.url, x) for x in parser.canonical_links]
     unique_canonicals = list(dict.fromkeys(canonicals))
@@ -1062,8 +1084,8 @@ def _parse_iso_date(value: Any) -> datetime | None:
         except ValueError:
             return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def _date_visible(value: str, parser: _HTMLAuditParser) -> bool:
@@ -1094,7 +1116,7 @@ def check_date_transparency(ctx: CheckContext, spec: CheckSpec) -> CheckResult:
     mod_raw = article.get("dateModified")
     pub = _parse_iso_date(pub_raw)
     mod = _parse_iso_date(mod_raw)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     pub_visible = _date_visible(str(pub_raw), parser) if isinstance(pub_raw, str) else False
     mod_visible = _date_visible(str(mod_raw), parser) if isinstance(mod_raw, str) else False
     evidence[0].metrics = {
@@ -1133,7 +1155,7 @@ def _intent_facets(headings: list[str]) -> set[str]:
         "troubleshooting": r"\b(troubleshoot|problem|error|doesn.?t work|ошибк|проблем|не работает|что делать)\w*",
         "comparison": r"\b(compare|comparison|versus|\bvs\b|сравнен|отличи|альтернатив)\w*",
     }
-    return {name for name, pattern in patterns.items() if re.search(pattern, joined, re.I)}
+    return {name for name, pattern in patterns.items() if re.search(pattern, joined, re.IGNORECASE)}
 
 
 def check_citation_readiness(ctx: CheckContext, spec: CheckSpec) -> CheckResult:
@@ -1149,10 +1171,10 @@ def check_citation_readiness(ctx: CheckContext, spec: CheckSpec) -> CheckResult:
     numeric_mentions = len(re.findall(r"(?<!\w)\d+(?:[.,]\d+)?(?:\s?(?:%|[$€£₽¥]|[A-Za-zА-Яа-я]{1,8}))?", visible))
     substantive = sum(len(p) >= 100 for p in parser.paragraphs)
     concrete_paragraphs = sum(
-        len(p) >= 80 and bool(re.search(r"\d|`|https?://|\b(?:if|when|requires?|limit|price|version|если|при|лимит|цена|верси)\w*", p, re.I))
+        len(p) >= 80 and bool(re.search(r"\d|`|https?://|\b(?:if|when|requires?|limit|price|version|если|при|лимит|цена|верси)\w*", p, re.IGNORECASE))
         for p in parser.paragraphs
     )
-    deictic = re.compile(r"^(?:this|that|these|those|it|they|above|below|here|there|это|этот|эта|эти|такой|такая|он|она|они|здесь|выше|ниже)\b", re.I)
+    deictic = re.compile(r"^(?:this|that|these|those|it|they|above|below|here|there|это|этот|эта|эти|такой|такая|он|она|они|здесь|выше|ниже)\b", re.IGNORECASE)
     self_contained = sum(len(p) >= 100 and not deictic.search(p.strip()) for p in parser.paragraphs)
     first = next((p.strip() for p in parser.paragraphs if len(p.strip()) >= 40), "")
     answer_first = bool(first and len(first) <= 600 and not first.endswith("?") and (re.search(r"\d", first) or len(first.split()) >= 8))
@@ -1234,6 +1256,12 @@ def run_check(ctx: CheckContext, spec: CheckSpec) -> CheckResult:
     try:
         return fn(ctx, spec)
     except Exception as exc:  # Defensive boundary: one audit must not abort the scan.
+        logger.exception(
+            "check execution failed check_id=%s target_host=%s error=%s",
+            spec.id,
+            ctx.target.hostname,
+            type(exc).__name__,
+        )
         return CheckResult(
             id=spec.id,
             title=spec.title,

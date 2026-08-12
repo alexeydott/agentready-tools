@@ -8,7 +8,12 @@ from datetime import datetime
 from .i18n import normalize_language
 from .mobile_i18n import mobile_detail, mobile_summary
 from .mobile_models import MobileReport
-from .report_components import render_category_card, render_check_cell, render_report_table, render_status_cell
+from .report_components import (
+    render_category_card,
+    render_check_cell,
+    render_report_table,
+    render_status_cell,
+)
 from .report_styles import BASE_REPORT_CSS
 
 _LABELS = {
@@ -116,7 +121,8 @@ def render_mobile_markdown(report: MobileReport, lang: str | None = None) -> str
         lines.append("|---|---|---|---|")
         for check in page.checks:
             title, category, _ = _localized_check(check.id, check.title, check.category, lang or report.language)
-            lines.append(f"| {labels.get(check.status, check.status)} | {category} | {title} (`{check.id}`) | {mobile_detail(check.details, lang or report.language).replace('|', '\\|')} |")
+            detail = mobile_detail(check.details, lang or report.language).replace("|", "\\|")
+            lines.append(f"| {labels.get(check.status, check.status)} | {category} | {title} (`{check.id}`) | {detail} |")
         lines.append("")
     lines.extend([f"## {labels['recommendations']}", ""])
     if report.recommendations:

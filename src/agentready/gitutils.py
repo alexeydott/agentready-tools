@@ -4,7 +4,7 @@ import html as html_lib
 import json
 import re
 import subprocess
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
@@ -48,8 +48,7 @@ def _run_git(repo: str | Path, args: list[str]) -> str:
         proc = subprocess.run(
             ["git", "-C", str(root), *args],
             check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             encoding="utf-8",
         )
@@ -76,7 +75,7 @@ def changed_files(repo: str | Path = ".", from_ref: str = "HEAD~1", to_ref: str 
 def _frontmatter_url(text: str, base_url: str) -> tuple[str | None, str | None]:
     if not text.startswith("---"):
         return None, None
-    m = re.match(r"^---\s*\n(.*?)\n---\s*(?:\n|$)", text, re.S)
+    m = re.match(r"^---\s*\n(.*?)\n---\s*(?:\n|$)", text, re.DOTALL)
     if not m:
         return None, None
     try:
@@ -97,13 +96,13 @@ def _html_canonical(text: str, base_url: str) -> tuple[str | None, str | None]:
     m = re.search(
         r"<link\b(?=[^>]*\brel\s*=\s*['\"]?canonical['\"]?)(?=[^>]*\bhref\s*=\s*['\"]([^'\"]+)['\"])[^>]*>",
         text,
-        re.I,
+        re.IGNORECASE,
     )
     if not m:
         m = re.search(
             r"<link\b(?=[^>]*\bhref\s*=\s*['\"]([^'\"]+)['\"])(?=[^>]*\brel\s*=\s*['\"]?canonical['\"]?)[^>]*>",
             text,
-            re.I,
+            re.IGNORECASE,
         )
     if not m:
         return None, None
@@ -180,8 +179,8 @@ def changed_urls_from_git(
 
 def _normalize_semantic(text: str, suffix: str) -> str:
     if suffix in {".md", ".mdx"}:
-        text = re.sub(r"^---\s*\n.*?\n---\s*(?:\n|$)", "", text, flags=re.S)
-        text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+        text = re.sub(r"^---\s*\n.*?\n---\s*(?:\n|$)", "", text, flags=re.DOTALL)
+        text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
     elif suffix in {".html", ".htm"}:
         text = re.sub(r"(?is)<(?:script|style|noscript|svg)\b.*?</(?:script|style|noscript|svg)>", " ", text)
         text = re.sub(r"(?is)<[^>]+>", " ", text)
@@ -249,7 +248,7 @@ def git_file_dates(path: str | Path, repo: str | Path = ".") -> tuple[str | None
 def _declared_dates(path: Path) -> tuple[str | None, str | None]:
     text = path.read_text(encoding="utf-8", errors="replace")
     if path.suffix.lower() in {".md", ".mdx"}:
-        m = re.match(r"^---\s*\n(.*?)\n---\s*(?:\n|$)", text, re.S)
+        m = re.match(r"^---\s*\n(.*?)\n---\s*(?:\n|$)", text, re.DOTALL)
         if not m:
             return None, None
         try:

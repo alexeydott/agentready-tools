@@ -5,12 +5,19 @@ import logging
 import httpx
 import pytest
 
-import agentready.google_indexing as google_indexing
-import agentready.indexnow as indexnow
+from agentready import google_indexing, indexnow
 from agentready.cli import main
 from agentready.google_indexing import GoogleIndexingError, get_metadata, publish_urls
-from agentready.indexnow import IndexNowError, build_payload, resolve_endpoint, submit_urls
-from agentready.structured_data import extract_jsonld_nodes, google_indexing_eligible_types
+from agentready.indexnow import (
+    IndexNowError,
+    build_payload,
+    resolve_endpoint,
+    submit_urls,
+)
+from agentready.structured_data import (
+    extract_jsonld_nodes,
+    google_indexing_eligible_types,
+)
 
 
 class FakeGoogleResponse:
@@ -301,8 +308,8 @@ def test_indexnow_cli_rejects_provider_endpoint_conflict(capsys):
 
 def test_google_inspect_url_eligibility_rejects_non_public_targets(monkeypatch):
     """inspect_url_eligibility must reject loopback / private targets, not just the initial URL."""
-    from agentready.google_indexing import GoogleIndexingError, inspect_url_eligibility
     from agentready import http as http_module
+    from agentready.google_indexing import GoogleIndexingError, inspect_url_eligibility
 
     class _PrivateRedirectClient:
         def __init__(self, **kwargs):
@@ -325,8 +332,8 @@ def test_google_inspect_url_eligibility_rejects_non_public_targets(monkeypatch):
 
 def test_google_inspect_url_eligibility_enforces_response_size_limit(monkeypatch):
     """inspect_url_eligibility must raise when the response exceeds the byte cap."""
-    from agentready.google_indexing import GoogleIndexingError, inspect_url_eligibility
     from agentready import http as http_module
+    from agentready.google_indexing import GoogleIndexingError, inspect_url_eligibility
 
     class _OversizedClient:
         def __init__(self, **kwargs):

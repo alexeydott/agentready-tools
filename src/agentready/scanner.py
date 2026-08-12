@@ -10,7 +10,13 @@ from .i18n import normalize_language
 from .models import ScanReport, utc_now_iso
 from .recommendations import generate_recommendations
 from .registry import selected_checks
-from .scoring import LEVEL_MODEL, ai_search_score, category_scores, maturity_level, overall_score
+from .scoring import (
+    LEVEL_MODEL,
+    ai_search_score,
+    category_scores,
+    maturity_level,
+    overall_score,
+)
 from .target import ensure_public_url, normalize_url, parse_target
 
 
@@ -23,7 +29,7 @@ def detect_commerce(html: str) -> list[str]:
         "commerce vocabulary": r"\b(?:add to cart|buy now|checkout|shopping cart)\b",
     }
     for label, pattern in patterns.items():
-        if re.search(pattern, lower, flags=re.I):
+        if re.search(pattern, lower, flags=re.IGNORECASE):
             signals.append(label)
     return signals
 
@@ -46,6 +52,7 @@ def scan(
     recommendation_limit: int = 10,
     config_source: str | None = None,
     language: str = "en",
+    client: HttpClient | None = None,
 ) -> ScanReport:
     started = utc_now_iso()
     language = normalize_language(language)
@@ -60,7 +67,9 @@ def scan(
             ensure_public_url(commerce)
     specs = selected_checks(preset, only, include, exclude)
 
-    with HttpClient(timeout=timeout, verify=verify_tls, allow_private=allow_private) as client:
+    owns_client = client is None
+    client = client or HttpClient(timeout=timeout, verify=verify_tls, allow_private=allow_private)
+    try:
         ctx = CheckContext(
             target=target,
             client=client,
@@ -85,6 +94,9 @@ def scan(
                 commerce_signals.extend(detect_commerce(homepage.text))
         except FetchError:
             pass
+    finally:
+        if owns_client:
+            client.close()
 
     score = overall_score(results)
     geo_score, geo_applicable = ai_search_score(results)

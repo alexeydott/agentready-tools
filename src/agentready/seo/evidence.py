@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from urllib.parse import urljoin
 
 from ..http import FetchError, HttpClient
+from ..page_parser import ParsedPage
 from ..seo_checks import SeoHtmlParser
 from ..structured_data import extract_jsonld_nodes
-from ..page_parser import ParsedPage
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def evidence_from_parsed_page(
     content_type: str,
     evidence_id: str | None = None,
 ) -> SeoPageEvidence:
-    """Project shared parsed facts into the legacy SEO evidence DTO."""
+    """Project shared parsed facts into the canonical SEO evidence DTO."""
     facts = page.facts
     if facts is None:
         raise ValueError("parsed page does not contain shared facts")

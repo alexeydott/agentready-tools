@@ -16,7 +16,7 @@ The HTTP client:
 For untrusted targets:
 
 ```bash
-agentready scan https://example.com --block-private
+agentready audit https://example.com --mode readiness
 ```
 
 The v2 crawler uses one bounded Fetcher/EgressPolicy boundary for HTTP and
@@ -34,7 +34,7 @@ Commerce checks (`x402`, `MPP`, `UCP`, `ACP`) inspect unauthenticated challenge 
 Example:
 
 ```bash
-agentready scan https://shop.example.com \
+agentready audit https://shop.example.com --mode readiness \
   --commerce-url https://api.example.com/paid-resource
 ```
 
@@ -54,6 +54,19 @@ agentready scan https://shop.example.com \
 - GA4/Search Console checks use a Google service account with read-only scopes (`analytics.readonly`, `webmasters.readonly`).
 - The JSON key is stored in the OS credential vault via `keyring`; it is never written to reports, logs, or API responses.
 - API/MCP analytics requests use the locally stored credential; there is no endpoint to upload or read credentials remotely.
+
+## External provider and crawl limits
+
+PageSpeed, GA4, GSC, and URL Inspection are enrichment providers, not scoring
+inputs. Provider jobs are explicitly requested, sample-bounded, timestamped,
+and report `not_requested`, `unavailable`, `timeout`, or quota states without
+pretending that missing data is a zero. Cached fixtures can be replayed through
+the v2 provider surface; credentials are never accepted in HTTP/MCP JSON.
+
+Internal link authority is a deterministic diagnostic metric over the observed
+crawl graph. It is not Google PageRank, Yandex ranking, or a promise of search
+visibility. Likewise, an orphan candidate means “not linked within known crawl
+and sitemap coverage”, not “the page is globally orphaned”.
 
 ## See Also
 

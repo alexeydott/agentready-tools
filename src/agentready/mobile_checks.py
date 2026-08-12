@@ -140,7 +140,7 @@ def check_viewport_meta(url: str, client: HttpClient) -> MobileCheckResult:
     detail = "viewport meta declares width=device-width and initial-scale" if ok else "viewport meta missing or incomplete (need width=device-width and initial-scale)"
     remediation = _remediation(
         "Add <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> to the page <head>.",
-        f"agentready mobile audit {url!r}",
+        f"agentready audit {url!r} --mode mobile",
         [_GOOGLE_VIEWPORT, _GOOGLE_MOBILE],
     ) if not ok else None
     return _result("viewport-meta", "Viewport meta tag", "configuration", "pass" if ok else "fail", True, detail, started, evidence, remediation)
@@ -163,7 +163,7 @@ def check_responsive_css(url: str, client: HttpClient) -> MobileCheckResult:
     detail = "responsive CSS signals found (media queries, relative units/flex/grid)" if ok else "no clear responsive CSS signals (media queries, relative units, flex/grid) detected"
     remediation = _remediation(
         "Use media queries, relative units (rem/em/%/vw) and flex/grid layouts instead of fixed pixel widths.",
-        f"agentready mobile audit {url!r}",
+        f"agentready audit {url!r} --mode mobile",
         [_GOOGLE_MOBILE],
     ) if not ok else None
     return _result("responsive-css", "Responsive CSS signals", "layout", "pass" if ok else "fail", True, detail, started, evidence, remediation)
@@ -187,7 +187,7 @@ def check_fixed_width_elements(url: str, client: HttpClient) -> MobileCheckResul
     detail = "no obvious fixed-width/table layout issues" if ok else "; ".join(issues)
     remediation = _remediation(
         "Avoid fixed pixel widths on images and table-based layouts; use max-width:100% and responsive tables.",
-        f"agentready mobile audit {url!r}",
+        f"agentready audit {url!r} --mode mobile",
         [_GOOGLE_MOBILE],
     ) if not ok else None
     return _result("fixed-width-elements", "Fixed-width elements", "layout", "pass" if ok else "warn", True, detail, started, evidence, remediation)
@@ -210,7 +210,7 @@ def check_touch_targets(url: str, client: HttpClient) -> MobileCheckResult:
     status = "warn" if dense else "pass"
     remediation = _remediation(
         "Ensure links, buttons and inputs are at least 48×48 CSS px with at least 8 px spacing between adjacent targets.",
-        f"agentready mobile audit {url!r}",
+        f"agentready audit {url!r} --mode mobile",
         [_GOOGLE_TAP, _GOOGLE_MOBILE],
     ) if dense else None
     return _result("touch-targets", "Touch target count", "usability", status, True, detail, started, evidence, remediation)
@@ -237,7 +237,7 @@ def check_font_readability(url: str, client: HttpClient) -> MobileCheckResult:
     detail = "font sizes appear readable and user scaling is allowed" if ok else "; ".join(issues)
     remediation = _remediation(
         "Use a base font size of at least 16 CSS px and allow user scaling (avoid user-scalable=no and maximum-scale=1).",
-        f"agentready mobile audit {url!r}",
+        f"agentready audit {url!r} --mode mobile",
         [_GOOGLE_FONT, _GOOGLE_MOBILE],
     ) if not ok else None
     return _result("font-readability", "Font readability", "content", "pass" if ok else "fail", True, detail, started, evidence, remediation)
@@ -257,7 +257,7 @@ def check_mobile_indexability(url: str, client: HttpClient) -> MobileCheckResult
     detail = "no mobile-blocking robots directives detected" if not blocked else "noindex/none directive detected"
     remediation = _remediation(
         "Remove noindex/none directives so the page can be indexed for mobile search.",
-        f"agentready mobile audit {url!r}",
+        f"agentready audit {url!r} --mode mobile",
         [_GOOGLE_MOBILE],
     ) if blocked else None
     return _result("mobile-indexability", "Mobile indexability", "configuration", "fail" if blocked else "pass", True, detail, started, evidence, remediation)

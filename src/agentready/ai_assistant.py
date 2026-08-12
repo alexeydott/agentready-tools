@@ -12,7 +12,6 @@ from .ai_models import (
     AssistantRequest,
     AssistantResponse,
     AssistantUsage,
-    ConversationMessage,
     EvidenceReference,
 )
 from .ai_prompts import build_prompts
@@ -147,4 +146,4 @@ def _bounded_metrics(value: Any, depth: int = 0) -> dict[str, Any]:
 
 
 def _empty_report(target: str | None) -> dict[str, Any]:
-    return {"schema": "agentready.scan.v1", "target": target or "", "checks": []}
+    return {"schema": "agentready.audit.v2", "target": target or "", "findings": []}

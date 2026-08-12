@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from . import __version__
@@ -30,7 +30,6 @@ class Remediation:
     rerun_command: str
     references: list[str] = field(default_factory=list)
     agent_prompt: str | None = None
-
 
 @dataclass(slots=True)
 class CheckResult:
@@ -104,10 +103,11 @@ class ScanReport:
     ai_search_score: int | None = None
     ai_search_applicable: int = 0
     tool_version: str = __version__
+    schema: str = "agentready.readiness-engine.v2"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()

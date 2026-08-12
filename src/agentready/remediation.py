@@ -53,11 +53,11 @@ def remediation_for(spec: CheckSpec, target: str) -> Remediation:
     prompt = (
         f"Improve this website for AI-agent readiness by fixing the `{spec.id}` audit. "
         f"{summary} Preserve existing human-facing behavior and security controls. "
-        f"After implementation, verify with: agentready scan {target!r} --only {spec.id}."
+        f"After implementation, verify with: agentready audit --mode readiness {target!r} --include {spec.id}."
     )
     return Remediation(
         summary=summary,
-        rerun_command=f"agentready scan {target!r} --only {spec.id}",
+        rerun_command=f"agentready audit --mode readiness {target!r} --include {spec.id}",
         references=refs,
         agent_prompt=prompt,
     )

@@ -10,6 +10,14 @@ from agentready.audit_service import AuditRequest, AuditService
 from agentready.crawler import CrawlCoverage, CrawlResult
 
 
+def test_audit_check_limit_is_bounded_and_zero_means_unlimited():
+    checks = [object(), object(), object()]
+    assert len(AuditService._apply_check_limit(checks, {"check_limit": 2})) == 2
+    assert AuditService._apply_check_limit(checks, {"check_limit": 0}) == checks
+    with pytest.raises(ValueError, match="check_limit"):
+        AuditService._apply_check_limit(checks, {"check_limit": 501})
+
+
 def _transport(page_count: int = 10) -> httpx.MockTransport:
     pages = {
         "https://example.test/": "".join(f'<a href="/page-{index}">page</a>' for index in range(page_count)),
@@ -66,6 +74,74 @@ def test_audit_service_ignores_non_http_links_without_aborting_crawl():
 
     assert result.crawl.coverage.fetched == 1
     assert result.crawl.coverage.failed == 0
+
+
+def test_audit_service_seo_mode_uses_shared_crawler_and_atomic_facts() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            content=(
+                b"<title>Canonical SEO page</title><meta name='robots' content='noindex'>"
+                b"<link rel='canonical' href='/preferred'><h1>Heading</h1>"
+            ),
+        )
+
+    result = AuditService().run(
+        AuditRequest(
+            target="https://example.test/",
+            mode="seo",
+            max_pages=5,
+            allow_private=True,
+            transport=httpx.MockTransport(handler),
+        )
+    )
+
+    assert result.seo_report is not None
+    assert result.seo_report.schema == "agentready.seo.v2"
+    assert result.crawl.coverage.fetched == 1
+    assert {check.id for check in result.seo_report.checks} >= {
+        "page-available",
+        "metadata",
+        "indexability",
+        "canonical",
+        "crawl-coverage",
+    }
+    assert next(check for check in result.seo_report.checks if check.id == "indexability").status == "fail"
+    assert result.seo_report.recommendations
+    assert all(check.remediation for check in result.seo_report.checks if check.status in {"fail", "warn", "error"})
+    assert result.to_dict()["request"]["mode"] == "seo"
+
+
+def test_audit_service_seo_mode_adds_site_wide_diagnostics() -> None:
+    pages = {
+        "https://example.test/": b'<title>Same</title><h1>Home</h1><a href="/de">de</a>',
+        "https://example.test/de": b'<title>Same</title><h1>Home</h1><a href="/">en</a>',
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/html"}, content=pages[str(request.url)])
+
+    result = AuditService().run(
+        AuditRequest(
+            target="https://example.test/",
+            mode="seo",
+            crawl=True,
+            max_pages=2,
+            allow_private=True,
+            transport=httpx.MockTransport(handler),
+        )
+    )
+    ids = {check.id for check in result.seo_report.checks}
+    assert {
+        "duplicate-metadata-site",
+        "duplicate-content-site",
+        "thin-content-site",
+        "heading-structure-site",
+        "canonical-consistency-site",
+        "hreflang-reciprocity-site",
+    } <= ids
+    assert next(check for check in result.seo_report.checks if check.id == "duplicate-metadata-site").status == "fail"
 
 
 def test_audit_service_profile_selection_changes_config_identity_deterministically():
@@ -153,6 +229,7 @@ def test_audit_request_fields_reach_canonical_execution_without_network(monkeypa
         provider="pagespeed-fixture",
         language="ru",
         allow_private=True,
+        run_rules=False,
     )
 
     result = AuditService().run(request)
@@ -177,6 +254,7 @@ def test_audit_request_fields_reach_canonical_execution_without_network(monkeypa
         "render": True,
         "provider": "pagespeed-fixture",
         "language": "ru",
+        "run_rules": False,
     }
     assert payload["run"]["config_hash"] == result.run.context.config_hash
     assert result.report.coverage.urls_fetched == 1
@@ -260,6 +338,34 @@ def test_audit_service_applies_include_and_exclude_scope_rules():
         "https://example.test/page-0",
         "https://example.test/page-2",
     }
+
+
+def test_audit_service_separates_check_ids_from_url_scope_rules(monkeypatch):
+    captured = {}
+
+    class FakeCrawler:
+        def __init__(self, scope, **kwargs):
+            captured["scope"] = scope
+
+        async def crawl(self):
+            return CrawlResult(
+                (),
+                CrawlCoverage(1, 0, 1, 1, 0, 0, False, False, False, True),
+            )
+
+    monkeypatch.setattr("agentready.audit_service.AsyncCrawler", FakeCrawler)
+    result = AuditService().run(
+        AuditRequest(
+            target="https://example.test/",
+            include=("robots-txt", "https://example.test/docs/*"),
+            exclude=("https://example.test/private",),
+            run_rules=False,
+            allow_private=True,
+        )
+    )
+    assert result.report.to_dict()["schema"] == "agentready.audit.v2"
+    assert captured["scope"].include_rules == ("https://example.test/docs/*",)
+    assert captured["scope"].exclude_rules == ("https://example.test/private",)
 
 
 def test_audit_service_selects_same_origin_urls_for_child_rescan():

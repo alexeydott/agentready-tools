@@ -4,11 +4,11 @@ import base64
 import json
 import threading
 import time
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from collections.abc import Callable
+from typing import Self
 from urllib.parse import parse_qs, urlparse
-
 
 MANIFEST_PATH = Path(__file__).with_name("manifest.json")
 
@@ -21,7 +21,7 @@ class _SiteLabHandler(BaseHTTPRequestHandler):
         return
 
     @property
-    def fixture(self) -> "SiteLabServer":
+    def fixture(self) -> SiteLabServer:
         return self.server.fixture  # type: ignore[attr-defined]
 
     def do_GET(self) -> None:
@@ -154,7 +154,7 @@ class SiteLabServer:
         host, port = self._httpd.server_address
         return f"http://{host}:{port}"
 
-    def start(self) -> "SiteLabServer":
+    def start(self) -> SiteLabServer:
         if self._thread is not None:
             raise RuntimeError("site-lab server is already started")
         self._thread = threading.Thread(
@@ -180,7 +180,7 @@ class SiteLabServer:
         suffix = f"?{query_keys}" if query_keys else ""
         self._request_logger(f"{method} {path}{suffix}")
 
-    def __enter__(self) -> "SiteLabServer":
+    def __enter__(self) -> Self:
         return self.start()
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:

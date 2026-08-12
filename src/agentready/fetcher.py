@@ -7,7 +7,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any, Protocol, Self
 from urllib.parse import urljoin, urlsplit
 
 import httpx
@@ -89,7 +89,7 @@ class FetchError(RuntimeError):
 class FetcherBoundary(Protocol):
     """Network collection contract exposed to crawler orchestration."""
 
-    async def __aenter__(self) -> "FetcherBoundary":
+    async def __aenter__(self) -> Self:
         ...
 
     async def __aexit__(self, *_: object) -> None:
@@ -131,7 +131,7 @@ class Fetcher:
         ] = {}
         logger.debug("[WP2.1] Fetcher initialized timeout=%s max_bytes=%d", timeout, self.policy.max_response_bytes)
 
-    async def __aenter__(self) -> "Fetcher":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *_: object) -> None:

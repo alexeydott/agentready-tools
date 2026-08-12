@@ -38,7 +38,7 @@ class UrlIdentity:
     fragment: str
 
     @classmethod
-    def parse(cls, value: str) -> "UrlIdentity":
+    def parse(cls, value: str) -> UrlIdentity:
         logger.debug("[WP1.2] parsing URL identity length=%d", len(value))
         if not value or not value.strip():
             raise ValueError("URL must not be empty")

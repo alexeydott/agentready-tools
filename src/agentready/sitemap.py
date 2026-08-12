@@ -4,9 +4,9 @@ from __future__ import annotations
 import gzip
 import io
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
-from collections.abc import Iterable
 from urllib.parse import urlsplit
 from xml.etree import ElementTree as ET
 

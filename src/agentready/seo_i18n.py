@@ -14,10 +14,12 @@ from .i18n import normalize_language
 
 # Remediation summaries / recommendation actions per check id.
 _SUMMARIES_RU: dict[str, str] = {
+    "page-available": "Убедитесь, что публичный URL отдаёт HTML с HTTP 200 без блокировки CDN, WAF или авторизацией.",
     "page-metadata": "Добавьте уникальный информативный title, meta description и один понятный H1.",
     "page-indexability": "Уберите случайные директивы noindex и оставьте страницу публично доступной для обхода.",
     "canonical": "Опубликуйте один canonical link, совпадающий с выбранным публичным URL, если нет осознанной стратегии дублей.",
     "robots-sitemap": "Опубликуйте корректный robots.txt и обнаруживаемую XML-карту сайта.",
+    "favicon": "Добавьте доступный favicon через link rel=\"icon\" и проверьте его HTTP-ответ.",
     "jsonld": "Исправьте синтаксис JSON-LD и проверьте итоговые структурированные данные.",
     "title-length": "Держите title в диапазоне 30–60 символов, чтобы он не обрезался и не был расплывчатым в выдаче.",
     "description-length": "Напишите meta description длиной 70–160 символов, обобщающее ценность страницы.",
@@ -43,6 +45,7 @@ _SUMMARIES_RU: dict[str, str] = {
     "insecure-links-pages": "Обновите HTTP-ссылки на всех обойдённых проблемных страницах до HTTPS-версий.",
     "ga-no-traffic": "Страница не получает измеряемого трафика; оцените её ценность, внутреннюю перелинковку и индексируемость.",
     "ga-bounce-rate": "Разберитесь, почему большинство визитов завершается отказом: несоответствие контента намерению, медленная загрузка или слабая перелинковка.",
+    "crawl-coverage": "Увеличьте лимит обхода или устраните ошибки загрузки, чтобы покрытие сайта было полным.",
     "ga-nonindexed-traffic": "Примите осознанное решение: индексировать страницу или скрыть её; трафик на noindex-страницу — сигнал смешанных намерений.",
     "gsc-no-clicks": "Улучшите сниппет (title/description) и позиции по запросам с показами без кликов.",
     "gsc-no-impressions": "Страница невидима в поиске; проверьте индексируемость, внутренние ссылки и покрытие sitemap.",
@@ -51,6 +54,10 @@ _SUMMARIES_RU: dict[str, str] = {
 
 # Detail-string translations: (regex, replacement template) evaluated in order.
 _DETAIL_PATTERNS_RU: list[tuple[str, Any]] = [
+    (r"^page is not HTTP 200 HTML$", "страница не является HTML с HTTP 200"),
+    (r"^Crawl classified as partial_limit; fetched (\d+) URL\(s\)\.$", lambda m: f"обход частичный: достигнут лимит страниц; загружено URL: {m.group(1)}"),
+    (r"^Crawl classified as partial_error; fetched (\d+) URL\(s\)\.$", lambda m: f"обход частичный: ошибки загрузки; загружено URL: {m.group(1)}"),
+    (r"^Crawl classified as complete_within_scope; fetched (\d+) URL\(s\)\.$", lambda m: f"обход завершён в пределах области; загружено URL: {m.group(1)}"),
     (r"^selected page returned HTTP 200 HTML$", "выбранная страница вернула HTTP 200 HTML"),
     (r"^HTTP (\d+)$", lambda m: f"HTTP {m.group(1)}"),
     (r"^expected HTML content type, got (.+)$", lambda m: f"ожидался HTML Content-Type, получено: {m.group(1)}"),
@@ -169,7 +176,7 @@ def seo_detail(text: str, lang: str) -> str:
     """Translate a scanner-generated SEO detail string for Russian reports."""
     if normalize_language(lang) != "ru":
         return text
-    if re.search(r"(?:timed out|timeout|connection|certificate|DNS|SSL|TLS|refused|unreachable)", text, re.I):
+    if re.search(r"(?:timed out|timeout|connection|certificate|DNS|SSL|TLS|refused|unreachable)", text, re.IGNORECASE):
         return "сетевая/протокольная ошибка: " + text
     return _translate_detail(text)
 

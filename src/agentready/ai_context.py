@@ -8,7 +8,7 @@ from typing import Any
 from .seo_i18n import seo_detail, seo_summary
 
 MAX_REPORT_BYTES = 2_000_000
-ALLOWED_SCHEMAS = {"agentready.seo.v1", "agentready.scan.v1", "agentready.audit.v2"}
+ALLOWED_SCHEMAS = {"agentready.audit.v2", "agentready.seo.v2", "agentready.mobile.v2"}
 
 
 class AIContextError(ValueError):
@@ -32,7 +32,7 @@ def load_report_file(path: str | Path) -> dict[str, Any]:
 
 
 def validate_report(report: dict[str, Any]) -> None:
-    schema = report.get("schema", "agentready.scan.v1")
+    schema = report.get("schema", "agentready.audit.v2")
     if schema not in ALLOWED_SCHEMAS:
         raise AIContextError("unsupported report schema")
     collection_key = "findings" if schema == "agentready.audit.v2" else "checks"
@@ -47,7 +47,7 @@ def project_report(report: dict[str, Any], *, mode: str, language: str, limit: i
     validate_report(report)
     if mode not in {"seo", "geo", "both"}:
         raise AIContextError("unsupported assistant mode")
-    schema = report.get("schema", "agentready.scan.v1")
+    schema = report.get("schema", "agentready.audit.v2")
     source_items = report["findings"] if schema == "agentready.audit.v2" else report["checks"]
     projected: dict[str, Any] = {
         "schema": schema,
@@ -55,6 +55,8 @@ def project_report(report: dict[str, Any], *, mode: str, language: str, limit: i
         "target": _short(report.get("target") or report.get("url"), 500),
         "score": report.get("score"),
         "coverage": report.get("coverage") if schema == "agentready.audit.v2" else None,
+        "inventory": _project_value(report.get("inventory", {})),
+        "provider_freshness": _project_value(report.get("provider_freshness", {})),
         "checks": [],
         "recommendations": [],
         "finding_groups": [],
@@ -81,9 +83,9 @@ def project_report(report: dict[str, Any], *, mode: str, language: str, limit: i
             "id": check_id,
             "status": status,
             "title": _short(str(check.get("title") or check_id), 200),
-            "details": seo_detail(details, language) if schema == "agentready.seo.v1" else details,
+            "details": seo_detail(details, language) if schema == "agentready.seo.v2" else details,
             "remediation": seo_summary(check_id, _short(str(remediation.get("summary") or ""), 500), language)
-            if schema == "agentready.seo.v1" else _short(str(remediation.get("summary") or ""), 500),
+            if schema == "agentready.seo.v2" else _short(str(remediation.get("summary") or ""), 500),
             "evidence": evidence,
         })
         if len(projected["checks"]) >= 500:
@@ -99,7 +101,7 @@ def project_report(report: dict[str, Any], *, mode: str, language: str, limit: i
                     str(recommendation.get("check_id") or ""),
                     _short(str(recommendation.get("action") or ""), 500),
                     language,
-                ) if schema == "agentready.seo.v1" else _short(str(recommendation.get("action") or ""), 500),
+                ) if schema == "agentready.seo.v2" else _short(str(recommendation.get("action") or ""), 500),
             })
     projected["finding_groups"] = [
         {"root": root, "check_ids": ids} for root, ids in sorted(group_ids.items())

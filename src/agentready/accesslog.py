@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Iterable, Mapping
 from urllib.parse import urlsplit, urlunsplit
 
 from .crawler_identity import (

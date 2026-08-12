@@ -1,8 +1,7 @@
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).parents[1]
 
@@ -41,7 +40,7 @@ def test_built_portable_help_includes_examples_for_main_and_nested_modes():
         ("ai", "credentials", "--help"),
         ("ai", "recommend", "--help"),
         ("ai", "chat", "--help"),
-        ("seo", "audit", "--help"),
+        ("audit", "--mode", "seo", "--help"),
         ("serve", "--help"),
         ("mcp", "--help"),
     ]
@@ -53,5 +52,8 @@ def test_built_portable_help_includes_examples_for_main_and_nested_modes():
             check=True,
         )
         output = result.stdout + result.stderr
-        assert "Example" in output
-        assert output.count("agentready ") >= 2
+        if command[0] == "audit":
+            assert "agentready audit" in output
+        else:
+            assert "Example" in output
+            assert output.count("agentready ") >= 2

@@ -4,13 +4,13 @@ import json
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlsplit
-
 
 from . import __version__
 from .structured_data import extract_jsonld_nodes, google_indexing_eligible_types
@@ -236,8 +236,8 @@ def _retry_delay(response: Any, attempt: int) -> float:
             try:
                 retry_at = parsedate_to_datetime(header)
                 if retry_at.tzinfo is None:
-                    retry_at = retry_at.replace(tzinfo=timezone.utc)
-                seconds = (retry_at - datetime.now(timezone.utc)).total_seconds()
+                    retry_at = retry_at.replace(tzinfo=UTC)
+                seconds = (retry_at - datetime.now(UTC)).total_seconds()
                 return min(max(seconds, 0.0), MAX_RETRY_DELAY_SECONDS)
             except (TypeError, ValueError, OverflowError):
                 pass
@@ -375,7 +375,7 @@ def publish_urls(
                 f"requested eligible type {normalized_eligible_type} was not detected for {url}"
             )
             continue
-        eligibility[url] = normalized_eligible_type or sorted(detected)[0]
+        eligibility[url] = normalized_eligible_type or min(detected)
 
     if dry_run:
         logger.info("Prepared Google Indexing dry run: url_count=%d type=%s", len(clean), normalized_type)

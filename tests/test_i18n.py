@@ -22,7 +22,7 @@ def sample_report(language: str = "ru") -> ScanReport:
         details="robots.txt must be HTTP 200 plain text and contain a User-agent directive",
         remediation=Remediation(
             summary="Publish /robots.txt as plain text with at least one User-agent directive; include your intended crawler policy explicitly.",
-            rerun_command="agentready scan 'https://example.com/' --only robots-txt",
+            rerun_command="agentready audit 'https://example.com/' --mode readiness --include robots-txt",
             references=["https://www.rfc-editor.org/rfc/rfc9309"],
             agent_prompt="old english prompt",
         ),

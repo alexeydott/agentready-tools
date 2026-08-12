@@ -1,8 +1,8 @@
 from agentready.audit_core import (
     Applicability,
+    Effort,
     EvaluationCompleteness,
     EvidenceRef,
-    Effort,
     FindingContract,
     FindingKey,
     FindingStateHash,
@@ -32,7 +32,7 @@ def test_finding_state_hash_ignores_localized_prose():
     assert english.value
 
 
-def test_finding_contract_projects_to_legacy_report_dto():
+def test_finding_contract_projects_to_canonical_report_dto():
     contract = FindingContract(
         key=FindingKey("metadata", "1", UrlIdentity.parse("https://example.test/")),
         state_hash=FindingStateHash("hash"),

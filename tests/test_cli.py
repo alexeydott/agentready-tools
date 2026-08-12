@@ -1,17 +1,20 @@
-from agentready.cli import build_parser
+import pytest
+
 from agentready import cli
+from agentready.cli import build_parser
+from agentready.report_v2 import AuditReport, Coverage
 
 
 def test_cli_help_includes_examples_for_top_level_modes():
     parser = build_parser()
     help_text = parser.format_help()
     for example in (
-        "agentready scan",
+        "agentready audit",
         "agentready checks",
         "agentready init",
         "agentready indexnow",
         "agentready google-indexing",
-        "agentready seo audit",
+        "agentready audit https://example.com --mode seo",
         "agentready geo",
         "agentready logs",
         "agentready serve",
@@ -20,9 +23,14 @@ def test_cli_help_includes_examples_for_top_level_modes():
         assert example in help_text
 
 
-def test_scan_help_includes_usage_examples():
-    command = next(action for action in build_parser()._actions if action.dest == "command")
-    assert "agentready scan" in command.choices["scan"].epilog
+def test_cli_rejects_removed_v1_commands():
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["scan", "https://example.com"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["seo", "audit", "https://example.com"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["mobile", "audit", "https://example.com"])
 
 
 def test_nested_cli_modes_include_usage_examples():
@@ -33,7 +41,6 @@ def test_nested_cli_modes_include_usage_examples():
         "google-indexing": ("publish", "status"),
         "geo": ("init-rules", "git-dates"),
         "logs": ("ai-bots",),
-        "seo": ("audit",),
     }
     for parent, children in nested.items():
         subparser = next(action for action in choices[parent]._actions if action.dest.endswith("command"))
@@ -98,7 +105,7 @@ def test_mcp_command_dispatches_to_mcp_server_with_host_port(monkeypatch):
         captured["host"] = host
         captured["port"] = port
 
-    import agentready.mcp_server as mcp_server
+    from agentready import mcp_server
 
     monkeypatch.setattr(mcp_server, "main", fake_main)
     args = type("Args", (), {"host": "127.0.0.1", "port": 9999})()
@@ -155,7 +162,7 @@ def test_audit_cli_maps_execution_fields_to_shared_request(monkeypatch, capsys):
     captured = {}
 
     class FakeResult:
-        report = type("Report", (), {"findings": ()})()
+        report = AuditReport("https://example.test", (), Coverage(0, 0, 0, 0))
 
         def to_dict(self):
             return {"schema": "agentready.audit.v2"}
@@ -203,13 +210,17 @@ def test_audit_cli_maps_execution_fields_to_shared_request(monkeypatch, capsys):
     assert request.language == "ru"
     import json
 
-    assert json.loads(capsys.readouterr().out) == {"schema": "agentready.audit.v2"}
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema"] == "agentready.audit.v2"
+    assert payload["score"] == 100
 
 
 def test_audit_cli_propagates_all_supported_profiles(monkeypatch, capsys):
     captured = []
 
     class FakeResult:
+        report = AuditReport("https://example.test", (), Coverage(0, 0, 0, 0))
+
         def to_dict(self):
             return {"schema": "agentready.audit.v2"}
 
@@ -231,11 +242,53 @@ def test_audit_cli_propagates_all_supported_profiles(monkeypatch, capsys):
     capsys.readouterr()
 
 
+def test_readiness_cli_renders_requested_v2_format_and_applies_score_gate(monkeypatch, capsys):
+    class FakeService:
+        def run(self, request):
+            return type(
+                "Result",
+                (),
+                {"report": AuditReport(
+                    "https://example.test",
+                    (),
+                    Coverage(0, 0, 0, 0),
+                )},
+            )()
+
+    monkeypatch.setattr(cli, "AuditService", FakeService)
+    args = build_parser().parse_args(
+        ["audit", "https://example.test", "--format", "markdown", "--min-score", "101"]
+    )
+    assert cli._cmd_audit(args) == 2
+    assert "min-score must be between 0 and 100" in capsys.readouterr().err
+
+    args = build_parser().parse_args(["audit", "https://example.test", "--format", "markdown"])
+    assert cli._cmd_audit(args) == 0
+    assert "# Audit report" in capsys.readouterr().out
+
+
+def test_audit_cli_forwards_selected_seo_checks(monkeypatch, capsys):
+    captured = {}
+
+    def fake_seo(url, **kwargs):
+        captured["checks"] = kwargs["checks"]
+        return type("Seo", (), {"score": 100})()
+
+    monkeypatch.setattr(cli, "audit_seo", fake_seo)
+    monkeypatch.setattr(cli, "render_seo", lambda report, output_format, language: "ok\n")
+    args = build_parser().parse_args(
+        ["audit", "https://example.test", "--mode", "seo", "--checks", "page-metadata"]
+    )
+    assert cli._cmd_audit(args) == 0
+    assert len(captured["checks"]) == 1
+    assert capsys.readouterr().out == "ok\n"
+
+
 def test_mcp_v2_maps_execution_fields_to_shared_request(monkeypatch):
     import pytest
 
     pytest.importorskip("mcp")
-    import agentready.mcp_server as mcp_server
+    from agentready import mcp_server
 
     captured = {}
 
@@ -278,7 +331,7 @@ def test_mcp_v2_propagates_all_supported_profiles(monkeypatch):
     import pytest
 
     pytest.importorskip("mcp")
-    import agentready.mcp_server as mcp_server
+    from agentready import mcp_server
 
     captured = []
 

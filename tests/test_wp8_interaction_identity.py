@@ -8,7 +8,11 @@ from agentready.crawler_identity import (
     observe_crawler,
     verify_crawler,
 )
-from agentready.interaction import InteractionApplicability, InteractionStatus, audit_accessibility_tree
+from agentready.interaction import (
+    InteractionApplicability,
+    InteractionStatus,
+    audit_accessibility_tree,
+)
 
 
 def test_accessibility_findings_keep_semantic_applicability() -> None:

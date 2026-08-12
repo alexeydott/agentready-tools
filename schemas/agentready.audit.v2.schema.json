@@ -3,7 +3,7 @@
   "$id": "https://agentready.dev/schemas/agentready.audit.v2.schema.json",
   "title": "AgentReady audit v2 contract",
   "type": "object",
-  "required": ["schema", "target", "version", "coverage", "evidence", "findings"],
+  "required": ["schema", "target", "version", "coverage", "evidence", "findings", "score"],
   "properties": {
     "schema": {
       "const": "agentready.audit.v2"
@@ -13,6 +13,15 @@
       "format": "uri"
     },
     "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "run_id": {
       "type": "string",
       "minLength": 1
     },
@@ -62,7 +71,20 @@
           "status": {"enum": ["pass", "fail", "warn", "skip", "unavailable"]},
           "reason": {"type": "string"},
           "fingerprint": {"type": "string"},
-          "evidence": {"type": "array"}
+          "state_hash": {"type": "string"},
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "summary"],
+              "properties": {
+                "id": {"type": "string"},
+                "summary": {"type": "string"},
+                "url": {"type": "string", "format": "uri"}
+              },
+              "additionalProperties": false
+            }
+          }
         },
         "additionalProperties": false
       }

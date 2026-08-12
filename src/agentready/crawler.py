@@ -6,30 +6,49 @@ import fnmatch
 import heapq
 import logging
 import time
-from datetime import datetime, timezone
-from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from urllib.parse import urldefrag, urljoin, urlsplit
 
-from .audit_core.store import PageRecord, RunRecord, RunUrlRecord, RunUrlState, SiteStore
-from .audit_core.run_context import AuditRunContext, RunCoordinator, RunState
+from .audit_core.run_context import (
+    AuditRunContext,
+    RunCoordinator,
+    RunSnapshot,
+    RunState,
+)
+from .audit_core.store import (
+    PageRecord,
+    RedirectFact,
+    RunRecord,
+    RunUrlRecord,
+    RunUrlState,
+    SiteStore,
+)
 from .audit_core.urls import UrlIdentity
 from .browser_pool import BrowserPool, BrowserPoolBoundary, BrowserPoolFactory
 from .egress import EgressPolicy
 from .fetcher import (
+    Fetcher,
+    FetcherBoundary,
+    FetcherFactory,
     FetchError,
     FetchErrorKind,
     FetchRequest,
     FetchResult,
     FetchTransport,
-    Fetcher,
-    FetcherBoundary,
-    FetcherFactory,
 )
 from .page_parser import ParsedPage, Representation, RepresentationSource, parse_page
 
 logger = logging.getLogger(__name__)
+
+
+def _locally_indexable(status_code: int, content_type: str, meta_robots: tuple[str, ...]) -> bool | None:
+    """Return the observable local indexability signal for an HTML response."""
+    if status_code != 200 or content_type not in {"text/html", "application/xhtml+xml"}:
+        return None
+    directives = " ".join(meta_robots).lower().replace(",", " ").split()
+    return "noindex" not in directives
 
 
 class CrawlItemState(StrEnum):
@@ -99,7 +118,7 @@ class CrawlScope:
     follow_links: bool = True
 
     @classmethod
-    def from_parts(cls, seeds: CrawlSeeds, policy: ScopePolicy) -> "CrawlScope":
+    def from_parts(cls, seeds: CrawlSeeds, policy: ScopePolicy) -> CrawlScope:
         return cls(seeds.urls, policy.allowed_origins, policy.include_rules, policy.exclude_rules)
 
     @property
@@ -378,7 +397,25 @@ class AsyncCrawler:
                     if time.monotonic() >= deadline:
                         deadline_hit = True
                     fetched += 1
+                    if self.store is not None:
+                        logger.debug(
+                            "crawl redirect projection run_id=%s source=%s hops=%d",
+                            run_id,
+                            _safe_log_url(item.url),
+                            len(response.redirect_records),
+                        )
+                        for hop in response.redirect_records:
+                            self.store.put_redirect(
+                                RedirectFact(
+                                    run_id,
+                                    hop.from_url,
+                                    hop.to_url,
+                                    hop.status_code,
+                                    hop.location_raw,
+                                )
+                            )
                     parsed: ParsedPage | None = None
+                    representation: Representation | None = None
                     if response.status_code == 200 and response.headers.get("content-type", "").split(";", 1)[0] in {"text/html", "application/xhtml+xml"}:
                         representation = Representation.from_body(
                             response.body,
@@ -446,7 +483,7 @@ class AsyncCrawler:
                                     resource.url,
                                     resource.resource_type,
                                     ordinal=resource.ordinal,
-                                    resolved_url=_normalize(urljoin(response.url, resource.url)),
+                                    resolved_url=_normalize_resource(urljoin(response.url, resource.url)),
                                     representation_id=resource.source_representation_id,
                                     element=resource.element,
                                     dom_path=resource.dom_path,
@@ -461,7 +498,44 @@ class AsyncCrawler:
                     pages[item.url] = CrawledPage(response.url, item.depth, response.status_code, parsed)
                     completed_items += 1
                     if self.store is not None:
-                        self.store.put_page(PageRecord(run_id, item.url, item.url, response.url, item.depth, response.status_code, response.headers.get("content-type")))
+                        facts = parsed.facts if parsed is not None else None
+                        canonical = (
+                            urljoin(response.url, facts.canonicals[0])
+                            if facts is not None and facts.canonicals
+                            else None
+                        )
+                        self.store.put_page(
+                            PageRecord(
+                                run_id,
+                                item.url,
+                                item.url,
+                                response.url,
+                                item.depth,
+                                response.status_code,
+                                response.headers.get("content-type"),
+                                title=parsed.title if parsed is not None else None,
+                                canonical=canonical,
+                                locally_indexable=(
+                                    _locally_indexable(
+                                        response.status_code,
+                                        response.headers.get("content-type", "").split(";", 1)[0],
+                                        facts.meta_robots if facts is not None else (),
+                                    )
+                                    if parsed is not None
+                                    else None
+                                ),
+                                content_hash=representation.body_hash if representation is not None else None,
+                                content=parsed.text if parsed is not None else None,
+                            )
+                        )
+                        logger.debug(
+                            "crawl page projection run_id=%s url=%s parsed=%s links=%d resources=%d",
+                            run_id,
+                            _safe_log_url(item.url),
+                            parsed is not None,
+                            len(facts.links) if facts is not None else 0,
+                            len(facts.resources) if facts is not None else 0,
+                        )
                 finally:
                     queue.task_done()
                     async with result_lock:
@@ -529,7 +603,7 @@ class AsyncCrawler:
         except Exception as exc:
             if coordinator is not None and coordinator.state is RunState.RUNNING:
                 coordinator.transition(RunState.FAILED, error_kind=type(exc).__name__)
-                persist_run_state(RunState.FAILED, finished_at=datetime.now(timezone.utc).isoformat())
+                persist_run_state(RunState.FAILED, finished_at=datetime.now(UTC).isoformat())
             logger.error(
                 "audit crawl failed run_id=%s error_kind=%s",
                 run_id,
@@ -581,6 +655,15 @@ class AsyncCrawler:
 def _normalize(url: str) -> str:
     value = urldefrag(url.strip())[0]
     return UrlIdentity.parse(value).normalized()
+
+
+def _normalize_resource(url: str) -> str | None:
+    """Normalize fetchable resource URLs while retaining data/blob references."""
+    scheme = urlsplit(url).scheme.lower()
+    if scheme not in {"http", "https"}:
+        logger.debug("[FIX:crawler-resource] skipped non-HTTP resource scheme=%s", scheme or "relative")
+        return None
+    return _normalize(url)
 
 
 def _origin(url: str) -> str:

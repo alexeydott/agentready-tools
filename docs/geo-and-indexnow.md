@@ -7,7 +7,7 @@
 Run dedicated GEO checks:
 
 ```bash
-agentready scan https://example.com/article/ --preset ai-search --lang ru
+agentready audit https://example.com/article/ --mode readiness --preset ai-search --lang ru
 ```
 
 The `all` preset includes the core GEO checks. Use the explicit flag when
@@ -15,7 +15,7 @@ making that intent visible in scripts or when preserving compatibility with
 older configuration:
 
 ```bash
-agentready scan https://example.com/article/ --preset all --with-ai-search --lang ru
+agentready audit https://example.com/article/ --mode readiness --preset ai-search --lang ru
 ```
 
 Reports can expose:

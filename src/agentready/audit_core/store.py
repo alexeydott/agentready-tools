@@ -8,12 +8,13 @@ import threading
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
 
 from agentready.security import SecretRedactor
+
 from .urls import UrlIdentity
 
 logger = logging.getLogger(__name__)
@@ -728,7 +729,7 @@ class SQLiteSiteStore:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _retained_content(content: str | None, retention: ContentRetention) -> str | None:

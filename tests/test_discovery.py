@@ -1,14 +1,15 @@
 import asyncio
-import pytest
-import httpx
 import gzip
+
+import httpx
+import pytest
 
 from agentready.crawler import CrawlConfig, CrawlScope
 from agentready.discovery import (
     CrawlSource,
     RobotsSitemapSource,
-    SitemapSource,
     SingleUrlSource,
+    SitemapSource,
     UrlListSource,
     discovery_plan_hash,
 )

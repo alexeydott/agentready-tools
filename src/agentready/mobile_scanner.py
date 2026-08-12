@@ -17,6 +17,8 @@ from .target import ensure_public_url, parse_target
 
 logger = logging.getLogger(__name__)
 
+MOBILE_SCHEMA = "agentready.mobile.v2"
+
 MobileCheck = type(MOBILE_RENDER_CHECKS[0]) if MOBILE_RENDER_CHECKS else object
 
 
@@ -58,7 +60,7 @@ async def _audit_page(
                     title=check.__name__.replace("check_", "").replace("_async", "").replace("_", " ").title(),
                     category="layout",
                     status="skip" if render_status == "playwright not installed" else "error",
-                    scored=False if render_status == "playwright not installed" else True,
+                    scored=render_status != "playwright not installed",
                     details=render_status,
                     duration_ms=0,
                 )
@@ -160,7 +162,7 @@ async def _audit_mobile_async(
         score, categories = score_mobile_checks(all_checks)
         recommendations = rank_mobile_recommendations(all_checks, limit=recommendation_limit)
         return MobileReport(
-            schema="agentready.mobile.v1",
+            schema=MOBILE_SCHEMA,
             targets=list(urls),
             pages=pages,
             score=score,

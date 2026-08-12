@@ -4,8 +4,13 @@ import ipaddress
 import httpx
 import pytest
 
-from agentready.egress import EgressPolicy, EgressPolicyError, PassivePublicContext, TrustedLocalCredentialContext
-from agentready.fetcher import FetchError, FetchErrorKind, FetchRequest, Fetcher
+from agentready.egress import (
+    EgressPolicy,
+    EgressPolicyError,
+    PassivePublicContext,
+    TrustedLocalCredentialContext,
+)
+from agentready.fetcher import Fetcher, FetchError, FetchErrorKind, FetchRequest
 from agentready.security import SecretRedactor
 
 

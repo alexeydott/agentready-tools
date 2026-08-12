@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import html
-from datetime import datetime
 import json
 import logging
+from datetime import datetime
 from typing import Any
 
 from .i18n import (
     SUPPORTED_LANGUAGES,
-    category_name,
     category_hint,
+    category_name,
     check_hint,
     check_title,
     detail_text,
@@ -24,18 +24,17 @@ from .i18n import (
 )
 from .models import ScanReport
 from .report_components import (
-    render_disclosure,
     render_category_card,
-    render_progress_bar,
-    render_remediation_block,
+    render_check_cell,
+    render_disclosure,
     render_recommendation_list,
+    render_remediation_block,
     render_report_navigation,
     render_report_table,
     render_report_toolbar,
     render_score_meter,
-    render_status_cell,
-    render_check_cell,
     render_section,
+    render_status_cell,
 )
 from .report_styles import BASE_REPORT_CSS
 
@@ -217,7 +216,6 @@ def _render_html_body(report: ScanReport, lang: str, generated: str, *, instance
         )
     category_cards: list[str] = []
     for cat in report.categories:
-        pct = cat.score or 0
         score_label = tr(lang, "n_a") if cat.score is None else f"{cat.score}%"
         label = f"{score_label} · {cat.passed}/{cat.applicable}"
         name = category_name(cat.category, lang)

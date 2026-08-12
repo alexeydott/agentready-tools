@@ -89,7 +89,7 @@ def check_ga_no_traffic(url: str, ctx: AnalyticsContext) -> SeoCheckResult:
         detail = "no GA4 sessions recorded for this page in the last 28 days"
         remediation = Remediation(
             summary="The page gets no measured traffic; review its value, internal linking and indexability.",
-            rerun_command=f"agentready seo audit {url!r} --ga-property {ctx.ga_property}",
+            rerun_command=f"agentready audit {url!r} --mode seo --ga-property {ctx.ga_property}",
             references=[_GA4_DOCS],
         )
         return _result("ga-no-traffic", "GA: page without traffic", "fail", detail, started, remediation=remediation)
@@ -109,7 +109,7 @@ def check_ga_bounce_rate(url: str, ctx: AnalyticsContext) -> SeoCheckResult:
     detail = f"GA4 bounce rate is {value:.0%}" + ("" if ok else f" (above {BOUNCE_RATE_THRESHOLD:.0%})")
     remediation = Remediation(
         summary="Investigate why most visits bounce: content-intent mismatch, slow load, or weak internal linking.",
-        rerun_command=f"agentready seo audit {url!r} --ga-property {ctx.ga_property}",
+            rerun_command=f"agentready audit {url!r} --mode seo --ga-property {ctx.ga_property}",
         references=[_GA4_DOCS],
     ) if not ok else None
     return _result("ga-bounce-rate", "GA: bounce rate", "pass" if ok else "warn", detail, started, remediation=remediation)
@@ -128,7 +128,7 @@ def check_gsc_no_clicks(url: str, ctx: AnalyticsContext) -> SeoCheckResult:
     detail = "page has recorded clicks in Search Console" if ok else f"page has impressions but zero clicks ({page_hits[0]['impressions']} impressions)"
     remediation = Remediation(
         summary="Improve the snippet (title/description) and ranking for queries that show impressions but no clicks.",
-        rerun_command=f"agentready seo audit {url!r} --gsc-site {ctx.gsc_site}",
+            rerun_command=f"agentready audit {url!r} --mode seo --gsc-site {ctx.gsc_site}",
         references=[_GSC_DOCS],
     ) if not ok else None
     return _result("gsc-no-clicks", "GSC: page without clicks", "pass" if ok else "fail", detail, started, evidence, remediation)
@@ -145,7 +145,7 @@ def check_gsc_no_impressions(url: str, ctx: AnalyticsContext) -> SeoCheckResult:
     detail = "page has impressions in Search Console" if ok else "page has no impressions in the last 28 days"
     remediation = Remediation(
         summary="The page is invisible in search; check indexability, internal links and sitemap coverage.",
-        rerun_command=f"agentready seo audit {url!r} --gsc-site {ctx.gsc_site}",
+            rerun_command=f"agentready audit {url!r} --mode seo --gsc-site {ctx.gsc_site}",
         references=[_GSC_DOCS],
     ) if not ok else None
     return _result("gsc-no-impressions", "GSC: page without impressions", "pass" if ok else "fail", detail, started, remediation=remediation)
@@ -157,8 +157,8 @@ def check_ga_nonindexed_traffic(url: str, ctx: AnalyticsContext) -> SeoCheckResu
     if not ctx.has_ga:
         return _skip("ga-nonindexed-traffic", "GA: non-indexable page with traffic", "GA4 property not configured", started)
     from .ga_gsc import ga_bounce_rate
-    from .seo_checks import check_indexability
     from .http import HttpClient
+    from .seo_checks import check_indexability
 
     with HttpClient() as client:
         indexability = check_indexability(url, client)
@@ -169,7 +169,7 @@ def check_ga_nonindexed_traffic(url: str, ctx: AnalyticsContext) -> SeoCheckResu
     detail = "page is not indexable" + (" but still receives traffic" if has_traffic else " and receives no traffic")
     remediation = Remediation(
         summary="Decide deliberately: index the page or keep it hidden; traffic to a noindex page signals mixed intent.",
-        rerun_command=f"agentready seo audit {url!r} --ga-property {ctx.ga_property}",
+            rerun_command=f"agentready audit {url!r} --mode seo --ga-property {ctx.ga_property}",
         references=[_GA4_DOCS],
     ) if not ok else None
     return _result("ga-nonindexed-traffic", "GA: non-indexable page with traffic", "pass" if ok else "warn", detail, started, remediation=remediation)
@@ -181,8 +181,8 @@ def check_gsc_nonindexed_impressions(url: str, ctx: AnalyticsContext) -> SeoChec
     if not ctx.has_gsc:
         return _skip("gsc-nonindexed-impressions", "GSC: non-indexable page with impressions", "Search Console site not configured", started)
     from .ga_gsc import gsc_pages_without_clicks
-    from .seo_checks import check_indexability
     from .http import HttpClient
+    from .seo_checks import check_indexability
 
     with HttpClient() as client:
         indexability = check_indexability(url, client)
@@ -194,7 +194,7 @@ def check_gsc_nonindexed_impressions(url: str, ctx: AnalyticsContext) -> SeoChec
     detail = "page is not indexable" + (" but still receives impressions" if has_impressions else " and has no impressions")
     remediation = Remediation(
         summary="A noindex page still earns impressions; align the indexing directive with the intended visibility.",
-        rerun_command=f"agentready seo audit {url!r} --gsc-site {ctx.gsc_site}",
+            rerun_command=f"agentready audit {url!r} --mode seo --gsc-site {ctx.gsc_site}",
         references=[_GSC_DOCS],
     ) if not ok else None
     return _result("gsc-nonindexed-impressions", "GSC: non-indexable page with impressions", "pass" if ok else "warn", detail, started, remediation=remediation)

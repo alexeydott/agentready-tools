@@ -11,6 +11,8 @@
 - **Maturity level** — sequential readiness tier from Level 0 through Level 5, calculated with the configured tier pass ratio.
 - **Remediation** — implementation guidance and an optional coding-agent prompt attached to an actionable audit result.
 - **Baseline** — prior JSON report used to detect check, score, or maturity regressions.
+- **v2 report** — the only supported public report contract, with typed findings,
+  evidence, coverage, stable identities, and bounded projections.
 - **Public-target mode** — network policy that rejects targets resolving to non-public IP addresses.
 
 ## Avoid

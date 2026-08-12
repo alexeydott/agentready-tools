@@ -10,7 +10,6 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 from . import __version__
-
 from .models import Evidence, Remediation
 
 MobileStatus = Literal["pass", "fail", "warn", "skip", "error"]

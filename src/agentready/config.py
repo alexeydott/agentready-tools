@@ -16,7 +16,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "checks": {"include": [], "exclude": []},
     "network": {"timeout": 5.0, "workers": 8, "verify_tls": True, "block_private": False},
     "content": {"content_url": None, "commerce_url": None, "verify_skill_digests": False},
-    "gates": {"min_score": None, "min_level": None, "min_ai_search_score": None, "fail_on_checks": False},
+    "gates": {"min_score": None, "fail_on_checks": False},
     "scoring": {"level_threshold": 0.8},
     "recommendations": {"max_items": 10},
     "report": {"language": "en"},
@@ -33,7 +33,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "model": "gpt-4o-mini",
         "base_url": "https://api.openai.com/v1",
         "credential_id": "openai-api-key",
-        "model": "gpt-4o-mini",
         "active_provider": "openai",
         "providers": [
             {
@@ -102,7 +101,7 @@ def load_config(path: str | Path | None = None, *, search: bool = True) -> tuple
     except yaml.YAMLError as exc:
         raise ValueError(f"invalid YAML in {selected}: {exc}") from exc
     if not isinstance(raw, dict):
-        raise ValueError(f"config root must be a mapping: {selected}")
+        raise TypeError(f"config root must be a mapping: {selected}")
     cfg = _deep_merge(DEFAULT_CONFIG, raw)
     raw_ai = raw.get("ai") if isinstance(raw.get("ai"), dict) else {}
     if "providers" not in raw_ai and ("base_url" in raw_ai or "credential_id" in raw_ai):
@@ -127,14 +126,8 @@ def validate_config(cfg: dict[str, Any]) -> None:
             raise ValueError(f"checks.{key} must be a list of check IDs")
     gates = cfg.get("gates") or {}
     min_score = gates.get("min_score")
-    min_level = gates.get("min_level")
     if min_score is not None and not (0 <= int(min_score) <= 100):
         raise ValueError("gates.min_score must be between 0 and 100")
-    if min_level is not None and not (0 <= int(min_level) <= 5):
-        raise ValueError("gates.min_level must be between 0 and 5")
-    min_geo = gates.get("min_ai_search_score")
-    if min_geo is not None and not (0 <= int(min_geo) <= 100):
-        raise ValueError("gates.min_ai_search_score must be between 0 and 100")
     language = str((cfg.get("report") or {}).get("language", "en")).lower()
     if language not in {"en", "ru"}:
         raise ValueError("report.language must be en or ru")
@@ -155,13 +148,13 @@ def validate_config(cfg: dict[str, Any]) -> None:
 
 def _validate_ai_config(ai: dict[str, Any]) -> None:
     if not isinstance(ai, dict):
-        raise ValueError("ai must be a mapping")
+        raise TypeError("ai must be a mapping")
     for key in ("enabled", "transport_enabled", "allow_loopback_http"):
         if not isinstance(ai.get(key, False), bool):
-            raise ValueError(f"ai.{key} must be a boolean")
+            raise TypeError(f"ai.{key} must be a boolean")
     for key in ("model", "credential_id", "api_mode", "response_mode", "language"):
         if not isinstance(ai.get(key), str) or not ai.get(key):
-            raise ValueError(f"ai.{key} must be a non-empty string")
+            raise TypeError(f"ai.{key} must be a non-empty string")
     if str(ai.get("language", "en")).lower() not in {"en", "ru"}:
         raise ValueError("ai.language must be en or ru")
     if ai.get("api_mode") not in {"chat_completions"}:
@@ -178,7 +171,7 @@ def _validate_ai_config(ai: dict[str, Any]) -> None:
         provider_ids: set[str] = set()
         for provider in providers:
             if not isinstance(provider, dict):
-                raise ValueError("ai.providers entries must be mappings")
+                raise TypeError("ai.providers entries must be mappings")
             provider_id = provider.get("id")
             if not isinstance(provider_id, str) or not AI_PROVIDER_ID.fullmatch(provider_id):
                 raise ValueError("ai.providers.id must contain only letters, numbers, dot, underscore, or hyphen")
@@ -251,8 +244,6 @@ content:
 
 gates:
   # min_score: 80
-  # min_level: 3
-  # min_ai_search_score: 80
   fail_on_checks: false
 
 scoring:
@@ -297,7 +288,7 @@ ai:
 
 
 def ai_provider_profiles(ai: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return normalized provider profiles, including legacy single-provider config."""
+    """Return normalized provider profiles, including single-provider config."""
     providers = ai.get("providers")
     if isinstance(providers, list) and providers:
         return [dict(provider) for provider in providers if isinstance(provider, dict)]
@@ -358,7 +349,7 @@ def save_ai_provider_config(
         providers.append(dict(provider))
     ai_raw = raw.setdefault("ai", {})
     if not isinstance(ai_raw, dict):
-        raise ValueError("ai must be a mapping")
+        raise TypeError("ai must be a mapping")
     ai_raw["providers"] = providers
     if active:
         ai_raw["active_provider"] = provider["id"]
@@ -388,11 +379,11 @@ def save_ai_provider_profiles(
     if selected.is_file():
         loaded = yaml.safe_load(selected.read_text(encoding="utf-8")) or {}
         if not isinstance(loaded, dict):
-            raise ValueError(f"config root must be a mapping: {selected}")
+            raise TypeError(f"config root must be a mapping: {selected}")
         raw = loaded
     ai_raw = raw.setdefault("ai", {})
     if not isinstance(ai_raw, dict):
-        raise ValueError("ai must be a mapping")
+        raise TypeError("ai must be a mapping")
     selected_provider = next(item for item in providers if item["id"] == active_provider)
     ai_raw["providers"] = [dict(item) for item in providers]
     ai_raw["active_provider"] = active_provider
@@ -424,7 +415,7 @@ def save_ai_enablement(
         raw = loaded
     ai_raw = raw.setdefault("ai", {})
     if not isinstance(ai_raw, dict):
-        raise ValueError("ai must be a mapping")
+        raise TypeError("ai must be a mapping")
     ai_raw["enabled"] = bool(enabled)
     ai_raw["transport_enabled"] = bool(enabled if transport_enabled is None else transport_enabled)
     merged = _deep_merge(DEFAULT_CONFIG, raw)

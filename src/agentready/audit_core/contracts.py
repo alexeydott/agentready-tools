@@ -76,7 +76,7 @@ class FindingStateHash:
         completeness: EvaluationCompleteness,
         evidence_ids: tuple[str, ...] = (),
         fact_ids: tuple[str, ...] = (),
-    ) -> "FindingStateHash":
+    ) -> FindingStateHash:
         payload = {
             "key": key.to_string(),
             "status": status.value,
@@ -107,7 +107,7 @@ class FindingContract:
             raise ValueError("finding priority must not be negative")
 
     def to_report_finding(self, *, title: str, reason: str, url: str | None = None) -> Any:
-        """Project canonical machine state into the legacy v2 report DTO."""
+        """Project canonical machine state into the v2 report DTO."""
         from ..report_v2 import Finding, FindingEvidence, FindingStatus
 
         status = (

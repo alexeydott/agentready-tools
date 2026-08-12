@@ -2,19 +2,24 @@ from __future__ import annotations
 
 import time
 
+from agentready.audit_core.store import (
+    MemorySiteStore,
+    RunRecord,
+    RunUrlRecord,
+    RunUrlState,
+)
 from agentready.metrics import (
     ExternalMetric,
     MetricKind,
     ProviderConfig,
-    ProviderStatus,
     ProviderJob,
     ProviderScheduler,
+    ProviderStatus,
     cached_result,
     evaluate_cross_facts,
     ga4_adapter,
     sample_cwv,
 )
-from agentready.audit_core.store import MemorySiteStore, RunRecord, RunUrlRecord, RunUrlState
 from agentready.query_service import QueryService
 
 
@@ -127,7 +132,7 @@ def test_provider_scheduler_selects_urls_and_persists_metrics():
         store=store,
     )
     assert results[0].status is ProviderStatus.AVAILABLE
-    assert list(store.iter_metrics("run-provider"))[0].value > 0
+    assert next(iter(store.iter_metrics("run-provider"))).value > 0
     assert ("run-provider", "provider:ga4:https://example.test/") in store._evidence
 
 

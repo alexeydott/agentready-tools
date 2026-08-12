@@ -11,6 +11,7 @@ from agentready.seo_analytics import (
     check_gsc_no_clicks,
     check_gsc_no_impressions,
 )
+from agentready.seo_models import SeoCheckResult
 
 URL = "https://example.com/page"
 
@@ -102,38 +103,53 @@ def test_analytics_metadata_is_localized():
 def test_audit_seo_runs_analytics_checks_when_configured(monkeypatch):
     from agentready import seo_scanner
 
-    monkeypatch.setattr("agentready.seo_scanner.parse_target", lambda url: type("T", (), {"url": url, "origin": "https://example.com"})())
-
-    class FakeClient:
-        def __init__(self, **kwargs):
-            pass
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            pass
-
-        def get(self, url, **kw):
-            raise RuntimeError("network must not be used in this test")
-
-    monkeypatch.setattr("agentready.seo_scanner.HttpClient", FakeClient)
-    monkeypatch.setattr("agentready.seo_scanner.score_checks", lambda checks: (0, []))
-    monkeypatch.setattr("agentready.seo_scanner.rank_recommendations", lambda checks, limit=10: [])
+    analytics = [
+        SeoCheckResult("ga-no-traffic", "GA", "analytics", "skip", False, "missing"),
+        SeoCheckResult("gsc-no-clicks", "GSC", "analytics", "skip", False, "missing"),
+    ]
+    fake_report = type("Report", (), {"checks": analytics})()
+    monkeypatch.setattr(
+        "agentready.audit_service.AuditService.run",
+        lambda self, request: type("Result", (), {"seo_report": fake_report})(),
+    )
 
     report = seo_scanner.audit_seo(URL, checks=[], ga_property="12345")
     analytics = [c for c in report.checks if c.category == "analytics"]
-    assert len(analytics) == 6
-    # GA checks run (error without real credentials is fine), GSC checks skip
+    assert len(analytics) == 2
     assert any(c.id == "ga-no-traffic" for c in analytics)
     assert any(c.id == "gsc-no-clicks" and c.status == "skip" for c in analytics)
+
+
+def test_public_seo_options_never_select_legacy_crawler(monkeypatch):
+    from agentready import seo_scanner
+
+    captured = {}
+
+    class FakeResult:
+        seo_report = type("Report", (), {})()
+
+    def fake_run(self, request):
+        captured["request"] = request
+        return FakeResult()
+
+    monkeypatch.setattr("agentready.audit_service.AuditService.run", fake_run)
+    seo_scanner.audit_seo(
+        "https://example.test/",
+        checks=[],
+        ga_property="12345",
+        gsc_site="https://example.test/",
+    )
+    request = captured["request"]
+    assert request.mode == "seo"
+    assert request.ga_property == "12345"
+    assert request.gsc_site == "https://example.test/"
 
 
 def test_cli_credentials_commands(monkeypatch, capsys):
     from agentready import cli
 
     monkeypatch.setattr("agentready.credentials.credential_status", lambda: {"configured": False, "source": None, "client_email": None})
-    args = type("Args", (), {"seo_command": "credentials", "action": "status", "path": None})()
-    assert cli._cmd_seo(args) == 0
+    args = type("Args", (), {"action": "status", "path": None})()
+    assert cli._cmd_credentials(args) == 0
     out = capsys.readouterr().out
     assert '"configured": false' in out

@@ -8,6 +8,7 @@ and reports only counts and property/site identifiers.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from .credentials import load_service_account_info
@@ -29,7 +30,7 @@ def _credentials(scopes: list[str]):
     if info is None:
         raise AnalyticsError(
             "GA/GSC credentials are not configured. Store a service account with "
-            "'agentready seo credentials set <file.json>' or set GOOGLE_APPLICATION_CREDENTIALS."
+            "'agentready credentials set <file.json>' or set GOOGLE_APPLICATION_CREDENTIALS."
         )
     try:
         from google.oauth2 import service_account
@@ -61,7 +62,12 @@ def ga_pages_without_traffic(ga_property: str, days: int = DEFAULT_RANGE_DAYS) -
     """
     client = _ga_client()
     try:
-        from google.analytics.data_v1beta.types import DateRange, Dimension, Metric, RunReportRequest
+        from google.analytics.data_v1beta.types import (
+            DateRange,
+            Dimension,
+            Metric,
+            RunReportRequest,
+        )
     except ImportError as exc:
         raise AnalyticsError("Install analytics extras: pip install 'agentready-tools[analytics]'") from exc
     request = RunReportRequest(
@@ -83,7 +89,14 @@ def ga_bounce_rate(ga_property: str, page: str, days: int = DEFAULT_RANGE_DAYS) 
     """GA4: bounce rate for one page path, or None when there is no data."""
     client = _ga_client()
     try:
-        from google.analytics.data_v1beta.types import DateRange, Dimension, Filter, FilterExpression, Metric, RunReportRequest
+        from google.analytics.data_v1beta.types import (
+            DateRange,
+            Dimension,
+            Filter,
+            FilterExpression,
+            Metric,
+            RunReportRequest,
+        )
     except ImportError as exc:
         raise AnalyticsError("Install analytics extras: pip install 'agentready-tools[analytics]'") from exc
     request = RunReportRequest(
@@ -119,9 +132,7 @@ def gsc_pages_without_impressions(site_url: str, days: int = DEFAULT_RANGE_DAYS)
 
 
 def _gsc_body(site_url: str, days: int) -> dict[str, Any]:
-    from datetime import date, timedelta
-
-    end = date.today()
+    end = datetime.now(UTC).date()
     start = end - timedelta(days=days)
     return {
         "startDate": start.isoformat(),

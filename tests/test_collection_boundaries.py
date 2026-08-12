@@ -6,10 +6,15 @@ import builtins
 from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Self
 
 import pytest
 
-from agentready.browser_pool import BrowserPool, BrowserPoolConfig, CapabilityUnavailableError
+from agentready.browser_pool import (
+    BrowserPool,
+    BrowserPoolConfig,
+    CapabilityUnavailableError,
+)
 from agentready.crawler import AsyncCrawler, CrawlConfig, CrawlScope
 from agentready.egress import EgressPolicy
 
@@ -38,7 +43,7 @@ def test_v2_crawler_keeps_playwright_boundary_in_browser_pool() -> None:
     assert "playwright" in _imports(ROOT / "src" / "agentready" / "browser_pool.py")
 
 
-def test_legacy_renderers_keep_playwright_boundary_in_browser_pool() -> None:
+def test_renderers_keep_playwright_boundary_in_browser_pool() -> None:
     for path in (
         ROOT / "src" / "agentready" / "mobile_render.py",
         ROOT / "src" / "agentready" / "seo_crawler.py",
@@ -83,7 +88,7 @@ class _FakeFetcher:
     def __init__(self, **_: object) -> None:
         pass
 
-    async def __aenter__(self) -> "_FakeFetcher":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *_: object) -> None:
@@ -91,7 +96,7 @@ class _FakeFetcher:
 
 
 class _FailingFetcher(_FakeFetcher):
-    async def __aenter__(self) -> "_FailingFetcher":
+    async def __aenter__(self) -> Self:
         raise RuntimeError("fetcher setup failed")
 
 

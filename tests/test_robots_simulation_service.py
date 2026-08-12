@@ -1,4 +1,9 @@
-from agentready.audit_core.store import MemorySiteStore, RunRecord, RunUrlRecord, RunUrlState
+from agentready.audit_core.store import (
+    MemorySiteStore,
+    RunRecord,
+    RunUrlRecord,
+    RunUrlState,
+)
 from agentready.query_service import QueryService
 from agentready.robots import RobotsSimulationService, parse_robots
 

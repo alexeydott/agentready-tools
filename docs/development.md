@@ -2,7 +2,7 @@
 
 # Development
 
-The current release is **0.10.0**. The package version, compatibility manifest,
+The current release is **0.12.0**. The package version, compatibility manifest,
 report defaults, and Win64 file metadata are synchronized from the same release
 change.
 
@@ -24,7 +24,7 @@ src/agentready/
   egress.py           public-target egress and redirect policy
   security.py         shared redaction and security helpers
   report.py           console/JSON/Markdown/HTML
-  report_v2.py        additive v2 report contract and evidence projection
+  report_v2.py        canonical v2 report contract and evidence projection
   audit_service.py    shared v2 application boundary and child-run lineage
   audit_core/         run lifecycle, canonical contracts, and Memory/SQLite store
   query_service.py    typed bounded inventory projections and pagination
@@ -36,20 +36,20 @@ src/agentready/
   custom_rules.py     bounded declarative extraction and debugger
   exports.py          bounded inventory formats and presentation branding
   jobs_v2.py          bounded asynchronous job lifecycle
-  compatibility.py    v1/v2 compatibility manifest and migration metadata
+  compatibility.py    v2 contract manifest
   gitutils.py         Git→URL mapping and publication-date audit
   indexnow.py         IndexNow key/verification/submission client
   accesslog.py        AI crawler access-log analysis
   geo_rules.py        project-policy template generator
   agentfindings.py    agent-facing findings/remediation-plan builders
-  seo_models.py       SEO report models (agentready.seo.v1)
+  seo_models.py       SEO report models (agentready.seo.v2)
   seo_checks.py       single-page SEO checks
   seo_crawler.py      bounded same-origin crawler + cross-page SEO checks
   seo_scoring.py      SEO score aggregation
   seo_recommendations.py  SEO recommendation ranking
   seo_report.py       SEO console/JSON/Markdown/HTML rendering
   seo_scanner.py      SEO audit orchestration
-  mobile_models.py    mobile report models (agentready.mobile.v1)
+  mobile_models.py    mobile report models (agentready.mobile.v2)
   mobile_checks.py    static mobile-friendliness checks
   mobile_render.py    optional Playwright-rendered mobile checks
   mobile_scoring.py   mobile score aggregation
@@ -176,12 +176,12 @@ python -m agentready.cli audit https://example.com --profile quick --max-pages 1
 - 0.8.0 introduced the v2 contract, bounded crawler, protocol profiles,
   independent SEO/mobile domains, jobs, diffs, exports, and compatibility
   metadata.
-- 0.8.1 preserved that v1-compatible surface and fixed combined dashboard
+- 0.8.1 fixed combined dashboard
   report composition, including report-local tooltip styles.
 - 0.9.0 hardens dashboard AI prompt localization/editing, browser persistence
   checks, module CLI execution, and synchronized release metadata.
-- 0.10.0 aligns the AI assistant workspace, prompt library, composer actions,
-  settings/model controls, and browser tooltip behavior while preserving v1/v2
+- 0.10.0 aligned the AI assistant workspace, prompt library, composer actions,
+  settings/model controls, and browser tooltip behavior while preserving the
   contracts. The user-facing architecture is documented in
   [Architecture](architecture.md).
 
@@ -189,5 +189,10 @@ python -m agentready.cli audit https://example.com --profile quick --max-pages 1
 
 - [Getting Started](getting-started.md) — install and first scan
 - [Reporting](reporting.md) — outputs and baselines
-- [Architecture](architecture.md) — runtime layers and compatibility boundaries
+- [Architecture](architecture.md) — runtime layers and v2 contract boundaries
 - [Configuration & CI](configuration-and-ci.md) — test gates and thresholds
+## WP6A scale budgets
+
+The opt-in scale suite is `AGENTREADY_SCALE_TESTS=1 pytest -q --import-mode=importlib tests/test_scale_budgets.py`. It uses deterministic synthetic Memory-store fixtures and records only operation, fixture size, duration, peak bytes, rows, and truncation. Provider/browser/network work is excluded.
+
+Local budget targets are 60 seconds wall time and 512 MiB peak memory per operation at 100k rows; 1k and 10k fixtures are smoke points for regression trends. The suite is skipped in the default fast regression run, but the deterministic fixture contract is always checked. Any budget regression must be fixed in the shared projection/query/graph/duplicate/export algorithm rather than in dashboard or transport adapters.

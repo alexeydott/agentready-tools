@@ -66,7 +66,7 @@ class AssistantError:
 
 @dataclass(slots=True)
 class AssistantResponse:
-    schema: str = "agentready.ai-assistant.v1"
+    schema: str = "agentready.ai-assistant.v2"
     operation: AssistantOperation = "recommend"
     mode: AssistantMode = "both"
     language: str = "en"

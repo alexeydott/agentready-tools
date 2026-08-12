@@ -26,7 +26,7 @@ def _capture_response(errors: list[str], response) -> None:
         return
     try:
         detail = response.text()[:300]
-    except Exception:
+    except (OSError, RuntimeError):
         detail = "response body unavailable"
     errors.append(f"response {response.status}: {response.url} detail={detail}")
 
@@ -53,14 +53,14 @@ def run(
         assert page.evaluate("typeof openAiCredentials") == "function"
         _check(page, "initial JavaScript handlers", lambda: None)
         page.evaluate(
-            """localStorage.setItem("agentready.dashboard.state.v1", JSON.stringify({
+            """localStorage.setItem("agentready.dashboard.state.v2", JSON.stringify({
                 url: "https://example.test/session",
                 "ai-message": "Restored session message",
                 language: "en"
             }))"""
         )
         page.evaluate(
-            """localStorage.setItem("agentready.ai.chat.v1", JSON.stringify({
+            """localStorage.setItem("agentready.ai.chat.v2", JSON.stringify({
                 history: [{role: "user", content: "Restored session message"}],
                 usage: {prompt_tokens: 3, completion_tokens: 2, total_tokens: 5}
             }))"""
@@ -70,8 +70,8 @@ def run(
         assert page.locator("#ai-message").input_value() == "Restored session message"
         assert "Restored session message" in page.locator("#ai-chat-history").inner_text()
         _check(page, "dashboard and chat localStorage restoration", lambda: None)
-        page.evaluate("localStorage.removeItem('agentready.dashboard.state.v1')")
-        page.evaluate("localStorage.removeItem('agentready.ai.chat.v1')")
+        page.evaluate("localStorage.removeItem('agentready.dashboard.state.v2')")
+        page.evaluate("localStorage.removeItem('agentready.ai.chat.v2')")
         if target:
             page.locator("#url").fill(target)
             page.evaluate("saveDashboardState()")
@@ -144,6 +144,22 @@ def run(
                 page.locator("#report-frame").wait_for(state="visible", timeout=180_000)
                 if profile == "v2":
                     assert "AgentReady v2 audit" in page.locator("#report-frame").get_attribute("srcdoc")
+                    _check(page, "v2 inventory load", lambda: page.locator('button[onclick="loadV2Inventory()"]') .click())
+                    page.wait_for_timeout(250)
+                    if page.locator("#v2-inventory tbody tr").count():
+                        _check(page, "v2 inventory column selection", lambda: page.locator("#v2-inventory-columns").select_option(["url", "status"]))
+                    _check(page, "v2 saved-view create", lambda: page.locator('button[onclick="saveV2InventoryView()"]') .click())
+                    page.wait_for_timeout(250)
+                    _check(page, "v2 saved-view reopen", lambda: page.evaluate("loadSavedV2Views()"))
+                    page.wait_for_timeout(250)
+                    if page.locator("#v2-saved-view option").count() > 1:
+                        page.locator("#v2-saved-view").select_option(index=1)
+                        page.wait_for_timeout(250)
+                        _check(page, "v2 saved-view export", lambda: page.evaluate("exportSavedV2View()"))
+                        _check(page, "v2 saved-view delete", lambda: page.evaluate("deleteSavedV2View()"))
+                    _check(page, "v2 compare baseline", lambda: page.evaluate("compareV2Inventory()"))
+                    _check(page, "v2 compare repeat", lambda: page.evaluate("compareV2Inventory()"))
+                    _check(page, "narrow viewport and keyboard focus", lambda: (page.set_viewport_size({"width": 390, "height": 844}), page.locator("#v2-inventory-filter").focus()))
                 if profile == "all":
                     report_frame = page.locator("#report-frame").content_frame
                     hint = report_frame.locator(".check-help").first
