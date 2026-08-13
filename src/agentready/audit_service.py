@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -53,6 +53,7 @@ class AuditRequest:
     crawl: bool = False
     recommendation_limit: int = 10
     mode: str = "readiness"
+    progress_callback: Callable[[dict[str, int | str]], None] | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         if not self.target.strip():
@@ -236,15 +237,20 @@ class AuditService:
             check_report = report_from_checks(target, self._apply_check_limit(list(rule_engine_report.checks), request.limits))
             crawler_transport = CachedHttpTransport(rule_client)
         try:
+            crawler_kwargs = {
+                "config": config,
+                "policy": policy,
+                "transport": crawler_transport,
+                "store": request.store,
+                "run_context": context,
+                "render": request.render,
+            }
+            if request.progress_callback is not None:
+                crawler_kwargs["progress_callback"] = request.progress_callback
             crawl = asyncio.run(
                 AsyncCrawler(
                     scope,
-                    config=config,
-                    policy=policy,
-                    transport=crawler_transport,
-                    store=request.store,
-                    run_context=context,
-                    render=request.render,
+                    **crawler_kwargs,
                 ).crawl()
             )
         finally:
@@ -316,15 +322,20 @@ class AuditService:
             execution_plan.config_hash[:12],
             request.crawl,
         )
+        crawler_kwargs = {
+            "config": profile.config,
+            "policy": policy,
+            "transport": request.transport,
+            "store": request.store,
+            "run_context": context,
+            "render": request.render,
+        }
+        if request.progress_callback is not None:
+            crawler_kwargs["progress_callback"] = request.progress_callback
         crawl = asyncio.run(
             AsyncCrawler(
                 scope,
-                config=profile.config,
-                policy=policy,
-                transport=request.transport,
-                store=request.store,
-                run_context=context,
-                render=request.render,
+                **crawler_kwargs,
             ).crawl()
         )
         checks: list[SeoCheckResult] = []

@@ -55,6 +55,12 @@ def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
         assert budget_label in html
         assert 'id="v2-profile"' in html
         assert 'id="v2-max-pages"' in html
+        assert 'id="crawl-progress"' in html
+        assert 'runV2Background' in html
+        assert 'function captureV2Report' in html
+        assert 'captureV2Report(html)' in html
+        assert 'agentready.dashboard.job.v2' in html
+        assert 'Service health checked without resetting audit progress' in html
         assert 'const v2ProfileDefaults' in html
         assert 'Profile budget synchronized' in html
         assert 'id="v2-render"' in html
@@ -83,7 +89,7 @@ def test_dashboard_exposes_localized_unlimited_audit_check_limit():
         assert 'id="check-limit"' in html
         assert label in html
         assert hint in html
-        assert 'limits:{check_limit:Number(document.getElementById("check-limit").value) || 0}' in html
+        assert 'selectedV2Limits()' in html
 
 
 def test_dashboard_localizes_inventory_kind_options():

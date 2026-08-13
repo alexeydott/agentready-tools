@@ -6,6 +6,7 @@ import fnmatch
 import heapq
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -251,6 +252,7 @@ class AsyncCrawler:
         render: bool = False,
         fetcher_factory: FetcherFactory | None = None,
         browser_pool_factory: BrowserPoolFactory | None = None,
+        progress_callback: Callable[[dict[str, int | str]], None] | None = None,
     ) -> None:
         self.scope = scope
         self.config = config or CrawlConfig()
@@ -264,6 +266,7 @@ class AsyncCrawler:
         self.render = render
         self.fetcher_factory = fetcher_factory or Fetcher
         self.browser_pool_factory = browser_pool_factory or BrowserPool
+        self.progress_callback = progress_callback
 
     async def crawl(self) -> CrawlResult:
         started = time.monotonic()
@@ -291,6 +294,8 @@ class AsyncCrawler:
 
         deadline = started + self.config.max_duration
         frontier = Frontier()
+        if self.progress_callback:
+            self.progress_callback({"phase": "crawl", "fetched": 0, "discovered": 0})
         for seed in sorted({_normalize(url) for url in self.scope.seeds.urls}):
             if frontier.add(CrawlItem(seed, 0)):
                 record_url(seed, RunUrlState.QUEUED, 0)
@@ -338,6 +343,8 @@ class AsyncCrawler:
                             record_url(item.url, RunUrlState.SKIPPED, item.depth)
                             continue
                         reserved_fetches += 1
+                        if self.progress_callback:
+                            self.progress_callback({"phase": "crawl", "fetched": fetched, "discovered": frontier.discovered, "queued": frontier.queued})
                     if time.monotonic() >= deadline:
                         deadline_hit = True
                         frontier.set_state(item.url, CrawlItemState.FAILED)
@@ -626,6 +633,8 @@ class AsyncCrawler:
             frontier_exhausted=frontier.queued == 0 and not deadline_hit,
         )
         ordered = tuple(pages[url] for url in sorted(pages))
+        if self.progress_callback:
+            self.progress_callback({"phase": "complete", "fetched": coverage.fetched, "discovered": coverage.discovered, "queued": coverage.queued_remaining})
         logger.info(
             "[WP4.1] crawl complete discovered=%d fetched=%d completed=%d skipped=%d failed=%d",
             coverage.discovered,

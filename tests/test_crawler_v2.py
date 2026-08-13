@@ -359,6 +359,43 @@ def test_crawler_propagates_run_id_to_fetch_and_store_records() -> None:
     asyncio.run(run())
 
 
+def test_crawler_depth_zero_keeps_start_page_resources_without_following_links() -> None:
+    async def run() -> None:
+        store = MemorySiteStore()
+        context = AuditRunContext.create(
+            "https://example.test/",
+            {"max_pages": 100, "max_depth": 0},
+            tool_version="test",
+            rule_catalog_version="rules-1",
+            run_id="run-depth-zero",
+        )
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                headers={"content-type": "text/html"},
+                content=b'<a href="/child">child</a><img src="/asset.png"><p>ok</p>',
+            )
+
+        result = await AsyncCrawler(
+            CrawlScope(("https://example.test/",), allowed_origins=("https://example.test",)),
+            config=CrawlConfig(max_pages=100, max_depth=0, min_request_interval_ms=0),
+            policy=EgressPolicy(allowed_origins=frozenset({"https://example.test"})),
+            transport=httpx.MockTransport(handler),
+            store=store,
+            run_context=context,
+        ).crawl()
+
+        assert result.coverage.fetched == 1
+        assert result.coverage.discovered == 1
+        assert len(result.pages) == 1
+        resources = list(store.iter_resource_occurrences("run-depth-zero"))
+        assert [resource.resource_url for resource in resources] == ["/asset.png"]
+        assert any(link.target_key.endswith("/child") for link in store.iter_link_occurrences("run-depth-zero"))
+
+    asyncio.run(run())
+
+
 def test_crawler_persists_redirect_inventory_from_fetch_result() -> None:
     from agentready.fetcher import FetchResult, RedirectHop
 

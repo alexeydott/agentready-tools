@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.13.1 — 2026-08-13
+
+### Background crawl progress and AI audit context
+
+- Added background v2 audit jobs with persisted progress, including crawl
+  phase, fetched URLs, discovered URLs, and queue state; progress survives a
+  dashboard reload and service-health checks no longer reset it.
+- Added configurable crawl depth. Deep profile with depth `0` inspects only
+  the start page and its same-origin resources; page limit `0` remains the
+  full same-origin crawl up to the shared 25,000-page safety cap.
+- Fixed dashboard-to-AI handoff: the completed v2 report is now extracted from
+  the background HTML response and passed to the AI chat instead of starting a
+  new default 25-page audit.
+- Added regression coverage for depth-zero resource inventory, background job
+  progress, report-context extraction, and rendered report restoration.
+
 ## 0.13.0 — 2026-08-13
 
 ### Full-site crawl and localized dashboard fixes

@@ -35,6 +35,8 @@ _TEXT = {
         "v2_max_pages_hint": "Maximum pages to fetch (1-25,000). Use 0 for a full same-origin crawl up to the server safety cap.",
         "v2_render": "Browser rendering",
         "v2_render_hint": "Render pages in a headless browser during the crawl. Slower, but captures client-rendered content.",
+        "v2_max_depth": "Crawl depth",
+        "v2_max_depth_hint": "0 checks the start page and its same-origin resources only; higher values follow same-origin links to that depth.",
         "profile_seo": "Independent SEO audit with optional same-origin crawl: metadata, indexability, links, canonical URL, robots/sitemap, favicon and JSON-LD.",
         "profile_mobile": "Mobile-friendliness audit based on Google Mobile-Friendly signals: viewport, responsive CSS, fixed widths, touch targets, font readability and indexability.",
         "language": "Language",
@@ -228,6 +230,8 @@ _TEXT = {
         "progress_start": "Preparing audit request",
         "progress_fetch": "Running website checks",
         "progress_render": "Rendering HTML report",
+        "progress_crawl": "Crawl: {fetched} fetched / {discovered} discovered",
+        "progress_crawl_phase": "Audit stage: {phase}",
         "progress_done": "Audit complete",
         "failed": "Audit failed",
         "no_url": "Enter a website URL first.",
@@ -273,6 +277,8 @@ _TEXT = {
         "v2_max_pages_hint": "Максимальное число страниц (1–25 000). 0 — полный обход в пределах безопасного серверного лимита.",
         "v2_render": "Браузерный рендеринг",
         "v2_render_hint": "Рендерить страницы в headless-браузере во время обхода. Медленнее, но захватывает контент, отрисованный на клиенте.",
+        "v2_max_depth": "Глубина обхода",
+        "v2_max_depth_hint": "0 — проверка стартовой страницы и её ресурсов в пределах сайта; большее значение разрешает переходы по ссылкам на эту глубину.",
         "profile_seo": "Независимый SEO-аудит с дополнительным обходом сайта: метаданные, индексируемость, ссылки, canonical URL, robots/sitemap, favicon и JSON-LD.",
         "profile_mobile": "Аудит мобильной дружественности по сигналам Google Mobile-Friendly: viewport, адаптивный CSS, фиксированная ширина, мишени касания, читаемость шрифта и индексируемость.",
         "language": "Язык",
@@ -466,6 +472,8 @@ _TEXT = {
         "progress_start": "Подготовка запроса аудита",
         "progress_fetch": "Выполнение проверок сайта",
         "progress_render": "Формирование HTML-отчёта",
+        "progress_crawl": "Обход: загружено {fetched}, найдено {discovered}",
+        "progress_crawl_phase": "Этап аудита: {phase}",
         "progress_done": "Аудит завершён",
         "failed": "Аудит завершился ошибкой",
         "no_url": "Сначала укажите URL сайта.",
@@ -738,6 +746,7 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 </div><div class="form-grid three" style="margin-top:14px">
 <div><label for="v2-profile">{escape(text["v2_profile"])} {_hint(text, "v2_profile_hint")}</label><select id="v2-profile"><option value="quick">{escape(text["v2_profile_quick"])}</option><option value="standard">{escape(text["v2_profile_standard"])}</option><option value="deep">{escape(text["v2_profile_deep"])}</option></select></div>
 <div><label for="v2-max-pages">{escape(text["v2_max_pages"])} {_hint(text, "v2_max_pages_hint")}</label><input id="v2-max-pages" type="number" min="0" max="25000" value="3"></div>
+<div><label for="v2-max-depth">{escape(text["v2_max_depth"])} {_hint(text, "v2_max_depth_hint")}</label><input id="v2-max-depth" type="number" min="0" max="32" placeholder="профиль"></div>
 <label><input id="v2-render" type="checkbox" style="width:auto;margin-right:8">{escape(text["v2_render"])} {_hint(text, "v2_render_hint")}</label>
 </div></details>
 <div class="advanced-links"><div class="advanced-link-row"><a href="#" class="text-link" onclick="loadChecks(); return false;">{escape(text["checks"])}</a>{_hint(text, "refresh_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="runHealth(); return false;">{escape(text["health"])}</a>{_hint(text, "health_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="openAiCredentials(); return false;">{escape(text["ai_credentials"])}</a>{_hint(text, "ai_credentials_hint")}</div><div class="advanced-link-row"><label style="font-weight:700;margin:0"><input id="debug" type="checkbox" style="width:auto;margin-right:6px">{escape(text["debug"])}</label>{_hint(text, "debug_hint")}</div></div>
@@ -745,7 +754,7 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <dialog id="ai-credentials-dialog"><form method="dialog" onsubmit="return false;"><h2>{escape(text["ai_credentials"])}</h2><p>{escape(text["ai_credentials_hint"])}</p><label for="ai-provider">{escape(text["ai_provider"])}</label><select id="ai-provider" onchange="selectAiProvider()"></select><div class="actions"><button type="button" class="secondary" onclick="newAiProvider()">{escape(text["ai_new"])}</button></div><div class="form-grid four" style="margin-top:14px"><div><label for="ai-provider-name">{escape(text["ai_provider_name"])}</label><input id="ai-provider-name" maxlength="100"></div><div><label for="ai-provider-url">{escape(text["ai_provider_url"])} {_hint(text, "ai_provider_url_hint")}</label><input id="ai-provider-url" type="url" maxlength="500"></div><div><label for="ai-provider-model">{escape(text["ai_model"])} {_hint(text, "ai_model_hint")}</label><div class="model-control"><select id="ai-provider-model"></select><button id="ai-provider-model-refresh" type="button" class="secondary" title="{escape(text["model_refresh"])}" aria-label="{escape(text["model_refresh"])}" onclick="refreshAiModels()">↻</button></div></div><div><label for="ai-key">{escape(text["ai_key"])}</label><input id="ai-key" type="password" autocomplete="off" maxlength="1000"></div></div><label style="margin-top:14px"><input id="ai-provider-chat-only" type="checkbox" onchange="toggleChatOnly()" style="width:auto;margin-right:8px">{escape(text["model_chat_only"])} {_hint(text, "model_chat_only_hint")}</label><label style="margin-top:14px"><input id="ai-enable" type="checkbox" style="width:auto;margin-right:8px">{escape(text["ai_enable"])} {_hint(text, "ai_enable_hint")}</label><div class="actions"><button type="button" onclick="saveAiProvider()">{escape(text["ai_save"])}</button><button type="button" class="secondary" onclick="activateAiProvider()">{escape(text["ai_activate"])}</button><button type="button" class="secondary" onclick="clearAiProvider()">{escape(text["ai_clear"])}</button><button type="button" class="secondary" onclick="document.getElementById('ai-credentials-dialog').close()">{escape(text["ai_close"])}</button></div><p id="ai-credentials-result" role="status" aria-live="polite"></p></form></dialog>
 <section class="panel"><details><summary>{escape(text["select_checks"])} <h2 class="sr-only">{escape(text["select_checks"])}</h2> {_hint(text, "checks_hint")}</summary><div class="checks-toolbar"><div></div><div class="actions"><span><button class="secondary" onclick="selectApplicable(true)">{escape(text["all_checks"])}</button>{_hint(text, "select_all_hint")}</span><span><button class="secondary" onclick="selectApplicable(false)">{escape(text["clear_checks"] )}</button>{_hint(text, "clear_checks_hint")}</span></div></div><div id="checks"></div></details></section>
 <section id="result-panel" class="panel" hidden><h2>{escape(text["result"])}</h2>
-<div id="progress" hidden role="status" aria-live="polite"><strong>{escape(text["progress_title"])}</strong><div class="progress-track"><span id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="{escape(text["progress_start"])}"></span></div><div id="progress-steps"><span>{escape(text["progress_start"])}</span><span>{escape(text["progress_fetch"])}</span><span>{escape(text["progress_render"])}</span></div></div>
+<div id="progress" hidden role="status" aria-live="polite"><strong>{escape(text["progress_title"])}</strong><div id="crawl-progress" class="progress-substatus" hidden><span id="crawl-progress-phase"></span><span id="crawl-progress-count"></span></div><div class="progress-track"><span id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="{escape(text["progress_start"])}"></span></div><div id="progress-steps"><span>{escape(text["progress_start"])}</span><span>{escape(text["progress_fetch"])}</span><span>{escape(text["progress_render"])}</span></div></div>
 <div id="result" hidden role="status" aria-live="polite">{escape(text["ready"])}</div></section>
 <section id="v2-inventory-panel" class="panel" hidden aria-labelledby="v2-inventory-title">
 <h2 id="v2-inventory-title">{escape(text["v2_inventory"])} {_hint(text, "v2_inventory_hint")}</h2>
@@ -803,7 +812,7 @@ helpToggle.onclick = () => {{
 }};
 const dashboardStateKey = "agentready.dashboard.state.v2";
 const dashboardReportKey = "agentready.dashboard.report.v2";
-const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-max-pages","v2-render","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only"];
+const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-max-pages","v2-max-depth","v2-render","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only"];
 function readDashboardState() {{
   try {{
     const raw = localStorage.getItem(dashboardStateKey);
@@ -851,7 +860,9 @@ const aiPanel = document.getElementById("ai-assistant-panel");
 let auditCompleted = false;
 const presetLabels = {{all:translations[language.value].preset_all, content:translations[language.value].preset_content, api:translations[language.value].preset_api, "ai-search":translations[language.value].preset_ai_search, v2:translations[language.value].preset_v2, seo:translations[language.value].preset_seo, mobile:translations[language.value].preset_mobile}};
 const profileHints = {{all:translations[language.value].profile_all, content:translations[language.value].profile_content, api:translations[language.value].profile_api, "ai-search":translations[language.value].profile_ai_search, v2:translations[language.value].profile_v2, seo:translations[language.value].profile_seo, mobile:translations[language.value].profile_mobile}};
-const progress = document.getElementById("progress"); const progressBar = document.getElementById("progress-bar");
+const progress = document.getElementById("progress"); const progressBar = document.getElementById("progress-bar"); const crawlProgress = document.getElementById("crawl-progress"); const crawlProgressPhase = document.getElementById("crawl-progress-phase"); const crawlProgressCount = document.getElementById("crawl-progress-count");
+let activeV2JobId = localStorage.getItem("agentready.dashboard.job.v2") || null;
+if (activeV2JobId === "null" || activeV2JobId === "undefined") activeV2JobId = null;
 function debugMode() {{ return document.getElementById("debug").checked; }}
 function updateAiModeHint() {{
   const mode = document.getElementById("ai-mode").value;
@@ -960,11 +971,12 @@ function scanPayload() {{
     include:selected.filter(id => !applicable.includes(id)), exclude:applicable.filter(id => !selected.includes(id)),
     timeout:Number(document.getElementById("timeout").value), workers:Number(document.getElementById("workers").value),
     level_threshold:decimalValue("threshold", .8), recommendation_limit:Number(document.getElementById("recommendations").value),
-    limits:{{check_limit:Number(document.getElementById("check-limit").value) || 0}},
+    limits:selectedV2Limits(),
     verify_skill_digests:document.getElementById("verify").checked}};
   return payload;
 }}
 function setProgress(percent, message) {{ showResult(); progress.hidden = false; progressBar.style.width = percent + "%"; progressBar.setAttribute("aria-valuenow", String(percent)); progressBar.setAttribute("aria-valuetext", message); result.textContent = message; }}
+function setCrawlProgress(progressData) {{ if (!progressData) return; crawlProgress.hidden = false; crawlProgressPhase.textContent = translations[language.value].progress_crawl_phase.replace("{{phase}}", progressData.phase || "crawl"); crawlProgressCount.textContent = translations[language.value].progress_crawl.replace("{{fetched}}", String(progressData.fetched || 0)).replace("{{discovered}}", String(progressData.discovered || 0)); }}
 function finishProgress(success) {{ const percent = success ? 100 : 0; progressBar.style.width = percent + "%"; progressBar.setAttribute("aria-valuenow", String(percent)); }}
 function hintIcon(text) {{ const span = document.createElement("span"); span.className = "hint"; span.tabIndex = 0; span.setAttribute("role", "img"); span.setAttribute("aria-label", text); span.dataset.tooltip = text; span.textContent = "?"; return span; }}
 function reportFilename(site) {{
@@ -985,6 +997,7 @@ function createReportActions(reportText, frame) {{
 const v2ProfileDefaults = {{quick:3, standard:25, deep:100}};
 let v2LastProfile = document.getElementById("v2-profile").value;
 function selectedV2MaxPages() {{ const value = Number(document.getElementById("v2-max-pages").value); return Number.isFinite(value) && value >= 0 ? value : 3; }}
+function selectedV2Limits() {{ const value = document.getElementById("v2-max-depth").value.trim(); return value === "" ? {{check_limit:Number(document.getElementById("check-limit").value) || 0}} : {{check_limit:Number(document.getElementById("check-limit").value) || 0,max_depth:Math.max(0,Math.min(32,Number(value)))}}; }}
 function syncV2ProfileBudget() {{
   const profile = document.getElementById("v2-profile").value;
   const pageLimit = document.getElementById("v2-max-pages");
@@ -1076,6 +1089,40 @@ function restoreReportState() {{
     return false;
   }}
 }}
+async function restoreActiveV2Job() {{
+  if (!activeV2JobId) return;
+  setProgress(35, translations[language.value].progress_fetch);
+  try {{
+    const status = await (await fetch("/v2/jobs/" + encodeURIComponent(activeV2JobId))).json();
+    if (["running", "pending"].includes(status.status)) {{ setCrawlProgress(status.progress); runV2BackgroundPollOnly(); }}
+    else if (status.status === "completed" && status.html) {{ captureV2Report(status.html); renderReport(status.html); activeV2JobId = null; localStorage.removeItem("agentready.dashboard.job.v2"); }}
+  }} catch (error) {{ console.warn("[FIX:dashboard-progress] Unable to restore job", {{error:String(error)}}); }}
+}}
+function captureV2Report(reportText, required=false) {{
+  try {{
+    const doubleQuotedMarker = '<script id="agentready-v2-report" type="application/json">';
+    const singleQuotedMarker = "<script id='agentready-v2-report' type='application/json'>";
+    const v2Marker = reportText.includes(doubleQuotedMarker) ? doubleQuotedMarker : singleQuotedMarker;
+    const start = reportText.indexOf(v2Marker);
+    const end = reportText.indexOf("<" + "/script>", start);
+    if (start >= 0 && end > start) {{
+      window.agentreadyV2Report = JSON.parse(reportText.slice(start + v2Marker.length, end));
+      console.info("[FIX:ai-audit-context] Embedded audit report captured", {{bytes:reportText.length, findings:(window.agentreadyV2Report.findings || []).length}});
+      return window.agentreadyV2Report;
+    }}
+  }} catch (error) {{
+    console.warn("[FIX:ai-audit-context] Unable to capture embedded audit report", {{error:String(error)}});
+  }}
+  if (required) {{
+    window.agentreadyV2Report = null;
+    console.warn("[FIX:ai-audit-context] Audit report context missing from HTML");
+    return null;
+  }}
+  return window.agentreadyV2Report;
+}}
+async function runV2BackgroundPollOnly() {{
+  while (activeV2JobId) {{ const jobId = activeV2JobId; await new Promise(resolve => setTimeout(resolve, 700)); if (!jobId) break; const status = await (await fetch("/v2/jobs/" + encodeURIComponent(jobId))).json(); setCrawlProgress(status.progress); if (status.status === "completed") {{ captureV2Report(status.html); renderReport(status.html); activeV2JobId = null; localStorage.removeItem("agentready.dashboard.job.v2"); }} else if (["failed","cancelled"].includes(status.status)) {{ activeV2JobId = null; localStorage.removeItem("agentready.dashboard.job.v2"); }} }}
+}}
 async function request(path, method="GET", body=null, html=false, showOutput=true, statusMessage="") {{
   if (showOutput) setProgress(8, translations[language.value].progress_start);
   const options = {{method, headers:{{"Content-Type":"application/json"}}}}; if (body) options.body = JSON.stringify(body);
@@ -1086,12 +1133,7 @@ async function request(path, method="GET", body=null, html=false, showOutput=tru
   if (html) {{
     if (showOutput) setProgress(78, translations[language.value].progress_render);
     const reportText = await response.text();
-    try {{
-      const v2Marker = '<script id="agentready-v2-report" type="application/json">';
-      const start = reportText.indexOf(v2Marker);
-      const end = reportText.indexOf("<" + "/script>", start);
-      if (start >= 0 && end > start) window.agentreadyV2Report = JSON.parse(reportText.slice(start + v2Marker.length, end));
-    }} catch (error) {{ console.warn("Ignoring unavailable embedded v2 report", {{error: String(error)}}); }}
+    captureV2Report(reportText, path === "/v2/audit/dashboard");
     return renderReport(reportText);
   }}
   const data = await response.json();
@@ -1115,12 +1157,28 @@ async function runV2() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
   window.agentreadyV2Report = null;
   try {{
-    await request("/v2/audit/dashboard","POST",{{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:selectedV2MaxPages(),render:document.getElementById("v2-render").checked,timeout:Number(document.getElementById("timeout").value),language:language.value}},true);
+    const reportHtml = await runV2Background();
+    renderReport(reportHtml);
     await loadV2Inventory();
     setAiAvailability(true);
   }} catch (error) {{
     setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message;
   }}
+}}
+async function runV2Background() {{
+  const payload = {{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:selectedV2MaxPages(),limits:selectedV2Limits(),render:document.getElementById("v2-render").checked,timeout:Number(document.getElementById("timeout").value),language:language.value}};
+  const response = await fetch("/v2/jobs", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify(payload)}});
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  const job = await response.json(); activeV2JobId = job.job_id; localStorage.setItem("agentready.dashboard.job.v2", activeV2JobId); setCrawlProgress({{phase:"queued",fetched:0,discovered:0}});
+  while (activeV2JobId) {{
+    const jobId = activeV2JobId;
+    await new Promise(resolve => setTimeout(resolve, 700));
+    if (!jobId) break;
+    const status = await (await fetch("/v2/jobs/" + encodeURIComponent(jobId))).json(); setCrawlProgress(status.progress);
+    if (status.status === "completed") {{ const html = status.html; captureV2Report(html); activeV2JobId = null; localStorage.removeItem("agentready.dashboard.job.v2"); return html; }}
+    if (["failed","cancelled"].includes(status.status)) throw new Error(status.error || status.status);
+  }}
+  throw new Error("job lost");
 }}
 let v2InventoryKind = "pages";
 let v2InventoryCursor = null;
@@ -1227,9 +1285,8 @@ async function runAll() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
   window.agentreadyV2Report = null;
   try {{
-    const geoFrame = await request("/v2/audit/dashboard","POST",scanPayload(),true);
-    const geoText = geoFrame.srcdoc;
-    const seoFrame = await request("/v2/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,profile:document.getElementById("v2-profile").value,crawl:true,max_pages:selectedV2MaxPages(),language:language.value,checks:null,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value),limits:{{check_limit:Number(document.getElementById("check-limit").value)||0}}}},true);
+    const geoText = await runV2Background();
+    const seoFrame = await request("/v2/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,profile:document.getElementById("v2-profile").value,crawl:true,max_pages:selectedV2MaxPages(),language:language.value,checks:null,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value),limits:selectedV2Limits()}},true);
     const combined = combinedReportDocument(geoText, seoFrame.srcdoc);
     renderReport(combined); setAiAvailability(true);
   }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
@@ -1237,7 +1294,7 @@ async function runAll() {{
 async function runSeo() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
   window.agentreadyV2Report = null;
-  try {{ await request("/v2/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,profile:document.getElementById("v2-profile").value,crawl:true,max_pages:selectedV2MaxPages(),language:language.value,checks:selectedChecks(),timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value),limits:{{check_limit:Number(document.getElementById("check-limit").value)||0}}}},true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
+  try {{ await request("/v2/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,profile:document.getElementById("v2-profile").value,crawl:true,max_pages:selectedV2MaxPages(),language:language.value,checks:selectedChecks(),timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value),limits:selectedV2Limits()}},true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
 async function runMobile() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
@@ -1245,7 +1302,7 @@ async function runMobile() {{
   console.info("Running mobile audit from dashboard", {{url:document.getElementById("url").value}});
   try {{ await request("/v2/mobile/audit/dashboard","POST",{{urls:[document.getElementById("url").value],language:language.value,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value)}},true); setAiAvailability(true); }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}
 }}
-async function runHealth() {{ try {{ await request("/healthz", "GET", null, false, true, translations[language.value].health_ok); }} catch (error) {{ showResult(); result.textContent = error.message; }} }}
+async function runHealth() {{ try {{ const response = await fetch("/healthz"); if (!response.ok) throw new Error("HTTP " + response.status); console.info("[FIX:dashboard-progress] Service health checked without resetting audit progress"); }} catch (error) {{ console.warn("[FIX:dashboard-progress] Health check failed", {{error:String(error)}}); }} }}
 async function openAiCredentials() {{
   const dialog = document.getElementById("ai-credentials-dialog");
   const result = document.getElementById("ai-credentials-result");
@@ -2275,6 +2332,7 @@ document.getElementById("preset").onchange = () => {{ setAiAvailability(false); 
 document.getElementById("v2-profile").addEventListener("change", syncV2ProfileBudget);
 updatePresetHint(); updateAiModeHint(); setAiAvailability(false); loadChecks(false);
 restoreReportState();
+restoreActiveV2Job();
 loadSavedV2Views();
 refreshAiProviders().catch(error => console.warn("Unable to initialize AI providers", {{error:String(error)}}));
 loadAiTools();

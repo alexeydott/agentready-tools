@@ -835,7 +835,7 @@ def seo_checks_endpoint(language: Literal["en", "ru"] = "en") -> list[dict[str, 
     ]
 
 
-def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None) -> dict:
+def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None, progress_callback=None) -> dict:
     fields_set = getattr(request, "model_fields_set", None)
     if fields_set is None:
         fields_set = getattr(request, "__fields_set__", set())
@@ -863,6 +863,7 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None) -
             parent_run_id=parent_run_id if parent_run_id is not None else request.rescan_of,
             selected_urls=tuple(request.selected_urls),
             store=store,
+            progress_callback=progress_callback,
         )
     )
     run = getattr(result, "run", None)
@@ -897,6 +898,9 @@ def _render_v2_dashboard(payload: dict) -> str:
     rows = "".join(
         "<tr><td>"
         + html.escape(str(item.get("id", "")))
+        + " <span class='check-help' tabindex='0' title='"
+        + html.escape(check_hint(str(item.get("id", "")), str(item.get("title", "")), str(item.get("category", "")), language))
+        + "'>?</span>"
         + "</td><td>"
         + html.escape(status_labels.get(str(item.get("status", "")), str(item.get("status", ""))))
         + "</td><td>"
@@ -918,7 +922,7 @@ def _render_v2_dashboard(payload: dict) -> str:
         + "</title>"
         + "<style>body{font:16px system-ui,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem}"
         + "table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccd;padding:.5rem;text-align:left}"
-        + "code{background:#f3f4f6;padding:.1rem .25rem}</style></head><body>"
+        + "code{background:#f3f4f6;padding:.1rem .25rem}.check-help{display:inline-flex;align-items:center;justify-content:center;width:1.1em;height:1.1em;border:1px solid #9e2f0b;border-radius:50%;font-size:.75em;color:#9e2f0b;cursor:help}.check-help:focus::after,.check-help:hover::after{content:attr(title);position:absolute;z-index:2;background:#24130d;color:#fff;padding:.4rem;border-radius:.3rem;max-width:22rem}</style></head><body>"
         + "<main id='report-content'><h1>"
         + html.escape(labels["title"])
         + "</h1><p>"
@@ -984,7 +988,9 @@ def audit_v2_rescan_endpoint(request: V2AuditRequest) -> dict:
 @app.post("/v2/jobs")
 def audit_v2_job_endpoint(request: V2AuditRequest) -> dict:
     try:
-        job_id = _V2_JOBS.submit(lambda: _run_v2_scan(request))
+        job_ref: dict[str, str] = {}
+        job_id = _V2_JOBS.submit(lambda: _run_v2_scan(request, progress_callback=lambda values: _V2_JOBS.update_progress(job_ref["id"], **values)))
+        job_ref["id"] = job_id
     except (RuntimeError, TargetError, ValueError) as exc:
         raise HTTPException(status_code=429 if isinstance(exc, RuntimeError) else 400, detail=str(exc)) from exc
     return {"job_id": job_id, "status": "running"}
@@ -993,7 +999,10 @@ def audit_v2_job_endpoint(request: V2AuditRequest) -> dict:
 @app.get("/v2/jobs/{job_id}")
 def audit_v2_job_status_endpoint(job_id: str) -> dict:
     try:
-        return _V2_JOBS.get(job_id).to_dict()
+        payload = _V2_JOBS.get(job_id).to_dict()
+        if payload.get("status") == "completed" and isinstance(payload.get("result"), dict):
+            payload["html"] = _render_v2_dashboard(payload["result"])
+        return payload
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="job not found") from exc
 

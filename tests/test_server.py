@@ -163,6 +163,30 @@ def test_v2_endpoint_propagates_all_supported_profiles(monkeypatch):
     assert captured[-1].limits == {"max_depth": 2}
 
 
+def test_v2_job_exposes_crawl_progress_and_rendered_report(monkeypatch):
+    def fake_scan(request, *, parent_run_id=None, progress_callback=None):
+        if progress_callback:
+            progress_callback({"phase": "crawl", "fetched": 2, "discovered": 5})
+        return {"schema": "agentready.audit.v2", "target": request.url, "coverage": {}, "findings": [], "run": {"id": "job-run"}}
+
+    monkeypatch.setattr(server_module, "_run_v2_scan", fake_scan)
+    client = TestClient(app)
+    response = client.post("/v2/jobs", json={"url": "https://example.com", "max_pages": 2})
+    assert response.status_code == 200
+    job_id = response.json()["job_id"]
+    import time
+
+    for _ in range(20):
+        status = client.get(f"/v2/jobs/{job_id}").json()
+        if status["status"] == "completed":
+            assert status["progress"]["fetched"] == 2
+            assert "html" in status
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("job did not complete")
+
+
 def test_v2_inventory_endpoints_paginate_typed_store_records():
     run_id = "server-pagination"
     store = MemorySiteStore()

@@ -29,9 +29,10 @@ class JobSnapshot:
     status: JobStatus
     result: Any = None
     error: str | None = None
+    progress: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "status": self.status.value, "result": self.result, "error": self.error}
+        return {"id": self.id, "status": self.status.value, "result": self.result, "error": self.error, "progress": self.progress or {}}
 
 
 class AuditJobManager:
@@ -41,6 +42,7 @@ class AuditJobManager:
         self._max_jobs = max_jobs
         self._executor = ThreadPoolExecutor(max_workers=max_jobs)
         self._jobs: dict[str, tuple[Future[Any], JobStatus, threading.Event]] = {}
+        self._progress: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
 
     def submit(self, operation: Callable[[], Any]) -> str:
@@ -55,6 +57,7 @@ class AuditJobManager:
             else:
                 future = self._executor.submit(operation)
             self._jobs[job_id] = (future, JobStatus.RUNNING, cancel_event)
+            self._progress[job_id] = {"phase": "queued", "fetched": 0, "discovered": 0}
             logger.info("v2 audit job submitted id=%s", job_id)
             return job_id
 
@@ -79,16 +82,21 @@ class AuditJobManager:
             raise KeyError(job_id)
         future, status, cancel_event = item
         if status is JobStatus.CANCELLED:
-            return JobSnapshot(job_id, status)
+            return JobSnapshot(job_id, status, progress=self._progress.get(job_id))
         if future.running():
-            return JobSnapshot(job_id, JobStatus.RUNNING, {"cancel_requested": cancel_event.is_set()})
+            return JobSnapshot(job_id, JobStatus.RUNNING, {"cancel_requested": cancel_event.is_set()}, progress=self._progress.get(job_id))
         if not future.done():
-            return JobSnapshot(job_id, JobStatus.PENDING, {"cancel_requested": cancel_event.is_set()})
+            return JobSnapshot(job_id, JobStatus.PENDING, {"cancel_requested": cancel_event.is_set()}, progress=self._progress.get(job_id))
         try:
-            return JobSnapshot(job_id, JobStatus.COMPLETED, future.result())
+            return JobSnapshot(job_id, JobStatus.COMPLETED, future.result(), progress=self._progress.get(job_id))
         except Exception as exc:  # noqa: BLE001 - job boundary must normalize operation failures
             logger.warning("v2 audit job failed id=%s error_type=%s", job_id, type(exc).__name__)
-            return JobSnapshot(job_id, JobStatus.FAILED, error="audit job failed")
+            return JobSnapshot(job_id, JobStatus.FAILED, error="audit job failed", progress=self._progress.get(job_id))
+
+    def update_progress(self, job_id: str, **values: Any) -> None:
+        with self._lock:
+            if job_id in self._progress:
+                self._progress[job_id].update(values)
 
 
 def _accepts_cancel_event(operation: Callable[..., Any]) -> bool:
