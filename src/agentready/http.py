@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from dataclasses import dataclass
 from typing import Self
 from urllib.parse import urljoin
@@ -7,6 +9,7 @@ from urllib.parse import urljoin
 import httpx
 
 from . import __version__
+from .audit_core.collection import FactView
 from .egress import EgressPolicy, EgressPolicyError
 from .models import Evidence
 from .security import SecretRedactor
@@ -14,6 +17,7 @@ from .target import TargetError
 
 _REDIRECTS = {301, 302, 303, 307, 308}
 _SENSITIVE = {"authorization", "proxy-authorization", "cookie", "set-cookie"}
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -164,7 +168,6 @@ class CachedHttpTransport:
 
     def __init__(self, client: HttpClient) -> None:
         self._client = client
-        self._fallback = httpx.AsyncHTTPTransport()
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         cached = self._client.cached(str(request.url), dict(request.headers))
@@ -175,7 +178,57 @@ class CachedHttpTransport:
                 content=cached.body,
                 request=request,
             )
-        return await self._fallback.handle_async_request(request)
+        # Keep cache misses on the same bounded HttpClient boundary.  The old
+        # async transport bypassed egress, timeout, and the collected cache.
+        fetched = await asyncio.to_thread(
+            self._client.get,
+            str(request.url),
+            headers=dict(request.headers),
+        )
+        return httpx.Response(
+            fetched.status_code,
+            headers=fetched.headers,
+            content=fetched.body,
+            request=request,
+        )
 
     async def aclose(self) -> None:
-        await self._fallback.aclose()
+        return None
+
+
+class CollectedHttpClient:
+    """Replay collected page representations before bounded fallback fetches."""
+
+    def __init__(self, client: HttpClient | None, fact_views: tuple[FactView, ...]) -> None:
+        self._client = client
+        self._views: dict[str, FactView] = {}
+        for view in fact_views:
+            self._views[view.url] = view
+            if view.page.requested_url:
+                self._views[view.page.requested_url] = view
+
+    @staticmethod
+    def _is_collected_representation(headers: dict[str, str] | None) -> bool:
+        if not headers:
+            return True
+        lowered = {key.lower(): value for key, value in headers.items()}
+        if "user-agent" in lowered:
+            return False
+        accept = lowered.get("accept", "")
+        return not accept or "text/html" in accept or "application/xhtml+xml" in accept or "*/*" in accept
+
+    def get(self, url: str, headers: dict[str, str] | None = None, *, use_cache: bool = True) -> Fetched:
+        view = self._views.get(url)
+        if use_cache and view is not None and view.body is not None and self._is_collected_representation(headers):
+            logger.debug("[FIX:fact-view-replay] replaying collected response url=%s", url)
+            return Fetched(
+                url=view.url,
+                status_code=view.page.status_code or 0,
+                headers=dict(view.headers),
+                body=view.body,
+                redirected_from=[],
+            )
+        if self._client is None:
+            logger.error("[FIX:collection-replay] analyzer requested an uncollected representation url=%s", url)
+            raise FetchError(f"representation was not collected for analyzer replay: {url}")
+        return self._client.get(url, headers=headers, use_cache=use_cache)

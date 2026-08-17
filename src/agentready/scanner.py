@@ -1,11 +1,17 @@
+"""Legacy readiness rule adapter used only behind ``AuditService``.
+
+The canonical v2 boundary owns collection and reuses this module's bounded
+rule catalog through a shared cached client; transports must not call it.
+"""
 from __future__ import annotations
 
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from . import __version__
+from .audit_core.collection import FactView
 from .checks import CheckContext, run_check
-from .http import FetchError, HttpClient
+from .http import CollectedHttpClient, FetchError, HttpClient
 from .i18n import normalize_language
 from .models import ScanReport, utc_now_iso
 from .recommendations import generate_recommendations
@@ -53,6 +59,7 @@ def scan(
     config_source: str | None = None,
     language: str = "en",
     client: HttpClient | None = None,
+    fact_views: tuple[FactView, ...] = (),
 ) -> ScanReport:
     started = utc_now_iso()
     language = normalize_language(language)
@@ -69,10 +76,11 @@ def scan(
 
     owns_client = client is None
     client = client or HttpClient(timeout=timeout, verify=verify_tls, allow_private=allow_private)
+    analysis_client = CollectedHttpClient(client, fact_views) if fact_views else client
     try:
         ctx = CheckContext(
             target=target,
-            client=client,
+            client=analysis_client,
             content_url=content,
             commerce_url=commerce,
             verify_skill_digests=verify_skill_digests,
@@ -89,7 +97,7 @@ def scan(
         if commerce:
             commerce_signals.append("explicit --commerce-url")
         try:
-            homepage = client.get(target.url)
+            homepage = analysis_client.get(target.url)
             if homepage.status_code == 200 and "html" in homepage.content_type:
                 commerce_signals.extend(detect_commerce(homepage.text))
         except FetchError:

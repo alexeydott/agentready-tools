@@ -106,7 +106,14 @@ class FindingContract:
         if self.priority < 0:
             raise ValueError("finding priority must not be negative")
 
-    def to_report_finding(self, *, title: str, reason: str, url: str | None = None) -> Any:
+    def to_report_finding(
+        self,
+        *,
+        title: str,
+        reason: str,
+        url: str | None = None,
+        public_id: str | None = None,
+    ) -> Any:
         """Project canonical machine state into the v2 report DTO."""
         from ..report_v2 import Finding, FindingEvidence, FindingStatus
 
@@ -120,7 +127,7 @@ class FindingContract:
             for item in self.evidence
         )
         return Finding(
-            id=self.key.to_string(),
+            id=public_id or self.key.to_string(),
             title=title,
             status=status,
             reason=reason,

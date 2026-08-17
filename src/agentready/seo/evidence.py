@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
+from ..audit_core.collection import FactView
 from ..http import FetchError, HttpClient
 from ..page_parser import ParsedPage
 from ..seo_checks import SeoHtmlParser
@@ -40,7 +41,7 @@ class SeoPageEvidence:
 
 
 def evidence_from_parsed_page(
-    page: ParsedPage,
+    page: ParsedPage | FactView,
     *,
     url: str,
     final_url: str,
@@ -49,7 +50,8 @@ def evidence_from_parsed_page(
     evidence_id: str | None = None,
 ) -> SeoPageEvidence:
     """Project shared parsed facts into the canonical SEO evidence DTO."""
-    facts = page.facts
+    parsed = page.page if isinstance(page, FactView) else page
+    facts = parsed.facts
     if facts is None:
         raise ValueError("parsed page does not contain shared facts")
     titles = facts.titles
@@ -62,7 +64,7 @@ def evidence_from_parsed_page(
         final_url=final_url,
         status_code=status_code,
         content_type=content_type,
-        title=titles[0] if titles else page.title,
+        title=titles[0] if titles else parsed.title,
         titles=titles,
         description=descriptions[0] if descriptions else "",
         descriptions=descriptions,

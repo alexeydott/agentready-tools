@@ -8,6 +8,19 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from ..audit_core import (
+    Applicability,
+    Effort,
+    EvaluationCompleteness,
+    EvidenceRef,
+    FindingContract,
+    FindingKey,
+    FindingStateHash,
+    Severity,
+    Status,
+    UrlIdentity,
+)
+
 
 class ProtocolStatus(StrEnum):
     PASS = "pass"
@@ -48,25 +61,55 @@ class ProtocolFinding:
     evidence: tuple[ProtocolEvidence, ...] = ()
     deprecated: bool = False
 
+    def to_contract(self, target: str) -> FindingContract:
+        status = Status.ERROR if self.status is ProtocolStatus.UNAVAILABLE else Status(self.status.value)
+        key = FindingKey(self.profile_id, self.version, UrlIdentity.parse(target))
+        completeness = EvaluationCompleteness.PARTIAL if status is Status.ERROR else EvaluationCompleteness.COMPLETE
+        return FindingContract(
+            key=key,
+            state_hash=FindingStateHash.from_state(
+                key,
+                status=status,
+                applicability=Applicability.APPLICABLE,
+                completeness=completeness,
+                evidence_ids=tuple(item.source_id for item in self.evidence),
+            ),
+            status=status,
+            applicability=Applicability.APPLICABLE,
+            completeness=completeness,
+            severity=Severity.HIGH if status is Status.FAIL else Severity.INFO,
+            impact="high" if status is Status.FAIL else "info",
+            effort=Effort.MEDIUM,
+            priority=80 if status is Status.FAIL else 10,
+            evidence=tuple(EvidenceRef(item.source_id, item.locator, item.summary) for item in self.evidence),
+        )
+
     @property
     def fingerprint(self) -> str:
         payload = {
             "profile_id": self.profile_id,
             "version": self.version,
             "status": self.status.value,
-            "reason": self.reason,
-            "evidence": [item.to_dict() for item in self.evidence],
+            "evidence": [(item.source_id, item.locator, item.url, item.anchor) for item in self.evidence],
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         return hashlib.sha256(encoded).hexdigest()
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, *, target: str | None = None) -> dict[str, Any]:
+        projected = None
+        if target is not None:
+            projected = self.to_contract(target).to_report_finding(
+                title=self.title,
+                reason=self.reason,
+                url=target,
+                public_id=f"{self.profile_id}@{self.version}",
+            )
         return {
             "profile_id": self.profile_id,
             "version": self.version,
-            "status": self.status.value,
-            "title": self.title,
-            "reason": self.reason,
+            "status": projected.status.value if projected is not None else self.status.value,
+            "title": projected.title if projected is not None else self.title,
+            "reason": projected.reason if projected is not None else self.reason,
             "deprecated": self.deprecated,
             "fingerprint": self.fingerprint,
             "evidence": [item.to_dict() for item in self.evidence],

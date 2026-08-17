@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import __version__
-from .audit_core import AuditRunContext, RunSnapshot, RunState
+from .audit_core import AuditRunContext, CollectedPage, FactView, RunSnapshot, RunState
 from .crawl_profiles import HARD_CAPS, resolve_profile
 from .crawler import AsyncCrawler, CrawlResult, CrawlScope
 from .egress import EgressPolicy
@@ -53,6 +53,9 @@ class AuditRequest:
     crawl: bool = False
     recommendation_limit: int = 10
     mode: str = "readiness"
+    verify: bool = True
+    max_redirects: int = 5
+    max_bytes: int = 5 * 1024 * 1024
     progress_callback: Callable[[dict[str, int | str]], None] | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -64,10 +67,14 @@ class AuditRequest:
             object.__setattr__(self, "max_pages", HARD_CAPS.max_pages)
         if self.timeout <= 0:
             raise ValueError("timeout must be positive")
-        if self.mode not in {"readiness", "seo"}:
-            raise ValueError("mode must be readiness or seo")
+        if self.mode not in {"readiness", "seo", "mobile"}:
+            raise ValueError("mode must be readiness, seo, or mobile")
         if self.recommendation_limit < 0:
             raise ValueError("recommendation_limit must not be negative")
+        if self.max_redirects < 0:
+            raise ValueError("max_redirects must not be negative")
+        if self.max_bytes <= 0:
+            raise ValueError("max_bytes must be positive")
 
     def configuration(self) -> dict[str, Any]:
         """Return the non-secret configuration used for run identity."""
@@ -91,6 +98,9 @@ class AuditRequest:
             "run_rules": self.run_rules,
             "crawl": self.crawl,
             "recommendation_limit": self.recommendation_limit,
+            "verify": self.verify,
+            "max_redirects": self.max_redirects,
+            "max_bytes": self.max_bytes,
         }
 
 
@@ -102,9 +112,12 @@ class AuditResult:
     report: AuditReport
     lineage_id: str
     seo_report: Any | None = None
+    fact_views: tuple[FactView, ...] = ()
+    mobile_report: Any | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        payload = self.seo_report.to_dict() if self.seo_report is not None else self.report.to_dict()
+        projection = self.mobile_report or self.seo_report or self.report
+        payload = projection.to_dict()
         payload["run"] = {
             "id": self.run.context.run_id,
             "state": self.run.state.value,
@@ -149,7 +162,31 @@ class AuditService:
             return checks[:limit]
         return checks
 
+    @staticmethod
+    def _fact_views(crawl: CrawlResult) -> tuple[FactView, ...]:
+        """Project crawler output once for all downstream analyzers."""
+        views = tuple(
+            FactView(
+                CollectedPage(
+                    page.url,
+                    page.depth,
+                    page.status_code,
+                    page.parsed.representation if page.parsed is not None else None,
+                    page.parsed.facts if page.parsed is not None else None,
+                    page.error,
+                    page.headers,
+                    page.body,
+                    page.requested_url,
+                )
+            )
+            for page in crawl.pages
+        )
+        logger.debug("collection fact views built pages=%d", len(views))
+        return views
+
     def run(self, request: AuditRequest) -> AuditResult:
+        if request.mode == "mobile":
+            return self._run_mobile(request)
         if request.mode == "seo":
             return self._run_seo(request)
         from .plan_compiler import PlanCompiler
@@ -190,6 +227,8 @@ class AuditService:
         origin = parse_target(target).origin
         policy = EgressPolicy(
             block_private=not request.allow_private,
+            max_redirects=request.max_redirects,
+            max_response_bytes=request.max_bytes,
             allowed_origins=frozenset({origin}),
         )
         seeds = tuple(dict.fromkeys(self._validate_selected_urls(target, request.selected_urls)))
@@ -214,27 +253,10 @@ class AuditService:
         rule_client = None
         crawler_transport = request.transport
         # The v2 service is the sole public readiness boundary.  The existing
-        # rule implementations are reused here as an internal execution
-        # engine and projected immediately into the v2 report contract.  Its
-        # per-run cache is replayed by the crawler for overlapping URLs.
+        # rule implementations remain an internal adapter, but share the
+        # collection client's cache with the crawler so a URL is fetched once.
         if request.run_rules and request.transport is None and request.preset in {"all", "content", "api", "ai-search"}:
-            from .report_v2 import report_from_checks
-            from .scanner import scan
-
-            logger.info("running v2 readiness rules run_id=%s preset=%s", context.run_id, request.preset)
             rule_client = HttpClient(timeout=request.timeout, allow_private=request.allow_private)
-            rule_engine_report = scan(
-                target,
-                preset=request.preset,
-                include=check_include,
-                exclude=check_exclude,
-                timeout=request.timeout,
-                allow_private=request.allow_private,
-                workers=max(1, int(config.concurrency)),
-                language=request.language,
-                client=rule_client,
-            )
-            check_report = report_from_checks(target, self._apply_check_limit(list(rule_engine_report.checks), request.limits))
             crawler_transport = CachedHttpTransport(rule_client)
         try:
             crawler_kwargs = {
@@ -244,6 +266,7 @@ class AuditService:
                 "store": request.store,
                 "run_context": context,
                 "render": request.render,
+                "verify": request.verify,
             }
             if request.progress_callback is not None:
                 crawler_kwargs["progress_callback"] = request.progress_callback
@@ -253,6 +276,25 @@ class AuditService:
                     **crawler_kwargs,
                 ).crawl()
             )
+            fact_views = self._fact_views(crawl)
+            if rule_client is not None:
+                from .report_v2 import report_from_checks
+                from .scanner import scan
+
+                logger.info("[FIX:collection-cache] running v2 readiness analyzers from shared collection cache run_id=%s preset=%s", context.run_id, request.preset)
+                rule_engine_report = scan(
+                    target,
+                    preset=request.preset,
+                    include=check_include,
+                    exclude=check_exclude,
+                    timeout=request.timeout,
+                    allow_private=request.allow_private,
+                    workers=max(1, int(config.concurrency)),
+                    language=request.language,
+                    client=rule_client,
+                    fact_views=fact_views,
+                )
+                check_report = report_from_checks(target, self._apply_check_limit(list(rule_engine_report.checks), request.limits))
         finally:
             if rule_client is not None:
                 rule_client.close()
@@ -277,7 +319,128 @@ class AuditService:
             crawl.coverage.fetched,
             crawl.coverage.classification.value,
         )
-        return AuditResult(request, run, crawl, report, lineage_id)
+        return AuditResult(request, run, crawl, report, lineage_id, fact_views=fact_views)
+
+    def _run_mobile(self, request: AuditRequest) -> AuditResult:
+        """Collect one page once, then project static and rendered mobile facts."""
+        from .browser_pool import BrowserPool, CapabilityUnavailableError
+        from .http import CollectedHttpClient
+        from .mobile_models import MobileReport
+        from .mobile_scanner import MOBILE_SCHEMA, _audit_page
+        from .mobile_scoring import rank_mobile_recommendations, score_mobile_checks
+        from .models import utc_now_iso
+
+        target = parse_target(request.target).url
+        configuration = request.configuration()
+        configuration["target"] = target
+        context = AuditRunContext.create(
+            target,
+            configuration,
+            tool_version=__version__,
+            rule_catalog_version="mobile-v2",
+            run_id=None,
+        )
+        profile = resolve_profile(
+            request.profile,
+            overrides={"max_pages": 1, "timeout": request.timeout},
+            hard_caps=HARD_CAPS,
+        )
+        origin = parse_target(target).origin
+        policy = EgressPolicy(
+            block_private=not request.allow_private,
+            max_redirects=request.max_redirects,
+            max_response_bytes=request.max_bytes,
+            allowed_origins=frozenset({origin}),
+        )
+        crawl = asyncio.run(
+            AsyncCrawler(
+                CrawlScope((target,), allowed_origins=(origin,), follow_links=False),
+                config=profile.config,
+                policy=policy,
+                transport=request.transport,
+                store=request.store,
+                run_context=context,
+                render=False,
+                verify=request.verify,
+            ).crawl()
+        )
+        fact_views = self._fact_views(crawl)
+        replay_client = CollectedHttpClient(None, fact_views)
+
+        async def analyze_page() -> Any:
+            pool = None
+            render_status = None
+            if request.render:
+                pool = BrowserPool(policy)
+                try:
+                    await pool.start()
+                except CapabilityUnavailableError as exc:
+                    render_status = (
+                        "playwright not installed"
+                        if exc.capability == "Playwright browser support"
+                        else str(exc)
+                    )
+                    await pool.close()
+                    pool = None
+            try:
+                return await _audit_page(
+                    target,
+                    render=request.render,
+                    allow_private=request.allow_private,
+                    recommendation_limit=request.recommendation_limit,
+                    browser_pool=pool,
+                    render_status=render_status,
+                    client=replay_client,
+                )
+            finally:
+                if pool is not None:
+                    await pool.close()
+
+        started_at = utc_now_iso()
+        page = asyncio.run(analyze_page())
+        score, categories = score_mobile_checks(page.checks)
+        recommendations = rank_mobile_recommendations(
+            page.checks,
+            limit=request.recommendation_limit,
+        )
+        mobile_report = MobileReport(
+            schema=MOBILE_SCHEMA,
+            targets=[target],
+            pages=[page],
+            score=score,
+            categories=categories,
+            recommendations=recommendations,
+            started_at=started_at,
+            finished_at=utc_now_iso(),
+            language=request.language,
+        )
+        report = self._report(target, crawl, run_id=context.run_id)
+        state = (
+            RunState.PARTIAL
+            if crawl.coverage.classification.value != "complete_within_scope"
+            else RunState.COMPLETED
+        )
+        run = crawl.run or RunSnapshot(
+            context,
+            state,
+            None,
+            "crawl-partial" if state is RunState.PARTIAL else None,
+        )
+        logger.info(
+            "[FIX:mobile-collection] canonical mobile projection complete run_id=%s facts=%d checks=%d",
+            context.run_id,
+            len(fact_views),
+            len(page.checks),
+        )
+        return AuditResult(
+            request,
+            run,
+            crawl,
+            report,
+            request.parent_run_id or context.run_id,
+            fact_views=fact_views,
+            mobile_report=mobile_report,
+        )
 
     def _run_seo(self, request: AuditRequest) -> AuditResult:
         """Run the canonical SEO path over one bounded crawler result."""
@@ -308,6 +471,8 @@ class AuditService:
         origin = parse_target(target).origin
         policy = EgressPolicy(
             block_private=not request.allow_private,
+            max_redirects=request.max_redirects,
+            max_response_bytes=request.max_bytes,
             allowed_origins=frozenset({origin}),
         )
         seeds = tuple(dict.fromkeys(self._validate_selected_urls(target, request.selected_urls)))
@@ -329,6 +494,7 @@ class AuditService:
             "store": request.store,
             "run_context": context,
             "render": request.render,
+            "verify": request.verify,
         }
         if request.progress_callback is not None:
             crawler_kwargs["progress_callback"] = request.progress_callback
@@ -349,16 +515,17 @@ class AuditService:
         atomic_catalog = {"page-available", "metadata", "indexability", "canonical", "hreflang", "jsonld", "title-length"}
         atomic_ids = {value for value in requested_ids if value in atomic_catalog}
         excluded_ids = set(request.exclude)
-        for page in crawl.pages:
-            if page.parsed is None or page.parsed.facts is None:
+        fact_views = self._fact_views(crawl)
+        for view in fact_views:
+            if view.facts is None:
                 continue
-            representation = page.parsed.representation
+            representation = view.representation
             content_type = representation.content_type if representation is not None else ""
             evidence = evidence_from_parsed_page(
-                page.parsed,
-                url=page.url,
-                final_url=page.url,
-                status_code=page.status_code or 0,
+                view,
+                url=view.url,
+                final_url=view.url,
+                status_code=view.page.status_code or 0,
                 content_type=content_type,
             )
             for finding in run_atomic_rules(evidence):
@@ -374,7 +541,7 @@ class AuditService:
                         status=finding.status,
                         scored=finding.scored,
                         details=finding.details,
-                        evidence=[Evidence(action=finding.details, url=page.url, finding=finding.reason)],
+                        evidence=[Evidence(action=finding.details, url=view.url, finding=finding.reason)],
                     )
                 )
         stored_links = None
@@ -483,7 +650,7 @@ class AuditService:
             len(checks),
             score,
         )
-        return AuditResult(request, run, crawl, report, lineage_id, seo_report)
+        return AuditResult(request, run, crawl, report, lineage_id, seo_report, self._fact_views(crawl))
 
     @staticmethod
     def _validate_selected_urls(target: str, selected_urls: tuple[str, ...]) -> tuple[str, ...]:

@@ -65,6 +65,14 @@ def test_finding_state_hash_ignores_localized_prose():
     assert first.state_hash == second.state_hash
 
 
+def test_report_finding_projects_through_canonical_contract():
+    finding = Finding("rule", "Title", FindingStatus.FAIL, "reason", (FindingEvidence("e1", "summary"),))
+    contract = finding.to_contract(target="https://example.test/")
+    projected = contract.to_report_finding(title=finding.title, reason=finding.reason, public_id=finding.id)
+    assert contract.state_hash.value
+    assert projected.id == finding.id
+
+
 def test_classify_finding_changes_uses_state_hash_and_status_direction():
     current = AuditReport(
         "https://example.com",

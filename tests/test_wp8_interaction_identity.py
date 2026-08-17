@@ -31,6 +31,7 @@ def test_accessibility_findings_keep_semantic_applicability() -> None:
     assert controls.applicability is InteractionApplicability.APPLICABLE
     assert form.status is InteractionStatus.WARN
     assert form.evidence[0].locator == "$.children[0]"
+    assert controls.to_contract("https://example.test/").key.rule_version == "1.0.0"
 
 
 def test_user_agent_is_observed_but_not_verified() -> None:

@@ -8,6 +8,19 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from .audit_core import (
+    Applicability,
+    Effort,
+    EvaluationCompleteness,
+    EvidenceRef,
+    FindingContract,
+    FindingKey,
+    FindingStateHash,
+    Severity,
+    Status,
+    UrlIdentity,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +49,30 @@ class InteractionFinding:
     applicability: InteractionApplicability
     reason: str
     evidence: tuple[InteractionEvidence, ...] = ()
+
+    def to_contract(self, target: str) -> FindingContract:
+        status = Status.WARN if self.status is InteractionStatus.WARN else Status.PASS if self.status is InteractionStatus.PASS else Status.SKIP
+        applicability = Applicability(self.applicability.value)
+        completeness = EvaluationCompleteness.NOT_EVALUATED if status is Status.SKIP else EvaluationCompleteness.COMPLETE
+        key = FindingKey(self.rule_id, "1.0.0", UrlIdentity.parse(target))
+        return FindingContract(
+            key=key,
+            state_hash=FindingStateHash.from_state(
+                key,
+                status=status,
+                applicability=applicability,
+                completeness=completeness,
+                evidence_ids=tuple(item.locator for item in self.evidence),
+            ),
+            status=status,
+            applicability=applicability,
+            completeness=completeness,
+            severity=Severity.MEDIUM if status is Status.WARN else Severity.INFO,
+            impact="medium" if status is Status.WARN else "info",
+            effort=Effort.LOW,
+            priority=50 if status is Status.WARN else 5,
+            evidence=tuple(EvidenceRef(item.locator, item.locator, item.summary) for item in self.evidence),
+        )
 
 
 def _walk(node: Mapping[str, Any], path: str = "$"):

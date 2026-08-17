@@ -1,6 +1,11 @@
-"""Bounded same-origin crawler for cross-page SEO checks.
+"""Compatibility helpers for the canonical v2 SEO collection boundary.
 
-Fetches pages breadth-first from the start URL, staying on the same host.
+The public SEO request is executed by ``AuditService`` and ``AsyncCrawler``.
+These helpers remain only for metadata, fixture, and compatibility consumers;
+new application code must not instantiate this crawler.
+
+Historical implementation fetched pages breadth-first from the start URL,
+staying on the same host.
 Static HTML fetching via ``HttpClient`` is the default; ``render=True`` uses a
 headless Chromium (Playwright) so JS-driven navigation is also discovered.
 

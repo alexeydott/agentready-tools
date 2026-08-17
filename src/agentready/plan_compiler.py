@@ -54,6 +54,8 @@ class PlanCompiler:
         capabilities = ["crawl", "static-facts", "coverage"]
         if request.mode == "seo":
             capabilities.extend(("seo", "parsed-facts", "atomic-seo-rules"))
+        elif request.mode == "mobile":
+            capabilities.extend(("mobile", "mobile-static-rules"))
         if request.render:
             capabilities.append("rendered-dom")
         if request.provider:

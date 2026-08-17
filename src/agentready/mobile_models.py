@@ -33,6 +33,65 @@ class MobileCheckResult:
     def passed(self) -> bool:
         return self.status == "pass"
 
+    def to_contract(self, target: str):
+        """Return the canonical v2 identity for this mobile finding."""
+        from .audit_core import (
+            Applicability,
+            Effort,
+            EvaluationCompleteness,
+            EvidenceRef,
+            FindingContract,
+            FindingKey,
+            FindingStateHash,
+            Severity,
+            Status,
+            UrlIdentity,
+        )
+
+        status = Status.ERROR if self.status == "error" else Status(self.status if self.status in {"pass", "fail", "warn"} else "skip")
+        applicability = Applicability.NOT_APPLICABLE if self.status == "skip" else Applicability.APPLICABLE
+        completeness = EvaluationCompleteness.PARTIAL if self.status in {"skip", "error"} else EvaluationCompleteness.COMPLETE
+        key = FindingKey(self.id, "2.0.0", UrlIdentity.parse(target))
+        evidence = tuple(
+            EvidenceRef(item.finding or item.action, item.url or target, item.finding or item.action)
+            for item in self.evidence
+        )
+        return FindingContract(
+            key=key,
+            state_hash=FindingStateHash.from_state(
+                key,
+                status=status,
+                applicability=applicability,
+                completeness=completeness,
+                evidence_ids=tuple(item.id for item in evidence),
+            ),
+            status=status,
+            applicability=applicability,
+            completeness=completeness,
+            severity=Severity.HIGH if self.status == "fail" else Severity.INFO,
+            impact="high" if self.status == "fail" else "info",
+            effort=Effort.MEDIUM,
+            priority=80 if self.status == "fail" else 10,
+            evidence=evidence,
+        )
+
+    def to_dict(self, target: str) -> dict[str, Any]:
+        """Project canonical state into the existing mobile v2 check fields."""
+        projected = self.to_contract(target).to_report_finding(
+            title=self.title,
+            reason=self.details,
+            url=target,
+            public_id=self.id,
+        )
+        payload = asdict(self)
+        payload.update(
+            id=projected.id,
+            title=projected.title,
+            status=projected.status.value,
+            details=projected.reason,
+        )
+        return payload
+
 
 @dataclass(slots=True)
 class MobileCategoryScore:
@@ -65,7 +124,9 @@ class MobilePageReport:
     finished_at: str
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        payload["checks"] = [check.to_dict(self.url) for check in self.checks]
+        return payload
 
 
 @dataclass(slots=True)
@@ -82,4 +143,6 @@ class MobileReport:
     tool_version: str = __version__
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        payload["pages"] = [page.to_dict() for page in self.pages]
+        return payload

@@ -10,6 +10,7 @@ from typing import Self
 
 import pytest
 
+from agentready.audit_core.collection import CollectedPage, FactView
 from agentready.browser_pool import (
     BrowserPool,
     BrowserPoolConfig,
@@ -17,6 +18,8 @@ from agentready.browser_pool import (
 )
 from agentready.crawler import AsyncCrawler, CrawlConfig, CrawlScope
 from agentready.egress import EgressPolicy
+from agentready.http import CollectedHttpClient
+from agentready.mobile_checks import MOBILE_STATIC_CHECKS
 
 ROOT = Path(__file__).parents[1]
 
@@ -36,6 +39,15 @@ def test_v2_collection_orchestration_keeps_http_boundary_in_fetcher() -> None:
     assert "httpx" not in _imports(ROOT / "src" / "agentready" / "crawler.py")
     assert "httpx" not in _imports(ROOT / "src" / "agentready" / "audit_service.py")
     assert "httpx" in _imports(ROOT / "src" / "agentready" / "fetcher.py")
+
+
+def test_collected_page_and_fact_view_are_immutable_analyzer_inputs() -> None:
+    page = CollectedPage("https://example.test/", 0, 200, None, None)
+    view = FactView(page)
+    assert view.url == page.url
+    assert view.facts is None
+    with pytest.raises(AttributeError):
+        view.page = page  # type: ignore[misc]
 
 
 def test_v2_crawler_keeps_playwright_boundary_in_browser_pool() -> None:
@@ -62,6 +74,75 @@ def test_transport_adapters_delegate_v2_execution_to_audit_service() -> None:
         assert "audit_service" in imports
         assert "httpx" not in imports
         assert "playwright" not in imports
+
+
+def test_readiness_and_mobile_adapters_use_the_shared_collection_cache():
+    audit_source = (ROOT / "src" / "agentready" / "audit_service.py").read_text(encoding="utf-8")
+    mobile_source = (ROOT / "src" / "agentready" / "mobile_scanner.py").read_text(encoding="utf-8")
+    assert "CachedHttpTransport" in audit_source
+    assert "fact_views=fact_views" in audit_source
+    assert "AuditService" in mobile_source
+    assert "HttpClient" not in mobile_source
+    assert "BrowserPool(" not in mobile_source
+
+
+def test_collected_http_client_replays_analyzer_page_without_second_fetch() -> None:
+    class FailOnFetch:
+        def get(self, *_: object, **__: object) -> object:
+            raise AssertionError("analyzer attempted a duplicate network fetch")
+
+    url = "https://example.test/"
+    view = FactView(
+        CollectedPage(
+            url,
+            0,
+            200,
+            None,
+            None,
+            headers=(("content-type", "text/html; charset=utf-8"),),
+            body=b"<html><title>Collected</title></html>",
+            requested_url=url,
+        )
+    )
+    client = CollectedHttpClient(FailOnFetch(), (view,))  # type: ignore[arg-type]
+
+    fetched = client.get(url, headers={"Accept": "text/html"})
+
+    assert fetched.text == "<html><title>Collected</title></html>"
+    assert fetched.status_code == 200
+
+
+def test_multiple_mobile_analyzers_reuse_one_collected_representation() -> None:
+    url = "https://example.test/"
+    view = FactView(
+        CollectedPage(
+            url,
+            0,
+            200,
+            None,
+            None,
+            headers=(("content-type", "text/html; charset=utf-8"),),
+            body=(
+                b"<html><head><meta name='viewport' content='width=device-width, initial-scale=1'>"
+                b"<style>@media (max-width: 600px) { body { width: auto; } }</style></head>"
+                b"<body><button>Run</button></body></html>"
+            ),
+            requested_url=url,
+        )
+    )
+    client = CollectedHttpClient(None, (view,))
+
+    results = [check(url, client) for check in MOBILE_STATIC_CHECKS]
+
+    assert len(results) == len(MOBILE_STATIC_CHECKS)
+    assert {result.id for result in results} == {
+        "viewport-meta",
+        "responsive-css",
+        "fixed-width-elements",
+        "touch-targets",
+        "font-readability",
+        "mobile-indexability",
+    }
 
 
 def test_browser_pool_reports_missing_optional_capability(monkeypatch: pytest.MonkeyPatch) -> None:

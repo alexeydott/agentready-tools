@@ -174,6 +174,9 @@ class CrawledPage:
     status_code: int | None
     parsed: ParsedPage | None
     error: str | None = None
+    headers: tuple[tuple[str, str], ...] = ()
+    body: bytes | None = None
+    requested_url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,6 +253,7 @@ class AsyncCrawler:
         store: SiteStore | None = None,
         run_context: AuditRunContext | None = None,
         render: bool = False,
+        verify: bool = True,
         fetcher_factory: FetcherFactory | None = None,
         browser_pool_factory: BrowserPoolFactory | None = None,
         progress_callback: Callable[[dict[str, int | str]], None] | None = None,
@@ -264,6 +268,7 @@ class AsyncCrawler:
         self.store = store
         self.run_context = run_context
         self.render = render
+        self.verify = verify
         self.fetcher_factory = fetcher_factory or Fetcher
         self.browser_pool_factory = browser_pool_factory or BrowserPool
         self.progress_callback = progress_callback
@@ -502,7 +507,15 @@ class AsyncCrawler:
                         RunUrlState.PARSED if parsed is not None else RunUrlState.FETCHED,
                         item.depth,
                     )
-                    pages[item.url] = CrawledPage(response.url, item.depth, response.status_code, parsed)
+                    pages[item.url] = CrawledPage(
+                        response.url,
+                        item.depth,
+                        response.status_code,
+                        parsed,
+                        headers=tuple(sorted(response.headers.items())),
+                        body=response.body,
+                        requested_url=item.url,
+                    )
                     completed_items += 1
                     if self.store is not None:
                         facts = parsed.facts if parsed is not None else None
@@ -556,6 +569,7 @@ class AsyncCrawler:
             async with self.fetcher_factory(
                 policy=self.policy,
                 timeout=self.config.timeout,
+                verify=self.verify,
                 transport=self.transport,
             ) as fetcher:
                 await refill()

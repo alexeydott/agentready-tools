@@ -48,6 +48,7 @@ def test_audit_service_applies_exact_max_pages_and_reports_partial_coverage():
     assert result.crawl.coverage.fetched == 3
     assert result.crawl.coverage.max_pages_hit is True
     assert result.crawl.coverage.classification.value == "partial_limit"
+    assert len(result.fact_views) == result.crawl.coverage.fetched
     assert result.to_dict()["coverage"]["urls_fetched"] == 3
     assert result.to_dict()["coverage"]["limit"]["max_pages_hit"] is True
     assert result.report.run_id == result.run.context.run_id
@@ -100,6 +101,8 @@ def test_audit_service_seo_mode_uses_shared_crawler_and_atomic_facts() -> None:
     assert result.seo_report is not None
     assert result.seo_report.schema == "agentready.seo.v2"
     assert result.crawl.coverage.fetched == 1
+    assert len(result.fact_views) == 1
+    assert result.fact_views[0].facts is not None
     assert {check.id for check in result.seo_report.checks} >= {
         "page-available",
         "metadata",
@@ -193,10 +196,11 @@ def test_audit_request_fields_reach_canonical_execution_without_network(monkeypa
     captured = {}
 
     class FakeCrawler:
-        def __init__(self, scope, *, config, policy, transport, store, run_context, render):
+        def __init__(self, scope, *, config, policy, transport, store, run_context, render, verify):
             captured["scope"] = scope
             captured["config"] = config
             captured["render"] = render
+            captured["verify"] = verify
             captured["run_context"] = run_context
 
         async def crawl(self):
@@ -242,6 +246,7 @@ def test_audit_request_fields_reach_canonical_execution_without_network(monkeypa
     assert captured["scope"].include_rules == request.include
     assert captured["scope"].exclude_rules == request.exclude
     assert captured["render"] is True
+    assert captured["verify"] is True
     assert payload["request"] == {
         "preset": "all",
         "profile": "custom",

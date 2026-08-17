@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Any
 
 from .browser_pool import BrowserPoolBoundary
 from .mobile_models import MobileCheckResult
@@ -21,6 +24,21 @@ _GOOGLE_TAP = "https://developers.google.com/speed/docs/insights/SizeTapTargetsA
 
 _VIEWPORT_WIDTH = 360
 _VIEWPORT_HEIGHT = 640
+
+
+class _CollectedBrowserPagePool:
+    """Replay one already-navigated browser page to all rendered analyzers."""
+
+    def __init__(self, page: Any, response: Any) -> None:
+        self._page = page
+        self._response = response
+
+    @asynccontextmanager
+    async def page(self, **_: Any) -> AsyncIterator[Any]:
+        yield self._page
+
+    async def goto(self, *_: Any, **__: Any) -> Any:
+        return self._response
 
 
 def _result(
@@ -174,6 +192,17 @@ MOBILE_RENDER_CHECKS = (
     check_rendered_tap_targets_async,
     check_rendered_font_readability_async,
 )
+
+
+async def audit_rendered_mobile_page(
+    url: str,
+    pool: BrowserPoolBoundary,
+) -> list[MobileCheckResult]:
+    """Navigate once and replay the same rendered DOM to every mobile analyzer."""
+    async with pool.page(viewport={"width": _VIEWPORT_WIDTH, "height": _VIEWPORT_HEIGHT}) as page:
+        response = await pool.goto(page, url, wait_until="networkidle", timeout=30000)
+        collected_pool = _CollectedBrowserPagePool(page, response)
+        return [await check(url, collected_pool) for check in MOBILE_RENDER_CHECKS]
 
 MOBILE_RENDER_CHECKS_BY_ID = {
     "rendered-layout-overflow": check_rendered_layout_overflow_async,

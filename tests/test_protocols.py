@@ -6,6 +6,7 @@ from agentready.protocols import (
     audit_documents,
     to_agent_findings,
 )
+from agentready.protocols.models import ProtocolEvidence, ProtocolFinding
 
 
 def test_manifest_pins_current_and_legacy_profiles_explicitly() -> None:
@@ -32,6 +33,7 @@ def test_protocol_findings_are_versioned_and_have_source_locators() -> None:
     assert all(item.evidence[0].source_id for item in findings)
     assert all(item.evidence[0].locator == "$" for item in findings)
     assert all(item.fingerprint == item.fingerprint for item in findings)
+    assert findings[0].to_contract("https://example.test/").key.rule_version == findings[0].version
 
 
 def test_legacy_profile_is_not_silently_current_and_missing_is_unavailable() -> None:
@@ -56,9 +58,33 @@ def test_protocol_audit_does_not_mutate_supplied_documents() -> None:
 def test_agent_adapter_is_additive_and_version_aware() -> None:
     findings = audit_documents({"mcp": {"protocolVersion": "2026-07-28"}})
 
-    payload = to_agent_findings(findings)
+    payload = to_agent_findings(findings, target="https://example.com/")
 
     assert payload["schema"] == "agentready.protocol-findings.v2"
     assert payload["findings_count"] == 1
     assert payload["findings"][0]["profile_id"] == "mcp"
     assert payload["findings"][0]["version"] == "2026-07-28"
+    assert "canonical_findings" not in payload
+
+
+def test_protocol_fingerprint_is_stable_across_localized_copy() -> None:
+    evidence_en = ProtocolEvidence("source", "$.paths", "English summary")
+    evidence_ru = ProtocolEvidence("source", "$.paths", "Russian summary")
+    finding_en = ProtocolFinding(
+        "openapi",
+        "3.1",
+        ProtocolStatus.FAIL,
+        "English title",
+        "English reason",
+        (evidence_en,),
+    )
+    finding_ru = ProtocolFinding(
+        "openapi",
+        "3.1",
+        ProtocolStatus.FAIL,
+        "Russian title",
+        "Russian reason",
+        (evidence_ru,),
+    )
+
+    assert finding_en.fingerprint == finding_ru.fingerprint

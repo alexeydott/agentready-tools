@@ -108,6 +108,45 @@ class Finding:
     reason: str
     evidence: tuple[FindingEvidence, ...] = ()
 
+    def to_contract(self, *, target: str, rule_version: str = "1.0.0") -> Any:
+        """Return the canonical machine identity behind this v2 DTO."""
+        from .audit_core import (
+            Applicability,
+            Effort,
+            EvaluationCompleteness,
+            EvidenceRef,
+            FindingContract,
+            FindingKey,
+            FindingStateHash,
+            Severity,
+            Status,
+            UrlIdentity,
+        )
+
+        status = Status.ERROR if self.status is FindingStatus.UNAVAILABLE else Status(self.status.value)
+        applicability = Applicability.NOT_APPLICABLE if self.status is FindingStatus.SKIP else Applicability.APPLICABLE
+        completeness = EvaluationCompleteness.PARTIAL if self.status in {FindingStatus.SKIP, FindingStatus.UNAVAILABLE} else EvaluationCompleteness.COMPLETE
+        key = FindingKey(self.id, rule_version, UrlIdentity.parse(target))
+        evidence = tuple(EvidenceRef(item.id, item.url or target, item.summary) for item in self.evidence)
+        return FindingContract(
+            key=key,
+            state_hash=FindingStateHash.from_state(
+                key,
+                status=status,
+                applicability=applicability,
+                completeness=completeness,
+                evidence_ids=tuple(item.id for item in self.evidence),
+            ),
+            status=status,
+            applicability=applicability,
+            completeness=completeness,
+            severity=Severity.INFO if status is Status.PASS else Severity.LOW,
+            impact="info" if status is Status.PASS else "low",
+            effort=Effort.LOW,
+            priority=10 if status is Status.PASS else 20,
+            evidence=evidence,
+        )
+
     @property
     def fingerprint(self) -> str:
         payload = {
@@ -251,7 +290,14 @@ def report_from_checks(target: str, checks: Iterable[Any]) -> AuditReport:
         evidence.extend(check_evidence)
         raw_status = getattr(check, "status", "unavailable")
         status = FindingStatus("unavailable" if raw_status == "error" else raw_status)
-        findings.append(Finding(check.id, check.title, status, check.details, check_evidence))
+        dto = Finding(check.id, check.title, status, check.details, check_evidence)
+        contract = dto.to_contract(target=target, rule_version=str(getattr(check, "version", "1.0.0")))
+        findings.append(contract.to_report_finding(
+            title=dto.title,
+            reason=dto.reason,
+            url=target,
+            public_id=dto.id,
+        ))
     applicable = sum(item.status not in {FindingStatus.SKIP, FindingStatus.UNAVAILABLE} for item in findings)
     complete = sum(
         item.status in {FindingStatus.PASS, FindingStatus.FAIL, FindingStatus.WARN}

@@ -2,6 +2,8 @@ import sys
 from pathlib import Path
 from typing import ClassVar
 
+import httpx
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 from agentready.mobile_checks import (
@@ -113,6 +115,16 @@ def test_mobile_report_renders_all_formats():
     assert ".report-generated{margin:.25rem 0 1rem;color:#6b7280;font-size:.85rem}" in html_output
 
 
+def test_mobile_wire_contract_projects_canonical_state_without_parallel_field():
+    report = _report([_page("https://example.com", [_check("viewport-meta", "fail")])])
+
+    payload = report.to_dict()
+
+    assert "canonical_findings" not in payload
+    assert payload["pages"][0]["checks"][0]["id"] == "viewport-meta"
+    assert payload["pages"][0]["checks"][0]["status"] == "fail"
+
+
 def test_mobile_report_localizes_details_and_remediation():
     """Russian mobile reports must not leak scanner-generated English sentences."""
     page = _page(
@@ -213,28 +225,6 @@ def test_mobile_check_metadata_is_localized():
 def test_mobile_render_preserves_exact_optional_dependency_skip(monkeypatch):
     from agentready.browser_pool import CapabilityUnavailableError
 
-    class FakeResponse:
-        status_code = 200
-        content_type = "text/html"
-        text = "<html><head><meta name='viewport' content='width=device-width'></head></html>"
-        headers: ClassVar[dict[str, str]] = {}
-
-        def evidence(self, action, **kwargs):
-            return Evidence(action=action, url="https://example.com")
-
-    class FakeHttpClient:
-        def __init__(self, **kwargs):
-            pass
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            pass
-
-        def get(self, url, **kwargs):
-            return FakeResponse()
-
     class MissingBrowserPool:
         def __init__(self, policy):
             pass
@@ -248,9 +238,19 @@ def test_mobile_render_preserves_exact_optional_dependency_skip(monkeypatch):
         async def close(self):
             pass
 
-    monkeypatch.setattr("agentready.mobile_scanner.HttpClient", FakeHttpClient)
-    monkeypatch.setattr("agentready.mobile_scanner.BrowserPool", MissingBrowserPool)
-    report = audit_mobile(["https://example.com"], render=True)
+    async def collected_page(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            text="<html><head><meta name='viewport' content='width=device-width'></head></html>",
+        )
+
+    monkeypatch.setattr("agentready.browser_pool.BrowserPool", MissingBrowserPool)
+    report = audit_mobile(
+        ["https://example.com"],
+        render=True,
+        transport=httpx.MockTransport(collected_page),
+    )
 
     rendered = [check for check in report.pages[0].checks if check.id.startswith("rendered-")]
     assert len(rendered) == 3
@@ -263,7 +263,7 @@ def test_rendered_checks_use_one_shared_async_pool():
     import asyncio
     from contextlib import asynccontextmanager
 
-    from agentready.mobile_render import MOBILE_RENDER_CHECKS
+    from agentready.mobile_render import audit_rendered_mobile_page
 
     class FakePage:
         async def evaluate(self, script):
@@ -291,10 +291,10 @@ def test_rendered_checks_use_one_shared_async_pool():
 
     async def run():
         pool = FakePool()
-        results = [await check("https://example.com", pool) for check in MOBILE_RENDER_CHECKS]
+        results = await audit_rendered_mobile_page("https://example.com", pool)
         return pool, results
 
     pool, results = asyncio.run(run())
-    assert pool.pages == len(MOBILE_RENDER_CHECKS)
-    assert pool.navigations == len(MOBILE_RENDER_CHECKS)
+    assert pool.pages == 1
+    assert pool.navigations == 1
     assert [result.status for result in results] == ["pass", "skip", "pass"]

@@ -39,6 +39,11 @@ def test_shared_evidence_is_collected_once_and_rules_are_deterministic() -> None
     assert first == second
     assert all(item.evidence_ids for item in first)
     assert all(item.fingerprint for item in first)
+    contract = first[0].to_contract()
+    assert contract.key.rule_id == first[0].rule.id
+    assert contract.key.rule_version == "1.0.0"
+    assert contract.state_hash.value
+    assert first[0].to_v2().id == first[0].rule.id
 
 
 def test_atomic_rules_cover_metadata_canonical_hreflang_and_jsonld() -> None:

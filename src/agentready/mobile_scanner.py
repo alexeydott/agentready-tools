@@ -1,16 +1,14 @@
-"""Orchestration for multi-page mobile-friendliness audits."""
+"""Mobile v2 projection over facts collected by ``AuditService``."""
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from collections.abc import Sequence
+from typing import Any, Protocol
 
-from .browser_pool import BrowserPool, BrowserPoolBoundary, CapabilityUnavailableError
-from .egress import EgressPolicy
-from .http import HttpClient
+from .browser_pool import BrowserPoolBoundary
 from .mobile_models import MobileCheckResult, MobilePageReport, MobileReport
-from .mobile_render import MOBILE_RENDER_CHECKS
+from .mobile_render import MOBILE_RENDER_CHECKS, audit_rendered_mobile_page
 from .mobile_scoring import rank_mobile_recommendations, score_mobile_checks
 from .models import utc_now_iso
 from .target import ensure_public_url, parse_target
@@ -22,18 +20,22 @@ MOBILE_SCHEMA = "agentready.mobile.v2"
 MobileCheck = type(MOBILE_RENDER_CHECKS[0]) if MOBILE_RENDER_CHECKS else object
 
 
+class MobileReplayClient(Protocol):
+    """Analyzer-only view of the collected HTTP representation."""
+
+    def get(self, url: str, headers: dict[str, str] | None = None, *, use_cache: bool = True) -> Any:
+        ...
+
+
 async def _audit_page(
     url: str,
     *,
     render: bool,
-    timeout: float,
-    verify: bool,
     allow_private: bool,
-    max_redirects: int,
-    max_bytes: int,
     recommendation_limit: int,
     browser_pool: BrowserPoolBoundary | None = None,
     render_status: str | None = None,
+    client: MobileReplayClient | None = None,
 ) -> MobilePageReport:
     from .mobile_checks import MOBILE_STATIC_CHECKS
 
@@ -44,14 +46,9 @@ async def _audit_page(
     logger.info("Mobile audit started: url=%s render=%s", target.url, render)
     started_perf = time.perf_counter()
     checks: list[MobileCheckResult] = []
-    with HttpClient(
-        timeout=timeout,
-        verify=verify,
-        allow_private=allow_private,
-        max_redirects=max_redirects,
-        max_bytes=max_bytes,
-    ) as client:
-        checks.extend(check(target.url, client) for check in MOBILE_STATIC_CHECKS)
+    if client is None:
+        raise RuntimeError("mobile analysis requires AuditService collected facts")
+    checks.extend(check(target.url, client) for check in MOBILE_STATIC_CHECKS)
     if render:
         if render_status is not None:
             rendered_checks = [
@@ -91,13 +88,11 @@ async def _audit_page(
 
 
 async def _run_render_checks(url: str, browser_pool: BrowserPoolBoundary) -> list[MobileCheckResult]:
-    results: list[MobileCheckResult] = []
-    for check in MOBILE_RENDER_CHECKS:
-        try:
-            results.append(await check(url, browser_pool))
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Rendered mobile check failed: check=%s error=%s", check.__name__, exc)
-            results.append(
+    try:
+        return await audit_rendered_mobile_page(url, browser_pool)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("[FIX:mobile-browser-replay] rendered collection failed url=%s error=%s", url, exc)
+        return [
                 MobileCheckResult(
                     id=check.__name__.replace("check_", "").replace("_async", "").replace("_", "-"),
                     title=check.__name__.replace("check_", "").replace("_async", "").replace("_", " ").title(),
@@ -107,74 +102,8 @@ async def _run_render_checks(url: str, browser_pool: BrowserPoolBoundary) -> lis
                     details=str(exc),
                     duration_ms=0,
                 )
-            )
-
-
-async def _audit_mobile_async(
-    urls: Sequence[str],
-    *,
-    render: bool,
-    timeout: float,
-    verify: bool,
-    allow_private: bool,
-    max_redirects: int,
-    max_bytes: int,
-    recommendation_limit: int,
-    language: str,
-) -> MobileReport:
-    pool: BrowserPoolBoundary | None = None
-    render_status: str | None = None
-    if render:
-        pool = BrowserPool(
-            EgressPolicy(
-                block_private=not allow_private,
-                max_redirects=max_redirects,
-                max_response_bytes=max_bytes,
-            )
-        )
-        try:
-            await pool.start()
-        except CapabilityUnavailableError as exc:
-            if exc.capability == "Playwright browser support":
-                pool = None
-                render_status = "playwright not installed"
-            else:
-                render_status = str(exc)
-                await pool.close()
-                pool = None
-    try:
-        pages = [
-            await _audit_page(
-                url,
-                render=render,
-                timeout=timeout,
-                verify=verify,
-                allow_private=allow_private,
-                max_redirects=max_redirects,
-                max_bytes=max_bytes,
-                recommendation_limit=recommendation_limit,
-                browser_pool=pool,
-                render_status=render_status,
-            )
-            for url in urls
+            for check in MOBILE_RENDER_CHECKS
         ]
-        all_checks = [check for page in pages for check in page.checks]
-        score, categories = score_mobile_checks(all_checks)
-        recommendations = rank_mobile_recommendations(all_checks, limit=recommendation_limit)
-        return MobileReport(
-            schema=MOBILE_SCHEMA,
-            targets=list(urls),
-            pages=pages,
-            score=score,
-            categories=categories,
-            recommendations=recommendations,
-            started_at=utc_now_iso(),
-            finished_at=utc_now_iso(),
-            language=language,
-        )
-    finally:
-        if pool is not None:
-            await pool.close()
 
 
 def audit_mobile(
@@ -188,18 +117,55 @@ def audit_mobile(
     max_bytes: int = 5 * 1024 * 1024,
     recommendation_limit: int = 10,
     language: str = "en",
+    transport: Any | None = None,
 ) -> MobileReport:
+    from .audit_service import AuditRequest, AuditService
+
+    if not urls:
+        raise ValueError("at least one mobile audit target is required")
+    targets = [parse_target(url).url for url in urls]
+    if not allow_private:
+        for target in targets:
+            ensure_public_url(target)
     logger.info("Mobile audit started: urls=%d render=%s", len(urls), render)
-    report = asyncio.run(_audit_mobile_async(
-        urls,
-        render=render,
-        timeout=timeout,
-        verify=verify,
-        allow_private=allow_private,
-        max_redirects=max_redirects,
-        max_bytes=max_bytes,
-        recommendation_limit=recommendation_limit,
+    started_at = utc_now_iso()
+    pages = []
+    service = AuditService()
+    for target in targets:
+        result = service.run(
+            AuditRequest(
+                target=target,
+                mode="mobile",
+                profile="quick",
+                max_pages=1,
+                timeout=timeout,
+                render=render,
+                language=language,
+                allow_private=allow_private,
+                recommendation_limit=recommendation_limit,
+                verify=verify,
+                max_redirects=max_redirects,
+                max_bytes=max_bytes,
+                transport=transport,
+            )
+        )
+        if result.mobile_report is None:
+            raise RuntimeError("AuditService returned no mobile projection")
+        pages.extend(result.mobile_report.pages)
+    all_checks = [check for page in pages for check in page.checks]
+    score, categories = score_mobile_checks(all_checks)
+    recommendations = rank_mobile_recommendations(all_checks, limit=recommendation_limit)
+    report = MobileReport(
+        schema=MOBILE_SCHEMA,
+        targets=targets,
+        pages=pages,
+        score=score,
+        categories=categories,
+        recommendations=recommendations,
+        started_at=started_at,
+        finished_at=utc_now_iso(),
         language=language,
-    ))
+    )
+    logger.info("[FIX:mobile-collection] mobile adapter delegated pages=%d", len(pages))
     logger.info("Mobile audit finished: urls=%d aggregate_score=%d", len(urls), report.score)
     return report

@@ -236,7 +236,11 @@ def _run_provider_enrichment(run_id: str, request: ProviderEnrichmentRequest) ->
             "gsc": gsc_adapter,
             "url-inspection": url_inspection_adapter,
         }[request.provider](ProviderConfig())
-        result = adapter.run(lambda _: metrics, cached=metrics).to_dict()
+
+        async def cached_operation(_: str | None) -> tuple[ExternalMetric, ...]:
+            return metrics
+
+        result = adapter.run(cached_operation, cached=metrics).to_dict()
         result["sample_count"] = len(urls)
         for item in request.cached_metrics:
             if item.url_key is None:
