@@ -13,6 +13,7 @@
 .opencode/
 .mcp.json
 .ai-factory.json
+.agentready.yml
 .vscode/mcp.json
 .fonts
 .shieldfont/
