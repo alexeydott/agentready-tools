@@ -7,13 +7,16 @@ import pytest
 from agentready.audit_core.store import (
     ContentRetention,
     FetchFact,
+    FindingStorageQuery,
     MemorySiteStore,
     MetricRecord,
     PageRecord,
+    PageStorageQuery,
     RedirectFact,
     RunRecord,
     RunUrlRecord,
     RunUrlState,
+    RunUrlStorageQuery,
     SQLiteSiteStore,
     StoreError,
 )
@@ -47,6 +50,90 @@ def test_memory_store_is_idempotent_and_metadata_only_by_default():
     ]
     assert store.recover_interrupted_runs() == 1
     assert store.resume_run("run-1").state == "running"
+
+
+@pytest.mark.parametrize("store_kind", ["memory", "sqlite"])
+def test_storage_queries_are_bounded_and_cursor_bound(tmp_path: Path, store_kind: str):
+    store = MemorySiteStore() if store_kind == "memory" else SQLiteSiteStore(tmp_path / "query.sqlite")
+    try:
+        _populate(store)
+        store.put_finding("run-1", "finding-2", {"status": "fail"})
+        first = store.query_pages_storage(PageStorageQuery("run-1", limit=1))
+        assert len(first.items) == 1 and first.next_cursor
+        second = store.query_pages_storage(PageStorageQuery("run-1", limit=1, cursor=first.next_cursor))
+        assert second.items[0].url_key != first.items[0].url_key
+        findings = store.query_findings_storage(FindingStorageQuery("run-1", status="fail"))
+        assert [row.finding_id for row in findings.items] == ["finding-2"]
+        urls = store.query_run_urls_storage(RunUrlStorageQuery("run-1", limit=1))
+        assert urls.items[0].url_key.endswith("/a")
+        with pytest.raises(StoreError):
+            store.query_pages_storage(PageStorageQuery("other", limit=1, cursor=first.next_cursor))
+        with pytest.raises(ValueError):
+            PageStorageQuery("run-1", sort_key="status")
+        with pytest.raises(ValueError):
+            FindingStorageQuery("run-1", descending=True)
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("store_kind", ["memory", "sqlite"])
+def test_storage_query_pages_match_backend_sequences(tmp_path: Path, store_kind: str):
+    store = MemorySiteStore() if store_kind == "memory" else SQLiteSiteStore(tmp_path / "sequence.sqlite")
+    try:
+        _populate(store)
+        store.put_page(PageRecord("run-1", "https://example.com/c", "https://example.com/c", status_code=200, locally_indexable=False))
+        pages: list[str] = []
+        cursor = None
+        while True:
+            result = store.query_pages_storage(PageStorageQuery("run-1", limit=1, cursor=cursor))
+            pages.extend(page.url_key for page in result.items)
+            if not result.next_cursor:
+                break
+            cursor = result.next_cursor
+        assert pages == ["https://example.com/a", "https://example.com/b", "https://example.com/c"]
+        assert store.query_pages_storage(PageStorageQuery("run-1", status_code=204)).items == ()
+    finally:
+        store.close()
+
+
+def test_memory_and_sqlite_storage_cursors_match_after_deletion(tmp_path: Path):
+    memory = MemorySiteStore()
+    sqlite = SQLiteSiteStore(tmp_path / "cursor-parity.sqlite")
+    try:
+        _populate(memory)
+        _populate(sqlite)
+        del memory._pages[("run-1", "https://example.com/b")]
+        sqlite._connection.execute("DELETE FROM pages WHERE run_id=? AND url_key=?", ("run-1", "https://example.com/b"))
+        sqlite._connection.commit()
+        def collect(store):
+            cursor = None
+            rows = []
+            cursors = []
+            while True:
+                page = store.query_pages_storage(PageStorageQuery("run-1", limit=1, cursor=cursor))
+                rows.extend(item.url_key for item in page.items)
+                if not page.next_cursor:
+                    break
+                cursors.append(page.next_cursor)
+                cursor = page.next_cursor
+            return rows, cursors
+        assert collect(memory) == collect(sqlite)
+    finally:
+        memory.close()
+        sqlite.close()
+
+
+def test_sqlite_storage_query_uses_keyset_index(tmp_path: Path):
+    store = SQLiteSiteStore(tmp_path / "plan.sqlite")
+    try:
+        _populate(store)
+        plan = store._connection.execute(
+            "EXPLAIN QUERY PLAN SELECT * FROM pages WHERE run_id=? ORDER BY url_key LIMIT ?",
+            ("run-1", 2),
+        ).fetchall()
+        assert any("idx_pages_run_url" in str(tuple(row)).lower() or "sqlite_autoindex_pages" in str(tuple(row)).lower() for row in plan)
+    finally:
+        store.close()
 
 
 def test_sqlite_matches_memory_and_retains_bounded_samples(tmp_path: Path):
@@ -203,8 +290,27 @@ def test_sqlite_migration_is_idempotent_and_recovery_is_durable(tmp_path: Path):
     second = SQLiteSiteStore(path)
     try:
         assert second.recover_interrupted_runs() == 0
-        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 6
         assert second._connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 1
         assert second.resume_run("run-recovery").state == "running"
     finally:
         second.close()
+
+
+def test_sqlite_reclaims_stale_pending_evidence(tmp_path: Path):
+    path = tmp_path / "stale-evidence.sqlite"
+    store = SQLiteSiteStore(path)
+    store.begin_run(RunRecord("run-stale", "config", "tool", "rules"))
+    evidence_id = "provider:ga4:https://example.com/"
+    assert store.claim_evidence("run-stale", evidence_id)
+    store.put_evidence("run-stale", evidence_id, {"status": "pending"})
+    store._connection.execute("UPDATE evidence_claims SET claimed_at=datetime('now', '-2 hours')")
+    store._connection.commit()
+    store.close()
+
+    reopened = SQLiteSiteStore(path)
+    try:
+        assert reopened.claim_evidence("run-stale", evidence_id)
+        assert reopened.get_evidence("run-stale", evidence_id) is None
+    finally:
+        reopened.close()

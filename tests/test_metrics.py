@@ -1,23 +1,30 @@
 from __future__ import annotations
 
+import asyncio
 import time
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event, Lock
 
 from agentready.audit_core.store import (
+    EVIDENCE_CLAIM_STALE_SECONDS,
     MemorySiteStore,
     RunRecord,
     RunUrlRecord,
     RunUrlState,
+    SQLiteSiteStore,
 )
 from agentready.metrics import (
     ExternalMetric,
     MetricKind,
     ProviderConfig,
     ProviderJob,
+    ProviderRunBudget,
     ProviderScheduler,
     ProviderStatus,
     cached_result,
     evaluate_cross_facts,
     ga4_adapter,
+    gsc_adapter,
     sample_cwv,
 )
 from agentready.query_service import QueryService
@@ -27,10 +34,54 @@ def _metric(name: str = "sessions") -> ExternalMetric:
     return ExternalMetric("ga4", name, 12, "count", "fixture", "data-api-v1beta", "2026-08-10T00:00:00+00:00")
 
 
+def test_provider_scheduler_resumes_stale_pending_evidence() -> None:
+    store = MemorySiteStore()
+    run_id = "run-stale-provider"
+    url = "https://example.test/stale"
+    store.begin_run(RunRecord(run_id, "config", "tool", "rules"))
+    store.put_run_url(RunUrlRecord(run_id, url, RunUrlState.DISCOVERED))
+    evidence_id = f"provider:ga4:{url}"
+    store.claim_evidence(run_id, evidence_id)
+    store.put_evidence(run_id, evidence_id, {"provider": "ga4", "status": "pending"})
+    store._evidence_claims[(run_id, evidence_id)] = time.monotonic() - EVIDENCE_CLAIM_STALE_SECONDS - 1
+    calls = 0
+
+    async def operation(_: str, __: str | None) -> tuple[ExternalMetric, ...]:
+        nonlocal calls
+        calls += 1
+        return (_metric(),)
+
+    adapter = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True))
+    scheduler = ProviderScheduler()
+    result = scheduler.run_for_urls(
+        run_id,
+        adapter,
+        operation,
+        query_service=QueryService(store),
+        store=store,
+    )
+
+    assert calls == 1
+    assert result[0].status is ProviderStatus.AVAILABLE
+
+
+async def _one_metric(_: str | None) -> tuple[ExternalMetric, ...]:
+    return (_metric(),)
+
+
+async def _slow_metric(_: str | None) -> tuple[ExternalMetric, ...]:
+    await asyncio.sleep(0.05)
+    return ()
+
+
+async def _failed_metric(_: str | None) -> tuple[ExternalMetric, ...]:
+    raise RuntimeError("boom")
+
+
 def test_provider_requires_explicit_opt_in_and_does_not_call_operation() -> None:
     called = False
 
-    def operation(_: str | None):
+    async def operation(_: str | None):
         nonlocal called
         called = True
         return (_metric(),)
@@ -42,14 +93,26 @@ def test_provider_requires_explicit_opt_in_and_does_not_call_operation() -> None
 
 
 def test_provider_quota_timeout_and_failure_are_diagnosable() -> None:
-    quota = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True, quota=0)).run(lambda _: (_metric(),))
+    cancelled = False
+
+    async def cancellable_operation(_: str | None) -> tuple[ExternalMetric, ...]:
+        nonlocal cancelled
+        try:
+            await asyncio.sleep(1)
+        finally:
+            cancelled = True
+
+    quota = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True, quota=0)).run(_one_metric)
+    started = time.monotonic()
     timeout = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True, timeout_seconds=0.01)).run(
-        lambda _: (time.sleep(0.05),)[0]  # type: ignore[return-value]
+        cancellable_operation
     )
-    unavailable = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True)).run(lambda _: (_ for _ in ()).throw(RuntimeError("boom")))
+    unavailable = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True)).run(_failed_metric)
 
     assert quota.status is ProviderStatus.QUOTA_EXCEEDED
     assert timeout.status is ProviderStatus.TIMEOUT
+    assert time.monotonic() - started < 0.1
+    assert cancelled is True
     assert unavailable.status is ProviderStatus.UNAVAILABLE
 
 
@@ -90,7 +153,7 @@ def test_external_metric_projects_to_store_record() -> None:
 
 def test_provider_scheduler_runs_explicit_jobs_with_bounded_workers():
     adapter = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True))
-    result = ProviderScheduler(max_workers=1).run([ProviderJob(adapter, lambda _: (_metric(),))])
+    result = ProviderScheduler(max_workers=1).run([ProviderJob(adapter, _one_metric)])
     assert result[0].status is ProviderStatus.AVAILABLE
 
 
@@ -101,13 +164,13 @@ def test_provider_scheduler_isolates_timeout_and_quota_from_successful_facts():
     quota_exhausted = ga4_adapter(
         ProviderConfig(enabled=True, explicit_operation=True, quota=0)
     )
-    healthy = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True))
+    healthy = gsc_adapter(ProviderConfig(enabled=True, explicit_operation=True))
 
     results = ProviderScheduler(max_workers=3).run(
         [
-            ProviderJob(slow, lambda _: (time.sleep(0.05),)[0]),  # type: ignore[return-value]
-            ProviderJob(quota_exhausted, lambda _: (_metric("quota"),)),
-            ProviderJob(healthy, lambda _: (_metric("sessions"),)),
+            ProviderJob(slow, _slow_metric),
+            ProviderJob(quota_exhausted, _one_metric),
+            ProviderJob(healthy, _one_metric),
         ]
     )
 
@@ -119,21 +182,182 @@ def test_provider_scheduler_isolates_timeout_and_quota_from_successful_facts():
     assert results[2].metrics[0].observed_at == "2026-08-10T00:00:00+00:00"
 
 
+def test_provider_scheduler_enforces_one_global_quota_across_concurrent_jobs():
+    calls = 0
+
+    async def operation(_: str | None):
+        nonlocal calls
+        calls += 1
+        return (_metric(),)
+
+    adapter = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True, quota=1))
+    results = ProviderScheduler(max_workers=4).run(
+        [ProviderJob(adapter, operation) for _ in range(8)]
+    )
+
+    assert calls == 1
+    assert sum(result.status is ProviderStatus.AVAILABLE for result in results) == 1
+    assert sum(result.status is ProviderStatus.QUOTA_EXCEEDED for result in results) == 7
+
+
+def test_provider_scheduler_shares_quota_across_adapter_instances():
+    calls = 0
+
+    async def operation(_: str | None):
+        nonlocal calls
+        calls += 1
+        return (_metric(),)
+
+    adapters = [
+        ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True, quota=1)),
+        ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True, quota=1)),
+    ]
+    results = ProviderScheduler(max_workers=2).run([ProviderJob(adapter, operation) for adapter in adapters])
+    assert calls == 1
+    assert [item.status for item in results].count(ProviderStatus.AVAILABLE) == 1
+
+
+def test_provider_run_budget_keeps_total_and_provider_limits_deterministic():
+    budget = ProviderRunBudget(total=2, per_provider={"ga4": 1, "gsc": 2})
+
+    assert budget.reserve("ga4") is True
+    assert budget.reserve("ga4") is False
+    assert budget.reserve("gsc") is True
+    assert budget.reserve("gsc") is False
+    budget.mark_started("ga4")
+    budget.release("gsc")
+
+    snapshot = budget.snapshot()
+    assert snapshot.reserved == 1
+    assert snapshot.started == 1
+    assert snapshot.released == 1
+    assert snapshot.exhausted == 2
+
+
+def test_provider_scheduler_does_not_charge_cached_or_prestart_cancelled_jobs():
+    calls = 0
+
+    async def operation(_: str | None):
+        nonlocal calls
+        calls += 1
+        return (_metric(),)
+
+    adapter = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True, quota=1))
+    cached = _metric("cached")
+    results = ProviderScheduler(max_workers=2).run(
+        [
+            ProviderJob(adapter, operation, cached=(cached,)),
+            ProviderJob(adapter, operation, cancelled=True),
+            ProviderJob(adapter, operation),
+        ]
+    )
+
+    assert calls == 1
+    assert results[0].from_cache is True
+    assert results[1].status is ProviderStatus.CANCELLED
+    assert results[2].status is ProviderStatus.AVAILABLE
+
+
 def test_provider_scheduler_selects_urls_and_persists_metrics():
     store = MemorySiteStore()
     store.begin_run(RunRecord("run-provider", "config", "tool", "rules"))
     store.put_run_url(RunUrlRecord("run-provider", "https://example.test/", RunUrlState.PARSED))
     adapter = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True))
+
+    async def operation(url: str, _: str | None) -> tuple[ExternalMetric, ...]:
+        return (ExternalMetric("ga4", "sessions", len(url), "count", "fixture", "1", "now"),)
+
     results = ProviderScheduler(max_workers=1).run_for_urls(
         "run-provider",
         adapter,
-        lambda url, _: (ExternalMetric("ga4", "sessions", len(url), "count", "fixture", "1", "now"),),
+        operation,
         query_service=QueryService(store),
         store=store,
     )
     assert results[0].status is ProviderStatus.AVAILABLE
     assert next(iter(store.iter_metrics("run-provider"))).value > 0
     assert ("run-provider", "provider:ga4:https://example.test/") in store._evidence
+
+
+def test_provider_scheduler_resume_is_idempotent_for_memory_and_sqlite(tmp_path):
+    for store in (
+        MemorySiteStore(),
+        SQLiteSiteStore(tmp_path / "provider-idempotency.sqlite"),
+    ):
+        try:
+            store.begin_run(RunRecord("run-provider-idempotent", "config", "tool", "rules"))
+            for url in ("https://example.test/a", "https://example.test/b"):
+                store.put_run_url(RunUrlRecord("run-provider-idempotent", url, RunUrlState.PARSED))
+            calls = 0
+
+            async def operation(url: str, _: str | None):
+                nonlocal calls
+                calls += 1
+                return (ExternalMetric("ga4", "sessions", len(url), "count", "fixture", "1", "now"),)
+
+            adapter = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True, quota=2))
+            scheduler = ProviderScheduler(max_workers=2)
+            first = scheduler.run_for_urls(
+                "run-provider-idempotent", adapter, operation,
+                query_service=QueryService(store), store=store,
+            )
+            second = scheduler.run_for_urls(
+                "run-provider-idempotent", adapter, operation,
+                query_service=QueryService(store), store=store,
+            )
+
+            assert calls == 2
+            assert [result.from_cache for result in first] == [False, False]
+            assert [result.from_cache for result in second] == [True, True]
+            assert [(result.status, result.metrics, result.quota_remaining) for result in first] == [
+                (result.status, result.metrics, result.quota_remaining) for result in second
+            ]
+            assert len(tuple(store.iter_metrics("run-provider-idempotent"))) == 2
+        finally:
+            store.close()
+
+
+def test_provider_scheduler_claims_inflight_url_once(tmp_path):
+    for store in (MemorySiteStore(), SQLiteSiteStore(tmp_path / "provider-concurrent.sqlite")):
+        try:
+            run_id = "run-provider-concurrent"
+            store.begin_run(RunRecord(run_id, "config", "tool", "rules"))
+            url = "https://example.test/concurrent"
+            store.put_run_url(RunUrlRecord(run_id, url, RunUrlState.PARSED))
+            started = Event()
+            release = Event()
+            lock = Lock()
+            calls = 0
+
+            async def operation(
+                _: str,
+                __: str | None,
+                current_lock: Lock = lock,
+                current_started: Event = started,
+                current_release: Event = release,
+            ):
+                nonlocal calls
+                with current_lock:
+                    calls += 1
+                current_started.set()
+                deadline = time.monotonic() + 3
+                while not current_release.is_set() and time.monotonic() < deadline:
+                    await asyncio.sleep(0.01)
+                return (ExternalMetric("ga4", "sessions", 1, "count", "fixture", "1", "now"),)
+
+            adapter = ga4_adapter(ProviderConfig(enabled=True, explicit_operation=True, quota=2, timeout_seconds=3))
+            scheduler = ProviderScheduler(max_workers=1)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                first = pool.submit(scheduler.run_for_urls, run_id, adapter, operation, query_service=QueryService(store), store=store)
+                assert started.wait(timeout=2)
+                second = pool.submit(scheduler.run_for_urls, run_id, adapter, operation, query_service=QueryService(store), store=store)
+                release.set()
+                first_result = first.result(timeout=5)
+                second_result = second.result(timeout=5)
+            assert calls == 1
+            assert first_result[0].metrics == second_result[0].metrics
+        finally:
+            store.close()
 
 
 def test_cross_fact_rules_join_local_and_provider_signals():

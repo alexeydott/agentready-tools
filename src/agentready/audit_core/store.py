@@ -1,10 +1,13 @@
 """Memory and SQLite SiteStore contracts for deterministic audit persistence."""
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import logging
 import sqlite3
 import threading
+import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
@@ -18,11 +21,116 @@ from agentready.security import SecretRedactor
 from .urls import UrlIdentity
 
 logger = logging.getLogger(__name__)
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
+EVIDENCE_CLAIM_STALE_SECONDS = 3600.0
 
 
 class StoreError(RuntimeError):
     """Raised when a store cannot safely satisfy an operation."""
+
+
+@dataclass(frozen=True, slots=True)
+class StorageCursor:
+    """Opaque, query-bound keyset cursor; deliberately not cryptographic."""
+
+    run_id: str
+    query_hash: str
+    position: tuple[Any, ...]
+    version: int = 1
+
+    def encode(self) -> str:
+        payload = json.dumps(
+            {"v": self.version, "run": self.run_id, "query": self.query_hash, "position": self.position},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+    @classmethod
+    def decode(cls, token: str, *, run_id: str, query_hash: str) -> StorageCursor:
+        try:
+            payload = json.loads(base64.urlsafe_b64decode(token + "=" * (-len(token) % 4)))
+            cursor = cls(
+                str(payload["run"]),
+                str(payload["query"]),
+                tuple(payload["position"]),
+                int(payload["v"]),
+            )
+        except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            raise StoreError("invalid storage cursor") from exc
+        if cursor.version != 1 or cursor.run_id != run_id or cursor.query_hash != query_hash:
+            raise StoreError("storage cursor does not match query")
+        return cursor
+
+
+@dataclass(frozen=True, slots=True)
+class StorageQuery:
+    run_id: str
+    limit: int = 100
+    cursor: str | None = None
+    sort_key: str = "url"
+    descending: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.run_id.strip():
+            raise ValueError("storage query run_id must not be empty")
+        if self.limit <= 0 or self.limit > 1000:
+            raise ValueError("storage query limit must be between 1 and 1000")
+
+
+@dataclass(frozen=True, slots=True)
+class PageStorageQuery(StorageQuery):
+    status_code: int | None = None
+    locally_indexable: bool | None = None
+
+    def __post_init__(self) -> None:
+        StorageQuery.__post_init__(self)
+        if self.sort_key != "url" or self.descending:
+            raise ValueError("page storage queries support only ascending url order")
+
+
+@dataclass(frozen=True, slots=True)
+class RunUrlStorageQuery(StorageQuery):
+    state: RunUrlState | None = None
+
+    def __post_init__(self) -> None:
+        StorageQuery.__post_init__(self)
+        if self.sort_key != "url" or self.descending:
+            raise ValueError("run-url storage queries support only ascending url order")
+
+
+@dataclass(frozen=True, slots=True)
+class FindingStorageQuery(StorageQuery):
+    sort_key: str = "finding_id"
+    finding_id: str | None = None
+    status: str | None = None
+
+    def __post_init__(self) -> None:
+        StorageQuery.__post_init__(self)
+        if self.sort_key != "finding_id" or self.descending:
+            raise ValueError("finding storage queries support only ascending finding_id order")
+
+
+@dataclass(frozen=True, slots=True)
+class LinkStorageQuery(StorageQuery):
+    source_key: str | None = None
+    target_key: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceStorageQuery(StorageQuery):
+    page_key: str | None = None
+    resource_type: str | None = None
+    status_code: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class StoragePage:
+    """Bounded store-level page returned by push-down queries."""
+
+    items: tuple[Any, ...]
+    next_cursor: str | None
+    total: int | None = None
 
 
 class ContentRetention(StrEnum):
@@ -177,17 +285,23 @@ class SiteStore(Protocol):
                      element: str | None = None, dom_path: str | None = None) -> None: ...
     def put_metric(self, metric: MetricRecord) -> None: ...
     def put_evidence(self, run_id: str, evidence_id: str, payload: Mapping[str, Any]) -> None: ...
+    def get_evidence(self, run_id: str, evidence_id: str) -> Mapping[str, Any] | None: ...
+    def claim_evidence(self, run_id: str, evidence_id: str) -> bool: ...
+    def release_evidence_claim(self, run_id: str, evidence_id: str) -> None: ...
     def put_finding(self, run_id: str, finding_id: str, payload: Mapping[str, Any]) -> None: ...
     def put_coverage(self, run_id: str, payload: Mapping[str, Any]) -> None: ...
     def put_version_manifest(self, run_id: str, payload: Mapping[str, Any]) -> None: ...
     def iter_pages(self, run_id: str) -> Iterator[PageRecord]: ...
     def iter_run_urls(self, run_id: str) -> Iterator[RunUrlRecord]: ...
     def query_pages(self, run_id: str, *, status_code: int | None = None) -> list[PageRecord]: ...
+    def query_pages_storage(self, query: PageStorageQuery) -> StoragePage: ...
+    def query_run_urls_storage(self, query: RunUrlStorageQuery) -> StoragePage: ...
     def iter_link_occurrences(self, run_id: str) -> Iterator[LinkOccurrenceRecord]: ...
     def iter_resource_occurrences(self, run_id: str) -> Iterator[ResourceOccurrenceRecord]: ...
     def iter_metrics(self, run_id: str) -> Iterator[MetricRecord]: ...
     def iter_redirects(self, run_id: str) -> Iterator[RedirectFact]: ...
     def iter_findings(self, run_id: str) -> Iterator[FindingRecord]: ...
+    def query_findings_storage(self, query: FindingStorageQuery) -> StoragePage: ...
     def recover_interrupted_runs(self) -> int: ...
     def resume_run(self, run_id: str) -> RunRecord: ...
     def close(self) -> None: ...
@@ -209,6 +323,8 @@ class MemorySiteStore:
         self._resource_occurrences: dict[tuple[str, str, str, int], ResourceOccurrenceRecord] = {}
         self._metrics: dict[tuple[str, str | None, str, str], MetricRecord] = {}
         self._evidence: dict[tuple[str, str], dict[str, Any]] = {}
+        self._evidence_claims: dict[tuple[str, str], float] = {}
+        self._claims_lock = threading.Lock()
         self._findings: dict[tuple[str, str], dict[str, Any]] = {}
         self._redactor = SecretRedactor()
 
@@ -286,7 +402,38 @@ class MemorySiteStore:
         self._metrics[(metric.run_id, metric.url_key, metric.provider, metric.name)] = metric
 
     def put_evidence(self, run_id: str, evidence_id: str, payload: Mapping[str, Any]) -> None:
-        self._evidence.setdefault((run_id, evidence_id), self._redactor.value(dict(payload)))
+        key = (run_id, evidence_id)
+        safe = self._redactor.value(dict(payload))
+        if self._evidence.get(key, {}).get("status") == "pending":
+            self._evidence[key] = safe
+        else:
+            self._evidence.setdefault(key, safe)
+
+    def get_evidence(self, run_id: str, evidence_id: str) -> Mapping[str, Any] | None:
+        payload = self._evidence.get((run_id, evidence_id))
+        return dict(payload) if payload is not None else None
+
+    def claim_evidence(self, run_id: str, evidence_id: str) -> bool:
+        with self._claims_lock:
+            key = (run_id, evidence_id)
+            now = time.monotonic()
+            claimed_at = self._evidence_claims.get(key)
+            if claimed_at is not None and now - claimed_at >= EVIDENCE_CLAIM_STALE_SECONDS:
+                self._evidence_claims.pop(key, None)
+                self._evidence.pop(key, None)
+            payload = self._evidence.get(key)
+            if payload is not None and payload.get("status") != "pending":
+                return False
+            if key in self._evidence_claims:
+                return False
+            if payload is not None:
+                self._evidence.pop(key, None)
+            self._evidence_claims[key] = now
+            return True
+
+    def release_evidence_claim(self, run_id: str, evidence_id: str) -> None:
+        with self._claims_lock:
+            self._evidence_claims.pop((run_id, evidence_id), None)
 
     def put_finding(self, run_id: str, finding_id: str, payload: Mapping[str, Any]) -> None:
         self._findings.setdefault((run_id, finding_id), self._redactor.value(dict(payload)))
@@ -312,6 +459,21 @@ class MemorySiteStore:
     def query_pages(self, run_id: str, *, status_code: int | None = None) -> list[PageRecord]:
         pages = list(self.iter_pages(run_id))
         return [page for page in pages if status_code is None or page.status_code == status_code]
+
+    def query_pages_storage(self, query: PageStorageQuery) -> StoragePage:
+        rows = [
+            page for page in self.iter_pages(query.run_id)
+            if (query.status_code is None or page.status_code == query.status_code)
+            and (query.locally_indexable is None or page.locally_indexable is query.locally_indexable)
+        ]
+        return _storage_page(rows, query, lambda row: (row.url_key,))
+
+    def query_run_urls_storage(self, query: RunUrlStorageQuery) -> StoragePage:
+        rows = [
+            row for row in self.iter_run_urls(query.run_id)
+            if query.state is None or row.state is query.state
+        ]
+        return _storage_page(rows, query, lambda row: (row.url_key,))
 
     def iter_link_occurrences(self, run_id: str) -> Iterator[LinkOccurrenceRecord]:
         yield from sorted(
@@ -349,6 +511,14 @@ class MemorySiteStore:
             ),
             key=lambda finding: finding.finding_id,
         )
+
+    def query_findings_storage(self, query: FindingStorageQuery) -> StoragePage:
+        rows = [
+            row for row in self.iter_findings(query.run_id)
+            if (query.finding_id is None or row.finding_id == query.finding_id)
+            and (query.status is None or row.payload.get("status") == query.status)
+        ]
+        return _storage_page(rows, query, lambda row: (row.finding_id,))
 
     def recover_interrupted_runs(self) -> int:
         changed = 0
@@ -438,6 +608,20 @@ class SQLiteSiteStore:
                 self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             elif version == 3:
                 self._connection.executescript(_MIGRATION_4)
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                    (SCHEMA_VERSION, _now()),
+                )
+                self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+            elif version == 4:
+                self._connection.executescript(_MIGRATION_5)
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                    (SCHEMA_VERSION, _now()),
+                )
+                self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+            elif version == 5:
+                self._connection.executescript(_MIGRATION_6)
                 self._connection.execute(
                     "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
                     (SCHEMA_VERSION, _now()),
@@ -598,6 +782,51 @@ class SQLiteSiteStore:
     def put_evidence(self, run_id: str, evidence_id: str, payload: Mapping[str, Any]) -> None:
         self._put_json("evidence", run_id, evidence_id, payload)
 
+    def get_evidence(self, run_id: str, evidence_id: str) -> Mapping[str, Any] | None:
+        row = self._connection.execute(
+            "SELECT payload FROM evidence WHERE run_id=? AND item_id=?",
+            (run_id, evidence_id),
+        ).fetchone()
+        return json.loads(row["payload"]) if row is not None else None
+
+    def claim_evidence(self, run_id: str, evidence_id: str) -> bool:
+        if self.read_only:
+            return False
+        with self._transaction():
+            self._connection.execute(
+                "DELETE FROM evidence_claims WHERE claimed_at < datetime('now', '-1 hour')"
+            )
+            claim = self._connection.execute(
+                "SELECT 1 FROM evidence_claims WHERE run_id=? AND item_id=?",
+                (run_id, evidence_id),
+            ).fetchone()
+            evidence = self._connection.execute(
+                "SELECT payload FROM evidence WHERE run_id=? AND item_id=?", (run_id, evidence_id)
+            ).fetchone()
+            if evidence is not None:
+                payload = json.loads(evidence["payload"])
+                if payload.get("status") != "pending":
+                    return False
+                if claim is not None:
+                    return False
+                # A pending row without a live claim is an interrupted attempt.
+                self._connection.execute(
+                    "DELETE FROM evidence WHERE run_id=? AND item_id=?", (run_id, evidence_id)
+                )
+            cursor = self._connection.execute(
+                "INSERT OR IGNORE INTO evidence_claims(run_id, item_id, claimed_at) VALUES (?, ?, ?)",
+                (run_id, evidence_id, _now()),
+            )
+        return cursor.rowcount == 1
+
+    def release_evidence_claim(self, run_id: str, evidence_id: str) -> None:
+        if self.read_only:
+            return
+        with self._transaction():
+            self._connection.execute(
+                "DELETE FROM evidence_claims WHERE run_id=? AND item_id=?", (run_id, evidence_id)
+            )
+
     def put_finding(self, run_id: str, finding_id: str, payload: Mapping[str, Any]) -> None:
         self._put_json("findings", run_id, finding_id, payload)
 
@@ -639,6 +868,33 @@ class SQLiteSiteStore:
         return [_page_from_row(row) for row in self._connection.execute(
             "SELECT * FROM pages WHERE run_id=? AND status_code=? ORDER BY url_key", (run_id, status_code)
         )]
+
+    def query_pages_storage(self, query: PageStorageQuery) -> StoragePage:
+        query_hash = _storage_query_hash(query)
+        where = ["run_id=?"]
+        params: list[Any] = [query.run_id]
+        if query.status_code is not None:
+            where.append("status_code=?")
+            params.append(query.status_code)
+        if query.locally_indexable is not None:
+            where.append("locally_indexable=?")
+            params.append(int(query.locally_indexable))
+        if query.cursor:
+            cursor = StorageCursor.decode(query.cursor, run_id=query.run_id, query_hash=query_hash)
+            where.append("url_key > ?")
+            params.append(str(cursor.position[0]))
+        predicate = " AND ".join(where)
+        rows = list(self._connection.execute(
+            f"SELECT * FROM pages WHERE {predicate} ORDER BY url_key LIMIT ?", (*params, query.limit + 1)
+        ))
+        items = tuple(_page_from_row(row) for row in rows[:query.limit])
+        next_cursor = None
+        if len(rows) > query.limit and items:
+            next_cursor = StorageCursor(query.run_id, query_hash, (items[-1].url_key,)).encode()
+        total = int(self._connection.execute(
+            f"SELECT COUNT(*) FROM pages WHERE {predicate}", tuple(params)
+        ).fetchone()[0])
+        return StoragePage(items, next_cursor, total)
 
     def iter_link_occurrences(self, run_id: str) -> Iterator[LinkOccurrenceRecord]:
         rows = self._connection.execute(
@@ -705,6 +961,52 @@ class SQLiteSiteStore:
         for row in rows:
             yield FindingRecord(run_id, row["item_id"], json.loads(row["payload"]))
 
+    def query_run_urls_storage(self, query: RunUrlStorageQuery) -> StoragePage:
+        query_hash = _storage_query_hash(query)
+        where = ["run_id=?"]
+        params: list[Any] = [query.run_id]
+        if query.state is not None:
+            where.append("state=?")
+            params.append(query.state.value)
+        if query.cursor:
+            cursor = StorageCursor.decode(query.cursor, run_id=query.run_id, query_hash=query_hash)
+            where.append("url_key > ?")
+            params.append(str(cursor.position[0]))
+        predicate = " AND ".join(where)
+        rows = list(self._connection.execute(
+            f"SELECT * FROM run_urls WHERE {predicate} ORDER BY url_key LIMIT ?", (*params, query.limit + 1)
+        ))
+        items = tuple(RunUrlRecord(
+            run_id=row["run_id"], url_key=row["url_key"], state=RunUrlState(row["state"]),
+            depth=row["depth"], attempts=row["attempts"], error_kind=row["error_kind"],
+        ) for row in rows[:query.limit])
+        next_cursor = StorageCursor(query.run_id, query_hash, (items[-1].url_key,)).encode() if len(rows) > query.limit and items else None
+        total = int(self._connection.execute(f"SELECT COUNT(*) FROM run_urls WHERE {predicate}", tuple(params)).fetchone()[0])
+        return StoragePage(items, next_cursor, total)
+
+    def query_findings_storage(self, query: FindingStorageQuery) -> StoragePage:
+        query_hash = _storage_query_hash(query)
+        where = ["run_id=?"]
+        params: list[Any] = [query.run_id]
+        if query.finding_id is not None:
+            where.append("item_id=?")
+            params.append(query.finding_id)
+        if query.status is not None:
+            where.append("json_extract(payload, '$.status')=?")
+            params.append(query.status)
+        if query.cursor:
+            cursor = StorageCursor.decode(query.cursor, run_id=query.run_id, query_hash=query_hash)
+            where.append("item_id > ?")
+            params.append(str(cursor.position[0]))
+        predicate = " AND ".join(where)
+        rows = list(self._connection.execute(
+            f"SELECT item_id, payload FROM findings WHERE {predicate} ORDER BY item_id LIMIT ?", (*params, query.limit + 1)
+        ))
+        items = tuple(FindingRecord(query.run_id, row["item_id"], json.loads(row["payload"])) for row in rows[:query.limit])
+        next_cursor = StorageCursor(query.run_id, query_hash, (items[-1].finding_id,)).encode() if len(rows) > query.limit and items else None
+        total = int(self._connection.execute(f"SELECT COUNT(*) FROM findings WHERE {predicate}", tuple(params)).fetchone()[0])
+        return StoragePage(items, next_cursor, total)
+
     def recover_interrupted_runs(self) -> int:
         if self.read_only:
             return 0
@@ -730,6 +1032,29 @@ class SQLiteSiteStore:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _storage_query_hash(query: StorageQuery) -> str:
+    payload = asdict(query)
+    payload.pop("cursor", None)
+    payload["state"] = getattr(query, "state", None)
+    if hasattr(payload["state"], "value"):
+        payload["state"] = payload["state"].value
+    encoded = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()[:16]
+
+
+def _storage_page(rows: list[Any], query: StorageQuery, key_builder) -> StoragePage:
+    rows.sort(key=key_builder)
+    query_hash = _storage_query_hash(query)
+    if query.cursor:
+        cursor = StorageCursor.decode(query.cursor, run_id=query.run_id, query_hash=query_hash)
+        position = tuple(cursor.position)
+        rows = [row for row in rows if key_builder(row) > position]
+    selected = rows[: query.limit + 1]
+    items = tuple(selected[: query.limit])
+    next_cursor = StorageCursor(query.run_id, query_hash, key_builder(items[-1])).encode() if len(selected) > query.limit and items else None
+    return StoragePage(items, next_cursor, len(rows))
 
 
 def _retained_content(content: str | None, retention: ContentRetention) -> str | None:
@@ -882,6 +1207,12 @@ CREATE TABLE IF NOT EXISTS evidence (
     payload TEXT NOT NULL,
     PRIMARY KEY(run_id, item_id)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS evidence_claims (
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    item_id TEXT NOT NULL,
+    claimed_at TEXT NOT NULL,
+    PRIMARY KEY(run_id, item_id)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS findings (
     run_id TEXT NOT NULL REFERENCES runs(id),
     item_id TEXT NOT NULL,
@@ -913,7 +1244,11 @@ CREATE TABLE IF NOT EXISTS metrics (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_metrics_run_name ON metrics(run_id, name);
 CREATE INDEX IF NOT EXISTS idx_pages_run_status ON pages(run_id, status_code);
+CREATE INDEX IF NOT EXISTS idx_pages_run_url ON pages(run_id, url_key);
+CREATE INDEX IF NOT EXISTS idx_pages_run_status_url ON pages(run_id, status_code, url_key);
 CREATE INDEX IF NOT EXISTS idx_fetches_run ON fetches(run_id);
+CREATE INDEX IF NOT EXISTS idx_findings_run_item ON findings(run_id, item_id);
+CREATE INDEX IF NOT EXISTS idx_run_urls_run_url_state ON run_urls(run_id, url_key, state);
 """
 
 _MIGRATION_2 = """
@@ -990,4 +1325,20 @@ CREATE TABLE IF NOT EXISTS metrics (
     PRIMARY KEY(run_id, url_key, provider, name)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_metrics_run_name ON metrics(run_id, name);
+"""
+
+_MIGRATION_5 = """
+CREATE INDEX IF NOT EXISTS idx_pages_run_url ON pages(run_id, url_key);
+CREATE INDEX IF NOT EXISTS idx_pages_run_status_url ON pages(run_id, status_code, url_key);
+CREATE INDEX IF NOT EXISTS idx_findings_run_item ON findings(run_id, item_id);
+CREATE INDEX IF NOT EXISTS idx_run_urls_run_url_state ON run_urls(run_id, url_key, state);
+"""
+
+_MIGRATION_6 = """
+CREATE TABLE IF NOT EXISTS evidence_claims (
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    item_id TEXT NOT NULL,
+    claimed_at TEXT NOT NULL,
+    PRIMARY KEY(run_id, item_id)
+) WITHOUT ROWID;
 """
