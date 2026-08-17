@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.13.1 — 2026-08-13
+## 0.13.1 
 
 ### Background crawl progress and AI audit context
 
@@ -16,7 +16,7 @@
 - Added regression coverage for depth-zero resource inventory, background job
   progress, report-context extraction, and rendered report restoration.
 
-## 0.13.0 — 2026-08-13
+## 0.13.0
 
 ### Full-site crawl and localized dashboard fixes
 
@@ -32,7 +32,7 @@
 - Completed v2 SEO/marketer tooling, reports, inventory, MCP, jobs, saved views,
   and release-gate cleanup accumulated since 0.12.0.
 
-## 0.12.0 — 2026-08-12
+## 0.12.0
 
 ### v2 transport parity and final marketer workflow
 
@@ -45,7 +45,7 @@
 - Updated compatibility/version/package metadata, dashboard acceptance storage
   keys, documentation, and release goldens for v0.12.0.
 
-## 0.11.0 — 2026-08-12
+## 0.11.0
 
 ### Breaking: v2-only audit contracts
 
@@ -63,7 +63,7 @@
   serialized reports, all versioned HTTP routes are manifest-covered, and
   readiness rule/crawl execution reuses a bounded per-run response cache.
 
-## 0.10.0 — 2026-08-12
+## 0.10.0
 
 - Refined the SEO/GEO AI assistant workspace to match the planned chat-first
   layout, including in-chat Skills and MCP context pickers with explanatory
@@ -79,7 +79,7 @@
 - Documented the current runtime architecture and v1/v2 compatibility
   boundaries, and exposed the source-package command in the main documentation.
 
-## 0.9.0 — 2026-08-12
+## 0.9.0 
 
 - Added the AuditService-backed v2 dashboard profile and bounded typed run
   inventory endpoints, with scheduler protection for page limits and invalid
@@ -98,26 +98,25 @@
   and registry eviction behavior.
 - Rebuilt the portable executable and extended the regression gate to 361 tests.
 
-## 0.8.2 — 2026-08-11
+## 0.8.2
 
 - Hardened dashboard AI prompt editing so stable prompt IDs and independent
   English/Russian variants are preserved, with visible save failures.
 - Added headed browser regression coverage for `/dashboard`, local session/chat
   restoration, credential redaction, optional-provider skips, and browser
-  diagnostics on `gossnab.ru` and `mappl.ru`.
+  diagnostics.
 - Added the `python -m agentready.cli` entrypoint and synchronized package,
   compatibility, report, and Windows portable version metadata.
 - Added a full-extra GitHub Actions gate for MCP and Chromium-backed tests.
 - Rebuilt the portable executable and retained the 357-test regression gate.
 
-## 0.8.1 — 2026-08-10
+## 0.8.1
 
 - Fixed the combined “All checks” dashboard report so GEO and SEO sections
-  retain their built-in hover/focus hints, with Edge UI coverage against
-  `gossnab.ru`.
+  retain their built-in hover/focus hints, with Edge UI coverage.
 - Synchronized package, API, report, and Windows portable version metadata.
 
-## 0.8.0 — 2026-08-10
+## 0.8.0
 
 - Added the vNext compatibility surface: bounded v2 reports, evidence and
   coverage contracts, protocol and provider boundaries, storage/crawler

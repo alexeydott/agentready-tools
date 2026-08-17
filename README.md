@@ -1,4 +1,4 @@
-# AgentReady Tools 0.12.0
+# AgentReady Tools
 
 > Audit public websites for AI-agent protocol readiness and AI Search/GEO readiness.
 
