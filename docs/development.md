@@ -89,13 +89,15 @@ dependencies through `pip`. Playwright browser binaries are a separate step:
 .\.venv\Scripts\python.exe -m playwright install chromium
 ```
 
-Without the `mcp` extra, MCP-specific tests are reported as skipped. Without
-the Chromium binary, browser-backed tests and `--render` audits cannot run;
-the portable build itself does not require that binary.
+The default pytest collection requires the `mcp` extra because the acceptance
+matrix imports the MCP v2 contract at collection time. Install
+`requirements-dev.txt` before running the suite. Without the Chromium binary,
+browser-backed tests and `--render` audits cannot run; the portable build
+itself does not require that binary.
 
 The `full-extra` GitHub Actions workflow installs MCP, Playwright, and Chromium
-and runs the suite as a no-optional-skips release gate. Local development may
-still use the smaller dependency set when browser/MCP work is not in scope.
+and runs the suite as a no-optional-skips release gate. Local development uses
+the same explicit Python extras through `requirements-dev.txt`.
 
 ### L0-L4 acceptance matrix
 

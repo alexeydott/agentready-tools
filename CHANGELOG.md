@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.2
+
+### Explicit test dependencies and release packaging
+
+- Made `requirements-dev.txt` explicitly install the `dev`, MCP, and portable
+  extras required for collection and full-suite validation.
+- Corrected README and developer guidance to describe MCP as a collection-time
+  test dependency rather than an optional skipped test surface.
+- Excluded local `.agentready.yml` configuration from source archives and
+  synchronized source-package validation with the published v2 schemas.
+- Rebuilt the Win64 portable executable with synchronized `0.13.2` metadata.
+
 ## 0.13.1 
 
 ### Background crawl progress and AI audit context

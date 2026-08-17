@@ -46,9 +46,10 @@ explicitly:
 .\.venv\Scripts\python.exe -m pip install -e ".[ai]"
 ```
 
-If tests report a missing `mcp` module, activate the same virtual environment
-used by pytest and install `.[mcp]`. MCP-specific tests intentionally skip
-when that optional dependency is absent; the core test suite remains runnable.
+The default pytest collection requires the `mcp` module because the acceptance
+matrix imports the MCP v2 contract at collection time. Install
+`requirements-dev.txt` in the same virtual environment used by pytest before
+running the suite; do not rely on optional-test skips.
 If `agentready mcp` is started without the extra, it prints the same repair
 command and an import verification command.
 

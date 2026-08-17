@@ -83,13 +83,14 @@ rendered mobile or SEO checks:
 python -m playwright install chromium
 ```
 
-`requirements-dev.txt` installs the complete developer/build dependency set,
-including the optional MCP facade and Playwright Python package. The MCP tests
-are skipped when the `mcp` extra is not installed; install the full developer
-requirements when validating MCP behavior. Installing the Playwright package
-does not install browser binaries. If rendered SEO/mobile tests fail with a
-missing Chromium executable, run `python -m playwright install chromium` in
-the same virtual environment.
+`requirements-dev.txt` explicitly installs the complete developer/build test
+environment through the `dev`, `mcp`, and `portable` extras. The default pytest
+collection therefore requires the MCP Python package because the acceptance
+matrix imports the MCP v2 contract at collection time; install
+`requirements-dev.txt` before running the suite. Installing the Playwright
+package does not install browser binaries. If rendered SEO/mobile tests fail
+with a missing Chromium executable, run `python -m playwright install chromium`
+in the same virtual environment.
 
 If `agentready mcp` reports a missing MCP dependency, activate the same
 environment used by `agentready` and run

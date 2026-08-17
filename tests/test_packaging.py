@@ -23,11 +23,13 @@ def test_portable_packaging_uses_agentready_name_version_info_and_icon():
 def test_portable_packaging_includes_mcp_facade():
     spec = (ROOT / "packaging" / "agentready-portable.spec").read_text(encoding="utf-8")
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    requirements_dev = (ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
 
     assert "excludes=[]" in spec.replace(" ", "")
     assert '"agentready.mcp_server"' in spec
     assert 'collect_submodules("mcp")' in spec
     assert '"mcp[cli]>=2,<3"' in pyproject
+    assert "-e .[dev,mcp,portable]" in requirements_dev
 
 
 def test_built_portable_help_includes_examples_for_main_and_nested_modes():
