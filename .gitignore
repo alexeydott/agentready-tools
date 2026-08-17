@@ -5,8 +5,6 @@
 .github/*
 !.github/skills/
 .github/skills/*
-!.github/skills/aif-package-source-policy/
-!.github/skills/aif-package-source-policy/**
 
 # AI-agent context and local runtime configuration
 .agents/
