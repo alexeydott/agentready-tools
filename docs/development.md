@@ -2,7 +2,7 @@
 
 # Development
 
-The current release is **0.12.0**. The package version, compatibility manifest,
+The current release is **0.13.2**. The package version, compatibility manifest,
 report defaults, and Win64 file metadata are synchronized from the same release
 change.
 
@@ -89,15 +89,14 @@ dependencies through `pip`. Playwright browser binaries are a separate step:
 .\.venv\Scripts\python.exe -m playwright install chromium
 ```
 
-The default pytest collection requires the `mcp` extra because the acceptance
-matrix imports the MCP v2 contract at collection time. Install
-`requirements-dev.txt` before running the suite. Without the Chromium binary,
-browser-backed tests and `--render` audits cannot run; the portable build
-itself does not require that binary.
-
-The `full-extra` GitHub Actions workflow installs MCP, Playwright, and Chromium
-and runs the suite as a no-optional-skips release gate. Local development uses
-the same explicit Python extras through `requirements-dev.txt`.
+The minimal profile installs only `.[dev]`; MCP acceptance tests are isolated in
+`tests/test_acceptance_mcp.py` and import `mcp` inside the test, so minimal pytest
+collection does not fail when the optional package is absent. The MCP profile
+installs `.[dev,mcp]`. The browser profile installs `.[dev,portable]` and a
+Chromium binary. The full-release profile installs `.[dev,mcp,portable]` and
+rejects unexpected skips; only the explicitly marked scale suite is excluded.
+Local development uses the complete explicit profile through
+`requirements-dev.txt`.
 
 ### L0-L4 acceptance matrix
 
@@ -107,7 +106,7 @@ the same explicit Python extras through `requirements-dev.txt`.
 | --- | --- | --- |
 | L0 | Typed request and contract unit checks | Every test run |
 | L1 | Deterministic local dashboard/fixture behavior | Every test run |
-| L2 | CLI, FastAPI, and MCP request-field parity | Every test run |
+| L2 | CLI and FastAPI parity; MCP parity in the MCP profile | Minimal plus explicit MCP job |
 | L3 | Dashboard accessibility and inventory controls | Full-extra suite and headed acceptance |
 | L4 | Opt-in live-site smoke | `workflow_dispatch` only; never a blocking default gate |
 
@@ -195,6 +194,6 @@ python -m agentready.cli audit https://example.com --profile quick --max-pages 1
 - [Configuration & CI](configuration-and-ci.md) — test gates and thresholds
 ## WP6A scale budgets
 
-The opt-in scale suite is `AGENTREADY_SCALE_TESTS=1 pytest -q --import-mode=importlib tests/test_scale_budgets.py`. It uses deterministic synthetic Memory-store fixtures and records only operation, fixture size, duration, peak bytes, rows, and truncation. Provider/browser/network work is excluded.
+The opt-in scale suite is `AGENTREADY_SCALE_TESTS=1 pytest -q --import-mode=importlib tests/test_scale_budgets.py`. It uses deterministic synthetic Memory-store fixtures plus temporary SQLite databases for write/query/keyset-pagination coverage and records only operation, fixture size, duration, peak bytes, rows, and truncation. Generated databases are deleted with the test temporary directory; provider/browser/network work is excluded from this storage gate.
 
-Local budget targets are 60 seconds wall time and 512 MiB peak memory per operation at 100k rows; 1k and 10k fixtures are smoke points for regression trends. The suite is skipped in the default fast regression run, but the deterministic fixture contract is always checked. Any budget regression must be fixed in the shared projection/query/graph/duplicate/export algorithm rather than in dashboard or transport adapters.
+Local budget targets are 60 seconds wall time and 512 MiB peak memory per operation at 100k rows; 1k and 10k fixtures are smoke points for regression trends. The suite is skipped in the default fast regression run, but the deterministic fixture contract is always checked. Crawler cancellation and BrowserPool bounds remain covered by their focused integration tests and are not exercised by this network-free storage gate. Any budget regression must be fixed in the shared projection/query/graph/duplicate/export algorithm rather than in dashboard or transport adapters.

@@ -1,0 +1,129 @@
+name: Release and source artifact validation
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      live_smoke:
+        description: "Run the bounded opt-in L4 live smoke"
+        required: false
+        default: false
+        type: boolean
+      target:
+        description: "Public target for the bounded live smoke"
+        required: false
+        default: "https://example.com"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  full-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install full extras
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,mcp,portable]"
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Run full suite without unexpected skips
+        shell: bash
+        run: |
+          python -m pytest -q -ra -m "not scale" 2>&1 | tee pytest-output.txt
+          if grep -qE "SKIPPED|[0-9]+ skipped" pytest-output.txt; then
+            echo "Unexpected skipped tests in full-release run"
+            exit 1
+          fi
+
+  source-artifact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tooling and package
+        run: python -m pip install --upgrade pip build
+      - name: Build wheel and sdist
+        run: python -m build --wheel --sdist
+      - name: Build allowlisted source archive
+        shell: pwsh
+        run: ./scripts/package-source.ps1
+      - name: Inspect release artifacts in clean environments
+        shell: bash
+        run: |
+          python - <<'PY'
+          import tarfile
+          import zipfile
+          from pathlib import Path
+          forbidden = {".ai-factory", ".agents", ".codex", ".agentready.yml", ".git"}
+          archives = list(Path("dist").glob("*.whl")) + list(Path("dist").glob("*.tar.gz")) + list(Path("dist/source").glob("*.zip"))
+          assert archives, "no release archives found"
+          for archive in archives:
+              if archive.name.endswith(".tar.gz"):
+                  with tarfile.open(archive) as handle:
+                      names = handle.getnames()
+              else:
+                  with zipfile.ZipFile(archive) as handle:
+                      names = handle.namelist()
+              assert not any(part in forbidden for name in names for part in Path(name).parts)
+              if archive.suffix == ".zip" or archive.name.endswith(".tar.gz"):
+                  assert any(
+                      name == "schemas/agentready.audit.v2.schema.json"
+                      or name.endswith("/schemas/agentready.audit.v2.schema.json")
+                      for name in names
+                  )
+          PY
+      - name: Install and smoke wheel, sdist, and source archive
+        shell: bash
+        run: |
+          wheel=$(python -c 'from pathlib import Path; print(next(Path("dist").glob("*.whl")).resolve())')
+          sdist=$(python -c 'from pathlib import Path; print(next(Path("dist").glob("*.tar.gz")).resolve())')
+          source_zip=$(python -c 'from pathlib import Path; print(next(Path("dist/source").glob("*.zip")).resolve())')
+          hash_file="${RUNNER_TEMP}/agentready-artifact-sha256.txt"
+          echo "[FIX:artifact-hash] recording release artifact SHA-256 values"
+          sha256sum "${wheel}" "${sdist}" "${source_zip}" | tee "${hash_file}"
+          test -s "${hash_file}"
+
+          smoke_install() {
+            artifact=$1
+            environment=$2
+            echo "[FIX:clean-install] installing ${artifact} into ${environment}"
+            python -m venv "${environment}"
+            "${environment}/bin/python" -m pip install --upgrade pip
+            "${environment}/bin/python" -m pip install "${artifact}[mcp]"
+            "${environment}/bin/agentready" --help
+            "${environment}/bin/agentready" mcp --help
+            "${environment}/bin/python" -c "import agentready.mcp_server"
+          }
+
+          smoke_install "${wheel}" "${RUNNER_TEMP}/agentready-wheel"
+          smoke_install "${sdist}" "${RUNNER_TEMP}/agentready-sdist"
+
+          source_root="${RUNNER_TEMP}/agentready-source"
+          mkdir -p "${source_root}"
+          python -m zipfile -e "${source_zip}" "${source_root}"
+          test -f "${source_root}/MANIFEST.in"
+          smoke_install "${source_root}" "${RUNNER_TEMP}/agentready-source-venv"
+
+  l4-live-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.live_smoke == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install runtime
+        run: python -m pip install --upgrade pip && python -m pip install .
+      - name: Run bounded live smoke
+        run: python -m agentready.cli audit "${{ inputs.target }}" --profile quick --max-pages 3 --timeout 5

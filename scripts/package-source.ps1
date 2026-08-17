@@ -24,7 +24,7 @@ try {
     # available in a developer checkout but must never enter a source archive.
     $files = @(
         ".gitignore", "CHANGELOG.md", "LICENSE", "NOTICE.md",
-        "README.md", "pyproject.toml", "requirements.txt", "requirements-dev.txt"
+        "MANIFEST.in", "README.md", "pyproject.toml", "requirements.txt", "requirements-dev.txt"
     )
     $directories = @("docs", "packaging", "schemas", "scripts", "src", "tests")
     $excludedDocumentationDirectories = @("presentations", "vNext")

@@ -1,0 +1,52 @@
+name: Dependency profile validation
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  minimal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install minimal profile
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      - name: Collect and run minimal suite
+        run: python -m pytest -q -ra -m "not scale" --ignore=tests/test_acceptance_mcp.py
+
+  mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install MCP profile
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,mcp]"
+      - name: Run MCP contract suite
+        run: python -m pytest -q -ra tests/test_acceptance_mcp.py tests/test_agentfindings.py tests/test_cli.py tests/test_mobile.py
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install browser profile
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,portable]"
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Run browser-bound contract suite
+        run: python -m pytest -q -ra tests/test_acceptance_matrix.py tests/test_collection_boundaries.py tests/test_mobile.py

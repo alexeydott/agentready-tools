@@ -5,6 +5,9 @@
 .github/*
 !.github/skills/
 .github/skills/*
+!.github/workflows/
+!.github/workflows/ci.yml
+!.github/workflows/release-validation.yml
 
 # AI-agent context and local runtime configuration
 .agents/
