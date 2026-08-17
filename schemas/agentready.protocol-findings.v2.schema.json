@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentready.dev/schemas/agentready.protocol-findings.v2.schema.json",
+  "title": "AgentReady protocol findings v2 contract",
+  "type": "object",
+  "required": ["schema", "findings", "findings_count"],
+  "properties": {
+    "schema": {"const": "agentready.protocol-findings.v2"},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "findings_count": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

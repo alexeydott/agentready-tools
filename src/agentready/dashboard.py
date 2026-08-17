@@ -1004,6 +1004,20 @@ function scanPayload() {{
 }}
 function setProgress(percent, message) {{ showResult(); progress.hidden = false; progressBar.style.width = percent + "%"; progressBar.setAttribute("aria-valuenow", String(percent)); progressBar.setAttribute("aria-valuetext", message); result.textContent = message; }}
 function setCrawlProgress(progressData) {{ if (!progressData) return; crawlProgress.hidden = false; crawlProgressPhase.textContent = translations[language.value].progress_crawl_phase.replace("{{phase}}", progressData.phase || "crawl"); crawlProgressCount.textContent = translations[language.value].progress_crawl.replace("{{fetched}}", String(progressData.fetched || 0)).replace("{{discovered}}", String(progressData.discovered || 0)); }}
+function safeDashboardTarget(value) {{
+  try {{
+    const raw = String(value || "").trim();
+    const candidate = /^https?:\\/\\//i.test(raw)
+      ? raw
+      : (raw.startsWith("//") ? "https:" + raw : "https://" + raw);
+    const parsed = new URL(candidate, window.location.origin);
+    if (!/^https?:$/.test(parsed.protocol)) return "[invalid-target]";
+    if (!/^https?:\\/\\//i.test(raw)) console.info("[FIX:dashboard-redaction] Normalized dashboard target protocol", {{protocol:parsed.protocol}});
+    return parsed.origin + (parsed.pathname || "/");
+  }} catch (error) {{
+    return "[invalid-target]";
+  }}
+}}
 function logDashboardAction(action, details={{}}) {{
   const entry = {{at:new Date().toISOString(), action, ...details}};
   console.info("[DASHBOARD-ACTION]", entry);
@@ -1013,6 +1027,10 @@ function logDashboardAction(action, details={{}}) {{
     history.push(entry);
     localStorage.setItem(key, JSON.stringify(history.slice(-200)));
   }} catch (error) {{ console.warn("[DASHBOARD-ACTION] Unable to persist action", {{action, error:String(error)}}); }}
+}}
+function resetV2InventoryCursor() {{
+  v2InventoryCursor = null;
+  console.debug("[FIX:v2-cursor] inventory cursor reset");
 }}
 function finishProgress(success) {{ const percent = success ? 100 : 0; progressBar.style.width = percent + "%"; progressBar.setAttribute("aria-valuenow", String(percent)); }}
 function hintIcon(text) {{ const span = document.createElement("span"); span.className = "hint"; span.tabIndex = 0; span.setAttribute("role", "img"); span.setAttribute("aria-label", text); span.dataset.tooltip = text; span.textContent = "?"; return span; }}
@@ -1183,8 +1201,13 @@ async function request(path, method="GET", body=null, html=false, showOutput=tru
 }}
 async function runScan() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
-  logDashboardAction("audit.start", {{target:document.getElementById("url").value, preset:document.getElementById("preset").value, profile:document.getElementById("v2-profile").value, max_pages:selectedV2MaxPages()}});
-  if (aiConversationHistory.length) {{ await startNewChat(); logDashboardAction("ai.context.reset", {{reason:"new-audit"}}); }}
+  logDashboardAction("audit.start", {{target:safeDashboardTarget(document.getElementById("url").value), preset:document.getElementById("preset").value, profile:document.getElementById("v2-profile").value, max_pages:selectedV2MaxPages()}});
+  if (aiConversationHistory.length && !(await startNewChat())) {{
+    showResult(); finishProgress(false); result.textContent = translations[language.value].failed;
+    console.warn("[FIX:dashboard-context] New audit stopped because the previous chat could not be archived");
+    return;
+  }}
+  if (!aiConversationHistory.length) {{ logDashboardAction("ai.context.reset", {{reason:"new-audit"}}); }}
   window.agentreadyV2Report = null;
   const preset = document.getElementById("preset").value;
   if (preset === "all") {{ await runAll(); return; }}
@@ -1240,7 +1263,8 @@ async function loadV2Inventory(kind=null, cursor=null) {{
       v2InventoryCounts = overview.inventory || {{}};
       v2InventoryOverviewRunId = runId;
     }}
-    if (kind) {{ v2InventoryKind = kind; document.getElementById("v2-inventory-kind").value = kind; v2InventoryCursor = null; }}
+    if (cursor === null) resetV2InventoryCursor();
+    if (kind) {{ v2InventoryKind = kind; document.getElementById("v2-inventory-kind").value = kind; }}
     if (cursor !== null) v2InventoryCursor = cursor;
     const limit = Number(document.getElementById("v2-inventory-limit").value) || 100;
     const query = new URLSearchParams({{limit:String(limit),sort_by:document.getElementById("v2-inventory-sort").value,descending:String(document.getElementById("v2-inventory-desc").checked)}});
@@ -1734,7 +1758,7 @@ async function saveChat(nameOverride=null) {{
   const name = nameOverride || document.getElementById("ai-prompt-title").value.trim() || ("AI chat " + new Date().toISOString().slice(0, 19));
   try {{
     const response = await fetch("/ai/chats", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{
-      name, target:document.getElementById("url").value || null, language:language.value, mode:document.getElementById("ai-mode").value,
+      name, target:safeDashboardTarget(document.getElementById("url").value) || null, language:language.value, mode:document.getElementById("ai-mode").value,
       provider:document.getElementById("ai-chat-provider").value || null, model:document.getElementById("ai-model").value || null,
       messages:aiConversationHistory, usage:aiSessionUsage
     }})}});
@@ -1742,14 +1766,14 @@ async function saveChat(nameOverride=null) {{
     await loadSavedChats();
     return true;
   }} catch (error) {{
-    console.warn("Unable to save AI chat", {{error:String(error)}});
+    console.warn("[FIX:dashboard-context] Unable to save AI chat", {{error:String(error)}});
     return false;
   }}
 }}
 async function startNewChat() {{
   if (aiConversationHistory.length) {{
     const saved = await saveChat("AI chat " + new Date().toISOString().slice(0, 19));
-    if (!saved) return;
+    if (!saved) return false;
   }}
   aiConversationHistory = [];
   aiSessionUsage = {{prompt_tokens:0, completion_tokens:0, total_tokens:0, input_cost:0, output_cost:0, total_cost:0}};
@@ -1763,6 +1787,7 @@ async function startNewChat() {{
   document.getElementById("ai-prompt-library").value = "";
   document.getElementById("ai-prompt-title").value = "";
   aiPromptEditingMode = null;
+  return true;
 }}
 function exportChat() {{
   if (!aiConversationHistory.length) return;
@@ -1770,7 +1795,7 @@ function exportChat() {{
     messages: aiConversationHistory.map(item => ({{role:item.role, content:item.content}})),
     model: document.getElementById("ai-model").value || null,
     provider: document.getElementById("ai-chat-provider").value || null,
-    metadata: {{target:document.getElementById("url").value || null, language:language.value, mode:document.getElementById("ai-mode").value}},
+    metadata: {{target:safeDashboardTarget(document.getElementById("url").value) || null, language:language.value, mode:document.getElementById("ai-mode").value}},
     usage: aiSessionUsage
   }};
   const blob = new Blob([JSON.stringify(payload, null, 2)], {{type:"application/json"}});

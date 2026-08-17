@@ -22,6 +22,21 @@ def test_egress_policy_rejects_credentials_and_sensitive_headers():
         policy.validate_headers({"Authorization": "Bearer secret"})
 
 
+def test_egress_debug_log_redacts_rejected_url_userinfo_and_query(caplog):
+    policy = EgressPolicy(block_private=True)
+    target = "https://demo-user:demo-password@example.com/private?token=demo-token"
+
+    with caplog.at_level("DEBUG", logger="agentready.egress"), pytest.raises(
+        EgressPolicyError, match="credential-bearing URL"
+    ):
+        policy.validate_request(target)
+
+    messages = "\n".join(record.getMessage() for record in caplog.records)
+    assert "demo-user" not in messages
+    assert "demo-password" not in messages
+    assert "demo-token" not in messages
+
+
 def test_secret_redactor_removes_bearer_and_nested_secret_values():
     redactor = SecretRedactor()
     value = redactor.mapping({"Authorization": "Bearer secret", "nested": {"api_key": "secret"}})

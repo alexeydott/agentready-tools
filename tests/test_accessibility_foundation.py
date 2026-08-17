@@ -88,6 +88,27 @@ def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
         assert 'saveV2InventoryView' in html
 
 
+def test_dashboard_resets_inventory_cursor_when_query_shape_changes():
+    html = render_dashboard("en")
+
+    assert "function resetV2InventoryCursor()" in html
+    assert "resetV2InventoryCursor();" in html
+    assert "if (cursor !== null) v2InventoryCursor = cursor;" in html
+    assert "function safeDashboardTarget(value)" in html
+    assert 'raw.startsWith("//") ? "https:" + raw : "https://" + raw' in html
+    assert 'Normalized dashboard target protocol' in html
+    assert 'target:safeDashboardTarget(document.getElementById("url").value)' in html
+    assert 'target:document.getElementById("url").value' not in html
+
+
+def test_dashboard_stops_new_audit_when_chat_archive_fails():
+    html = render_dashboard("en")
+
+    assert "if (aiConversationHistory.length && !(await startNewChat()))" in html
+    assert 'console.warn("[FIX:dashboard-context] New audit stopped because the previous chat could not be archived")' in html
+    assert "return true;" in html
+
+
 def test_dashboard_exposes_localized_unlimited_audit_check_limit():
     for language, label, hint in (
         ("en", "Audit check limit", "0 means all selected checks"),

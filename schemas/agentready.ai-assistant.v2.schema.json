@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentready.dev/schemas/agentready.ai-assistant.v2.schema.json",
+  "title": "AgentReady AI assistant v2 contract",
+  "type": "object",
+  "required": ["schema", "operation", "mode", "language", "summary", "actions", "evidence", "cautions", "disclaimer"],
+  "properties": {
+    "schema": {"const": "agentready.ai-assistant.v2"},
+    "operation": {"enum": ["recommend", "chat"]},
+    "mode": {"enum": ["seo", "geo", "both"]},
+    "language": {"enum": ["en", "ru"]},
+    "target": {"type": ["string", "null"]},
+    "model": {"type": ["string", "null"]},
+    "summary": {"type": "string"},
+    "actions": {"type": "array", "items": {"type": "object"}},
+    "evidence": {"type": "array", "items": {"type": "object"}},
+    "cautions": {"type": "array", "items": {"type": "string"}},
+    "disclaimer": {"type": "string"},
+    "usage": {"type": ["object", "null"]},
+    "error": {"type": ["object", "null"]}
+  },
+  "additionalProperties": true
+}

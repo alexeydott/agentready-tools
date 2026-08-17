@@ -321,14 +321,7 @@ class QueryService:
             if query.anchor_contains is None or query.anchor_contains.lower() in (row.anchor_text or "").lower()
             if query.internal is None or ((row.target_key is not None) is query.internal)
         ]
-        if query.sort_by == "source" and not query.descending:
-            rows.sort(key=lambda row: (row.source_key, row.ordinal, row.raw_href))
-        else:
-            rows.sort(key=lambda row: _link_sort_key(row, query.sort_by), reverse=query.descending)
-        rows = [row for row in rows if query.cursor is None or _link_cursor(row) > query.cursor]
-        selected = rows[: query.limit + 1]
-        page = tuple(selected[: query.limit])
-        next_cursor = _link_cursor(page[-1]) if len(selected) > query.limit else None
+        page, next_cursor = _paginate_sorted(rows, query, _link_sort_key)
         self._log_query("links", query, len(page), len(rows), started, source=query.source_key)
         return QueryPage(page, next_cursor, len(rows))
 
@@ -340,11 +333,7 @@ class QueryService:
             if query.resource_type is None or row.resource_type == query.resource_type
             if query.status_code is None or row.status_code == query.status_code
         ]
-        rows.sort(key=lambda row: _resource_sort_key(row, query.sort_by), reverse=query.descending)
-        rows = [row for row in rows if query.cursor is None or _resource_cursor(row) > query.cursor]
-        selected = rows[: query.limit + 1]
-        page = tuple(selected[: query.limit])
-        next_cursor = _resource_cursor(page[-1]) if len(selected) > query.limit else None
+        page, next_cursor = _paginate_sorted(rows, query, _resource_sort_key)
         self._log_query("resources", query, len(page), len(rows), started, page=query.page_key)
         return QueryPage(page, next_cursor, len(rows))
 
@@ -357,11 +346,7 @@ class QueryService:
             and (query.min_value is None or _numeric(row.value) >= query.min_value)
             and (query.max_value is None or _numeric(row.value) <= query.max_value)
         ]
-        rows.sort(key=lambda row: _metric_sort_key(row, query.sort_by), reverse=query.descending)
-        rows = [row for row in rows if query.cursor is None or _metric_cursor(row) > query.cursor]
-        selected = rows[: query.limit + 1]
-        page = tuple(selected[: query.limit])
-        next_cursor = _metric_cursor(page[-1]) if len(selected) > query.limit else None
+        page, next_cursor = _paginate_sorted(rows, query, _metric_sort_key)
         self._log_query("metrics", query, len(page), len(rows), started, provider=query.provider, name=query.name)
         return QueryPage(page, next_cursor, len(rows))
 
@@ -373,11 +358,7 @@ class QueryService:
             and (query.status_code is None or row.status_code == query.status_code)
             and (query.to_url is None or row.to_url == query.to_url)
         ]
-        rows.sort(key=lambda row: _redirect_sort_key(row, query.sort_by), reverse=query.descending)
-        rows = [row for row in rows if query.cursor is None or _redirect_cursor(row) > query.cursor]
-        selected = rows[: query.limit + 1]
-        page = tuple(selected[: query.limit])
-        next_cursor = _redirect_cursor(page[-1]) if len(selected) > query.limit else None
+        page, next_cursor = _paginate_sorted(rows, query, _redirect_sort_key)
         self._log_query("redirects", query, len(page), len(rows), started, from_url=query.from_url, status=query.status_code)
         return QueryPage(page, next_cursor, len(rows))
 
@@ -389,11 +370,7 @@ class QueryService:
             and (query.status is None or row.payload.get("status") == query.status)
             and (query.affected_url is None or query.affected_url in tuple(row.payload.get("affected_urls", ())))
         ]
-        rows.sort(key=lambda row: _finding_sort_key(row, query.sort_by), reverse=query.descending)
-        rows = [row for row in rows if query.cursor is None or row.finding_id > query.cursor]
-        selected = rows[: query.limit + 1]
-        page = tuple(selected[: query.limit])
-        next_cursor = page[-1].finding_id if len(selected) > query.limit else None
+        page, next_cursor = _paginate_sorted(rows, query, _finding_sort_key)
         self._log_query("findings", query, len(page), len(rows), started, finding_id=query.finding_id, status=query.status)
         return QueryPage(page, next_cursor, len(rows))
 
@@ -425,23 +402,6 @@ class QueryService:
         )
 
 
-def _link_cursor(row: LinkOccurrenceRecord) -> str:
-    return f"{row.source_key}\x00{row.ordinal:010d}\x00{row.raw_href}"
-
-
-def _resource_cursor(row: ResourceOccurrenceRecord) -> str:
-    return f"{row.page_key}\x00{row.ordinal:010d}\x00{row.resource_url}"
-
-
-def _metric_cursor(row: MetricRecord) -> str:
-    return f"{row.url_key or ''}\x00{row.provider}\x00{row.name}"
-
-
-def _redirect_cursor(row: RedirectFact) -> str:
-    has_target = "1" if row.to_url is not None else "0"
-    return f"{row.from_url}\x00{row.status_code:03d}\x00{has_target}\x00{row.to_url or ''}\x00{row.location_raw}"
-
-
 def _numeric(value: object) -> float:
     try:
         return float(value)
@@ -461,24 +421,24 @@ def _page_sort_key(row: PageRecord, field: str) -> tuple[object, str]:
     return value, row.url_key
 
 
-def _link_sort_key(row: LinkOccurrenceRecord, field: str) -> tuple[object, str, int]:
+def _link_sort_key(row: LinkOccurrenceRecord, field: str) -> tuple[object, str, int, str]:
     value = {
         "source": row.source_key,
         "target": row.target_key or "",
         "anchor": (row.anchor_text or "").lower(),
         "ordinal": row.ordinal,
     }[field]
-    return value, row.source_key, row.ordinal
+    return value, row.source_key, row.ordinal, row.raw_href
 
 
-def _resource_sort_key(row: ResourceOccurrenceRecord, field: str) -> tuple[object, str, int]:
+def _resource_sort_key(row: ResourceOccurrenceRecord, field: str) -> tuple[object, str, int, str]:
     value = {
         "page": row.page_key,
         "resource": row.resource_url,
         "type": row.resource_type,
         "status": row.status_code or 0,
     }[field]
-    return value, row.page_key, row.ordinal
+    return value, row.page_key, row.ordinal, row.resource_url
 
 
 def _metric_sort_key(row: MetricRecord, field: str) -> tuple[object, str, str, str]:
@@ -491,13 +451,13 @@ def _metric_sort_key(row: MetricRecord, field: str) -> tuple[object, str, str, s
     return value, row.url_key or "", row.provider, row.name
 
 
-def _redirect_sort_key(row: RedirectFact, field: str) -> tuple[object, str, int]:
+def _redirect_sort_key(row: RedirectFact, field: str) -> tuple[object, str, int, str, str]:
     value = {
         "from_url": row.from_url,
         "to_url": row.to_url or "",
         "status": row.status_code,
     }[field]
-    return value, row.from_url, row.status_code
+    return value, row.from_url, row.status_code, row.to_url or "", row.location_raw
 
 
 def _finding_sort_key(row: FindingRecord, field: str) -> tuple[object, str]:
@@ -516,13 +476,27 @@ def _paginate_sorted(rows: list[object], query: object, key_builder) -> tuple[tu
     rows.sort(key=lambda row: key_builder(row, sort_by), reverse=descending)
     cursor = query.cursor
     if cursor:
-        # Custom sorted cursors are opaque deterministic key strings.  A
-        # missing/old cursor simply starts a fresh page rather than leaking
-        # arbitrary filtering semantics.
-        rows = [row for row in rows if _cursor_key(key_builder(row, sort_by)) > cursor]
+        # Cursors are opaque serialized typed keys. Resume by locating the exact
+        # key in the already sorted sequence so numeric values and descending
+        # order retain their native semantics.
+        keys = [_cursor_key(key_builder(row, sort_by)) for row in rows]
+        try:
+            rows = rows[keys.index(cursor) + 1 :]
+        except ValueError:
+            # A missing/old cursor starts a fresh page rather than applying an
+            # arbitrary filtering rule.
+            pass
     selected = rows[: int(query.limit) + 1]
     page = tuple(selected[: int(query.limit)])
     next_cursor = _cursor_key(key_builder(page[-1], sort_by)) if len(selected) > len(page) else None
+    logger.debug(
+        "[FIX:v2-cursor] sorted page sort_by=%s descending=%s has_cursor=%s rows=%d has_next=%s",
+        sort_by,
+        descending,
+        bool(cursor),
+        len(page),
+        bool(next_cursor),
+    )
     return page, next_cursor
 
 

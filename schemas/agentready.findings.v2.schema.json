@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentready.dev/schemas/agentready.findings.v2.schema.json",
+  "title": "AgentReady findings v2 contract",
+  "type": "object",
+  "required": ["schema", "mode", "target", "language", "findings_count", "findings"],
+  "properties": {
+    "schema": {"const": "agentready.findings.v2"},
+    "source_schema": {"type": "string"},
+    "mode": {"enum": ["readiness", "seo", "mobile"]},
+    "target": {"type": "string"},
+    "coverage": {"type": ["object", "null"]},
+    "score": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+    "language": {"enum": ["en", "ru"]},
+    "findings_count": {"type": "integer", "minimum": 0},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "message": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 from agentready.audit_core.store import (
@@ -10,6 +11,7 @@ from agentready.audit_core.store import (
     RunUrlState,
     SQLiteSiteStore,
 )
+from agentready.exports import export_query
 from agentready.query_service import (
     FindingQuery,
     LinkQuery,
@@ -167,3 +169,86 @@ def test_marketer_queries_support_allowlisted_filters_and_sorts():
     store.put_metric(MetricRecord("run-1", "https://example.test/", "ga4", "sessions", 42, "count", "fixture", "1", "now"))
     assert service.metrics(MetricQuery("run-1", min_value=40)).items[0].value == 42
     assert service.summary(PageQuery("run-1"), group_by="status_code")["200"] == 3
+
+
+def _collect_query_pages(service: QueryService, query):
+    items = []
+    cursor = None
+    for _ in range(20):
+        page = service.execute(replace(query, cursor=cursor, limit=1))
+        items.extend(page.items)
+        if page.next_cursor is None:
+            return items
+        cursor = page.next_cursor
+    raise AssertionError("cursor pagination did not terminate")
+
+
+def test_sorted_page_cursors_preserve_typed_order_in_both_directions():
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("run-sorted", "config", "tool", "rules"))
+    for depth in (1, 2, 10, 20):
+        url = f"https://example.test/{depth}"
+        store.put_page(PageRecord("run-sorted", url, url, status_code=200, depth=depth))
+    service = QueryService(store)
+
+    ascending = _collect_query_pages(service, PageQuery("run-sorted", sort_by="depth"))
+    descending = _collect_query_pages(service, PageQuery("run-sorted", sort_by="depth", descending=True))
+
+    assert [item.depth for item in ascending] == [1, 2, 10, 20]
+    assert [item.depth for item in descending] == [20, 10, 2, 1]
+    assert len({item.url_key for item in ascending + descending}) == 4
+
+
+def test_sorted_occurrence_cursors_use_the_requested_sort_key():
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("run-occ-sorted", "config", "tool", "rules"))
+    store.put_link("run-occ-sorted", "https://example.test/", "/a", ordinal=0, anchor_text="beta")
+    store.put_link("run-occ-sorted", "https://example.test/", "/b", ordinal=1, anchor_text="alpha")
+    store.put_link("run-occ-sorted", "https://example.test/", "/c", ordinal=2, anchor_text="gamma")
+    service = QueryService(store)
+
+    links = _collect_query_pages(service, LinkQuery("run-occ-sorted", sort_by="anchor"))
+
+    assert [item.anchor_text for item in links] == ["alpha", "beta", "gamma"]
+
+
+def test_all_sorted_inventory_cursors_preserve_order_and_terminate():
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("run-all-sorted", "config", "tool", "rules"))
+    store.put_resource("run-all-sorted", "https://example.test/", "/a.js", "script", status_code=200, ordinal=0)
+    store.put_resource("run-all-sorted", "https://example.test/", "/b.css", "stylesheet", status_code=404, ordinal=1)
+    store.put_metric(MetricRecord("run-all-sorted", "https://example.test/", "fixture", "small", 2, None, "fixture", "1", "now"))
+    store.put_metric(MetricRecord("run-all-sorted", "https://example.test/", "fixture", "large", 10, None, "fixture", "1", "now"))
+    store.put_redirect(RedirectFact("run-all-sorted", "https://example.test/a", "/b", 301, "/b"))
+    store.put_redirect(RedirectFact("run-all-sorted", "https://example.test/z", "/x", 302, "/x"))
+    store.put_finding("run-all-sorted", "finding-a", {"status": "fail", "summary": "A"})
+    store.put_finding("run-all-sorted", "finding-b", {"status": "pass", "summary": "B"})
+    service = QueryService(store)
+
+    resources = _collect_query_pages(service, ResourceQuery("run-all-sorted", sort_by="status", descending=True))
+    metrics = _collect_query_pages(service, MetricQuery("run-all-sorted", sort_by="value"))
+    redirects = _collect_query_pages(service, RedirectQuery("run-all-sorted", sort_by="status", descending=True))
+    findings = _collect_query_pages(service, FindingQuery("run-all-sorted", sort_by="status"))
+
+    assert [item.status_code for item in resources] == [404, 200]
+    assert [item.value for item in metrics] == [2, 10]
+    assert [item.status_code for item in redirects] == [302, 301]
+    assert [item.payload["status"] for item in findings] == ["fail", "pass"]
+
+
+def test_sorted_exports_consume_each_row_once():
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("run-export-sorted", "config", "tool", "rules"))
+    for depth in (1, 2, 10):
+        url = f"https://example.test/{depth}"
+        store.put_page(PageRecord("run-export-sorted", url, url, status_code=200, depth=depth))
+
+    payload = export_query(
+        QueryService(store),
+        PageQuery("run-export-sorted", sort_by="depth", limit=1),
+        format="json",
+    )
+
+    import json
+
+    assert [item["depth"] for item in json.loads(payload)] == [1, 2, 10]

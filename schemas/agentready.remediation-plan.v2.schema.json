@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentready.dev/schemas/agentready.remediation-plan.v2.schema.json",
+  "title": "AgentReady remediation plan v2 contract",
+  "type": "object",
+  "required": ["schema", "mode", "target", "language", "subject", "intro", "steps_count", "steps"],
+  "properties": {
+    "schema": {"const": "agentready.remediation-plan.v2"},
+    "mode": {"enum": ["readiness", "seo", "mobile"]},
+    "target": {"type": "string"},
+    "language": {"enum": ["en", "ru"]},
+    "subject": {"type": "string"},
+    "intro": {"type": "string"},
+    "steps_count": {"type": "integer", "minimum": 0},
+    "steps": {"type": "array", "items": {"type": "object"}},
+    "message": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}

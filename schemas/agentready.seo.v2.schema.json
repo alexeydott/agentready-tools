@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentready.dev/schemas/agentready.seo.v2.schema.json",
+  "title": "AgentReady SEO v2 contract",
+  "type": "object",
+  "required": ["schema", "target", "origin", "checks", "score", "categories", "recommendations", "started_at", "finished_at"],
+  "properties": {
+    "schema": {"const": "agentready.seo.v2"},
+    "target": {"type": "string", "format": "uri"},
+    "origin": {"type": "string"},
+    "checks": {"type": "array", "items": {"$ref": "#/$defs/check"}},
+    "score": {"type": "integer", "minimum": 0, "maximum": 100},
+    "categories": {"type": "array", "items": {"$ref": "#/$defs/category"}},
+    "recommendations": {"type": "array", "items": {"$ref": "#/$defs/recommendation"}},
+    "started_at": {"type": "string"},
+    "finished_at": {"type": "string"},
+    "language": {"enum": ["en", "ru"]},
+    "tool_version": {"type": "string"}
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "required": ["id", "title", "category", "status", "scored", "details", "duration_ms", "evidence", "remediation"],
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "category": {"type": "string"},
+        "status": {"enum": ["pass", "fail", "warn", "skip", "error"]},
+        "scored": {"type": "boolean"},
+        "details": {"type": "string"},
+        "duration_ms": {"type": "integer", "minimum": 0},
+        "evidence": {"type": "array", "items": {"type": "object"}},
+        "remediation": {"type": ["object", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "category": {
+      "type": "object",
+      "required": ["category", "passed", "applicable", "score"],
+      "properties": {
+        "category": {"type": "string"},
+        "passed": {"type": "integer", "minimum": 0},
+        "applicable": {"type": "integer", "minimum": 0},
+        "score": {"type": ["integer", "null"], "minimum": 0, "maximum": 100}
+      },
+      "additionalProperties": true
+    },
+    "recommendation": {
+      "type": "object",
+      "required": ["check_id", "title", "action", "reason", "impact", "effort", "priority"],
+      "properties": {
+        "check_id": {"type": "string"},
+        "title": {"type": "string"},
+        "action": {"type": "string"},
+        "reason": {"type": "string"},
+        "impact": {"enum": ["high", "medium", "low"]},
+        "effort": {"enum": ["low", "medium", "high"]},
+        "priority": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

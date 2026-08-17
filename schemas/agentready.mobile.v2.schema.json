@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentready.dev/schemas/agentready.mobile.v2.schema.json",
+  "title": "AgentReady mobile v2 contract",
+  "type": "object",
+  "required": ["schema", "targets", "pages", "score", "categories", "recommendations", "started_at", "finished_at"],
+  "properties": {
+    "schema": {"const": "agentready.mobile.v2"},
+    "targets": {"type": "array", "items": {"type": "string", "format": "uri"}},
+    "pages": {"type": "array", "items": {"$ref": "#/$defs/page"}},
+    "score": {"type": "integer", "minimum": 0, "maximum": 100},
+    "categories": {"type": "array", "items": {"$ref": "#/$defs/category"}},
+    "recommendations": {"type": "array", "items": {"$ref": "#/$defs/recommendation"}},
+    "started_at": {"type": "string"},
+    "finished_at": {"type": "string"},
+    "language": {"enum": ["en", "ru"]},
+    "tool_version": {"type": "string"}
+  },
+  "$defs": {
+    "page": {
+      "type": "object",
+      "required": ["url", "rendered", "checks", "score", "categories", "recommendations", "started_at", "finished_at"],
+      "properties": {
+        "url": {"type": "string", "format": "uri"},
+        "rendered": {"type": "boolean"},
+        "checks": {"type": "array", "items": {"$ref": "#/$defs/check"}},
+        "score": {"type": "integer", "minimum": 0, "maximum": 100},
+        "categories": {"type": "array", "items": {"$ref": "#/$defs/category"}},
+        "recommendations": {"type": "array", "items": {"$ref": "#/$defs/recommendation"}},
+        "started_at": {"type": "string"},
+        "finished_at": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "check": {
+      "type": "object",
+      "required": ["id", "title", "category", "status", "scored", "details", "duration_ms", "evidence", "remediation"],
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "category": {"type": "string"},
+        "status": {"enum": ["pass", "fail", "warn", "skip", "error"]},
+        "scored": {"type": "boolean"},
+        "details": {"type": "string"},
+        "duration_ms": {"type": "integer", "minimum": 0},
+        "evidence": {"type": "array", "items": {"type": "object"}},
+        "remediation": {"type": ["object", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "category": {
+      "type": "object",
+      "required": ["category", "passed", "applicable", "score"],
+      "properties": {
+        "category": {"type": "string"},
+        "passed": {"type": "integer", "minimum": 0},
+        "applicable": {"type": "integer", "minimum": 0},
+        "score": {"type": ["integer", "null"], "minimum": 0, "maximum": 100}
+      },
+      "additionalProperties": true
+    },
+    "recommendation": {
+      "type": "object",
+      "required": ["check_id", "title", "action", "reason", "impact", "effort", "priority"],
+      "properties": {
+        "check_id": {"type": "string"},
+        "title": {"type": "string"},
+        "action": {"type": "string"},
+        "reason": {"type": "string"},
+        "impact": {"enum": ["high", "medium", "low"]},
+        "effort": {"enum": ["low", "medium", "high"]},
+        "priority": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

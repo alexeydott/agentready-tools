@@ -99,6 +99,41 @@ def test_canonical_audit_payload_validates_against_published_schema():
     jsonschema.Draft202012Validator(schema).validate(payload)
 
 
+def test_published_seo_and_mobile_schemas_validate_current_serializers():
+    jsonschema = pytest.importorskip("jsonschema")
+    from agentready.mobile_models import MobileReport
+    from agentready.seo_models import SeoReport
+
+    root = Path(__file__).parents[1] / "schemas"
+    payloads = (
+        (root / "agentready.seo.v2.schema.json", SeoReport(
+            "agentready.seo.v2",
+            "https://example.test/",
+            "https://example.test",
+            [],
+            0,
+            [],
+            [],
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:01Z",
+        ).to_dict()),
+        (root / "agentready.mobile.v2.schema.json", MobileReport(
+            "agentready.mobile.v2",
+            ["https://example.test/"],
+            [],
+            0,
+            [],
+            [],
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:01Z",
+        ).to_dict()),
+    )
+
+    for schema_path, payload in payloads:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        jsonschema.Draft202012Validator(schema).validate(payload)
+
+
 def test_core_modules_do_not_import_transport_adapters():
     package = Path(__file__).parents[1] / "src" / "agentready" / "audit_core"
     forbidden = ("agentready.cli", "agentready.server", "agentready.mcp_server", "tests.")

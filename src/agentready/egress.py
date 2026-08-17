@@ -64,7 +64,7 @@ class EgressPolicy:
             raise ValueError("max_response_bytes must be positive")
 
     def validate_request(self, url: str, *, purpose: str = "audit") -> None:
-        logger.debug("[WP2.3] validating egress purpose=%s url=%s", purpose, _safe_url(url))
+        logger.debug("[FIX:egress-redaction] validating egress purpose=%s url=%s", purpose, _safe_url(url))
         parsed = urlsplit(url)
         if parsed.username or parsed.password:
             raise EgressPolicyError("credential-bearing URLs are not allowed")
@@ -130,4 +130,8 @@ class EgressPolicy:
 
 def _safe_url(url: str) -> str:
     parts = urlsplit(url)
-    return f"{parts.scheme}://{parts.netloc}{parts.path or '/'}"
+    try:
+        hostname = parts.hostname or "[invalid-host]"
+    except ValueError:
+        hostname = "[invalid-host]"
+    return f"{parts.scheme}://{hostname}{parts.path or '/'}"
