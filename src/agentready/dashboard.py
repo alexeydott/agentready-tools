@@ -37,6 +37,16 @@ _TEXT = {
         "v2_render_hint": "Render pages in a headless browser during the crawl. Slower, but captures client-rendered content.",
         "v2_max_depth": "Crawl depth",
         "v2_max_depth_hint": "0 checks the start page and its same-origin resources only; higher values follow same-origin links to that depth.",
+        "v2_rows": "Rows",
+        "v2_filter": "Filter",
+        "v2_filter_hint": "Filter the rows already loaded into the table.",
+        "v2_columns": "Columns",
+        "v2_sort_status": "Status", "v2_sort_depth": "Depth", "v2_sort_title": "Title", "v2_sort_anchor": "Anchor", "v2_sort_type": "Type", "v2_sort_resource": "Resource",
+        "v2_next_page": "Next page",
+        "v2_save_view": "Save view",
+        "v2_saved_view": "Saved view",
+        "v2_delete_view": "Delete view",
+        "v2_export_view": "Export view",
         "profile_seo": "Independent SEO audit with optional same-origin crawl: metadata, indexability, links, canonical URL, robots/sitemap, favicon and JSON-LD.",
         "profile_mobile": "Mobile-friendliness audit based on Google Mobile-Friendly signals: viewport, responsive CSS, fixed widths, touch targets, font readability and indexability.",
         "language": "Language",
@@ -123,6 +133,7 @@ _TEXT = {
         "ai_timeout": "The AI provider did not respond in time. Check the provider or try again.",
         "ai_report_title": "AI audit report",
         "ai_open_full_report": "Show full audit report",
+        "ai_open_full_report_inline": "Show full report here",
         "ai_open_full_report_hint": "The complete AI audit report will open in a new window.",
         "ai_summary": "Summary",
         "ai_actions": "Prioritized recommendations",
@@ -223,6 +234,8 @@ _TEXT = {
         "v2_inventory_empty": "Run the bounded audit to load inventory.",
         "v2_kind_pages": "Pages", "v2_kind_links": "Links", "v2_kind_resources": "Resources", "v2_kind_redirects": "Redirects", "v2_kind_findings": "Findings", "v2_kind_metrics": "Metrics",
         "v2_inventory_error": "Unable to load inventory",
+        "v2_inventory_loading": "Loading this page…",
+        "v2_inventory_page": "Page loaded: {count} rows",
         "v2_inventory_kind": "Inventory section", "v2_inventory_sort": "Sort", "v2_inventory_desc": "Descending",
         "v2_inventory_compare": "Compare", "v2_inventory_rescan": "Rescan selected", "v2_inventory_job": "Run as job", "v2_inventory_cancel": "Cancel job",
         "loading": "Loading...",
@@ -279,6 +292,16 @@ _TEXT = {
         "v2_render_hint": "Рендерить страницы в headless-браузере во время обхода. Медленнее, но захватывает контент, отрисованный на клиенте.",
         "v2_max_depth": "Глубина обхода",
         "v2_max_depth_hint": "0 — проверка стартовой страницы и её ресурсов в пределах сайта; большее значение разрешает переходы по ссылкам на эту глубину.",
+        "v2_rows": "Строки",
+        "v2_filter": "Фильтр",
+        "v2_filter_hint": "Фильтрует уже загруженные строки таблицы.",
+        "v2_columns": "Столбцы",
+        "v2_sort_status": "Статус", "v2_sort_depth": "Глубина", "v2_sort_title": "Заголовок", "v2_sort_anchor": "Анкор", "v2_sort_type": "Тип", "v2_sort_resource": "Ресурс",
+        "v2_next_page": "Следующая страница",
+        "v2_save_view": "Сохранить представление",
+        "v2_saved_view": "Сохранённое представление",
+        "v2_delete_view": "Удалить представление",
+        "v2_export_view": "Экспортировать представление",
         "profile_seo": "Независимый SEO-аудит с дополнительным обходом сайта: метаданные, индексируемость, ссылки, canonical URL, robots/sitemap, favicon и JSON-LD.",
         "profile_mobile": "Аудит мобильной дружественности по сигналам Google Mobile-Friendly: viewport, адаптивный CSS, фиксированная ширина, мишени касания, читаемость шрифта и индексируемость.",
         "language": "Язык",
@@ -365,6 +388,7 @@ _TEXT = {
         "ai_timeout": "AI-провайдер не ответил вовремя. Проверьте провайдера или повторите запрос.",
         "ai_report_title": "Отчёт AI-аудита",
         "ai_open_full_report": "Показать полный отчёт аудита",
+        "ai_open_full_report_inline": "Показать полный отчёт здесь",
         "ai_open_full_report_hint": "Полный отчёт AI-аудита откроется в новом окне.",
         "ai_summary": "Итог",
         "ai_actions": "Приоритетные рекомендации",
@@ -465,6 +489,8 @@ _TEXT = {
         "v2_inventory_empty": "Запустите ограниченный аудит, чтобы загрузить инвентарь.",
         "v2_kind_pages": "Страницы", "v2_kind_links": "Ссылки", "v2_kind_resources": "Ресурсы", "v2_kind_redirects": "Редиректы", "v2_kind_findings": "Проверки", "v2_kind_metrics": "Метрики",
         "v2_inventory_error": "Не удалось загрузить инвентарь",
+        "v2_inventory_loading": "Загрузка страницы…",
+        "v2_inventory_page": "Загружено строк: {count}",
         "v2_inventory_kind": "Раздел инвентаря", "v2_inventory_sort": "Сортировка", "v2_inventory_desc": "По убыванию",
         "v2_inventory_compare": "Сравнить", "v2_inventory_rescan": "Повторно проверить выбранные", "v2_inventory_job": "Запустить как задачу", "v2_inventory_cancel": "Отменить задачу",
         "loading": "Загрузка...",
@@ -591,6 +617,7 @@ button.secondary {{ background:#fff; color:#9e2f0b; border:1px solid #ed4308; }}
 .form-grid.three {{ grid-template-columns:repeat(3,minmax(0,1fr)); }} .form-grid.four {{ grid-template-columns:repeat(4,minmax(0,1fr)); }}
 details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} details summary h2,details summary h3 {{ display:inline; font:inherit; margin:0; }} .actions {{ display:flex; gap:10px; margin-top:16px; }}
 .advanced-links {{ display:flex; flex-wrap:wrap; gap:18px; margin-top:18px; padding-top:14px; border-top:1px solid #efcdb8; }} .advanced-link-row {{ display:flex; align-items:center; gap:6px; position:relative; }}
+.inventory-toolbar {{ display:grid; grid-template-columns:minmax(150px,1.2fr) repeat(4,minmax(110px,1fr)) minmax(180px,1.5fr) minmax(150px,1fr); gap:10px; align-items:end; }} .inventory-toolbar > label {{ min-width:0; }} .inventory-toolbar > select,.inventory-toolbar > input {{ min-width:0; box-sizing:border-box; }} .inventory-toolbar > button {{ width:auto; min-width:120px; }} .inventory-toolbar input[type=checkbox] {{ width:auto; min-height:20px; padding:0; }}
 .text-link {{ color:#9e2f0b; font-weight:700; text-decoration:underline; cursor:pointer; }} .checks-toolbar {{ display:flex; justify-content:space-between; gap:12px; align-items:center; }}
 #checks {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:14px; }}
 .check {{ border:1px solid #efcdb8; border-radius:10px; padding:12px; display:grid; grid-template-columns:auto 1fr; gap:10px; }}
@@ -716,7 +743,7 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .help-content p,.help-content li {{ line-height:1.5; }}
 header .header-actions {{ display:flex; align-items:center; gap:8px; }}
 header .help-header-button {{ width:auto; min-width:120px; }}
-@media (max-width:900px) {{ .dashboard-layout,.dashboard-layout.help-open {{ grid-template-columns:1fr; }} .help-sidebar,.dashboard-layout:not(.help-open) .help-sidebar {{ position:static; width:auto; max-width:none; min-width:0; min-height:0; resize:none; }} .help-content {{ max-height:none; }} .form-grid,.form-grid.three,.form-grid.four {{ grid-template-columns:1fr 1fr; }} }}
+@media (max-width:900px) {{ .dashboard-layout,.dashboard-layout.help-open {{ grid-template-columns:1fr; }} .help-sidebar,.dashboard-layout:not(.help-open) .help-sidebar {{ position:static; width:auto; max-width:none; min-width:0; min-height:0; resize:none; }} .help-content {{ max-height:none; }} .form-grid,.form-grid.three,.form-grid.four,.inventory-toolbar {{ grid-template-columns:1fr 1fr; }} }}
 @media (max-width:600px) {{ body {{ padding:16px; }} header {{ display:block; }} header select {{ margin-top:12px; }} #checks,.form-grid,.form-grid.three,.form-grid.four {{ grid-template-columns:1fr; }} .actions {{ display:grid; }} }}
 </style>
 </head>
@@ -758,22 +785,22 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div id="result" hidden role="status" aria-live="polite">{escape(text["ready"])}</div></section>
 <section id="v2-inventory-panel" class="panel" hidden aria-labelledby="v2-inventory-title">
 <h2 id="v2-inventory-title">{escape(text["v2_inventory"])} {_hint(text, "v2_inventory_hint")}</h2>
-<div class="actions">
+<div class="inventory-toolbar">
 <button type="button" class="secondary" onclick="loadV2Inventory()">{escape(text["v2_inventory_load"])}</button>
 <label for="v2-inventory-kind">{escape(text["v2_inventory_kind"])}</label>
 <select id="v2-inventory-kind" onchange="loadV2Inventory(this.value)"><option value="pages">{escape(text["v2_kind_pages"])}</option><option value="links">{escape(text["v2_kind_links"])}</option><option value="resources">{escape(text["v2_kind_resources"])}</option><option value="redirects">{escape(text["v2_kind_redirects"])}</option><option value="findings">{escape(text["v2_kind_findings"])}</option><option value="metrics">{escape(text["v2_kind_metrics"])}</option></select>
-<label for="v2-inventory-limit">Rows</label>
+<label for="v2-inventory-limit">{escape(text["v2_rows"])}</label>
 <select id="v2-inventory-limit" onchange="loadV2Inventory()"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option></select>
-<label for="v2-inventory-sort">{escape(text["v2_inventory_sort"])}</label><select id="v2-inventory-sort" onchange="loadV2Inventory()"><option value="url">URL</option><option value="status">Status</option><option value="depth">Depth</option><option value="title">Title</option><option value="anchor">Anchor</option></select>
+<label for="v2-inventory-sort">{escape(text["v2_inventory_sort"])}</label><select id="v2-inventory-sort" onchange="loadV2Inventory()"><option value="url">URL</option><option value="status">{escape(text["v2_sort_status"])}</option><option value="depth">{escape(text["v2_sort_depth"])}</option><option value="title">{escape(text["v2_sort_title"])}</option><option value="anchor">{escape(text["v2_sort_anchor"])}</option></select>
 <label><input id="v2-inventory-desc" type="checkbox" style="width:auto;margin-right:6px" onchange="loadV2Inventory()">{escape(text["v2_inventory_desc"])}</label>
-<label for="v2-inventory-filter">Filter</label>
-<input id="v2-inventory-filter" type="search" placeholder="Find in loaded rows" oninput="filterV2Inventory()">
-<label for="v2-inventory-columns">Columns</label><select id="v2-inventory-columns" multiple size="3" aria-label="Columns"><option value="url" selected>URL</option><option value="status" selected>Status</option><option value="title" selected>Title</option><option value="depth">Depth</option><option value="anchor">Anchor</option></select>
-<button id="v2-inventory-next" type="button" class="secondary" onclick="loadNextV2Inventory()" hidden>Next page</button>
-<button type="button" class="secondary" onclick="saveV2InventoryView()">Save view</button>
-<label for="v2-saved-view">Saved view</label><select id="v2-saved-view" onchange="loadSavedV2View(this.value)"><option value="">—</option></select>
-<button type="button" class="secondary" onclick="deleteSavedV2View()">Delete view</button>
-<button type="button" class="secondary" onclick="exportSavedV2View()">Export view</button>
+<label for="v2-inventory-filter">{escape(text["v2_filter"])} {_hint(text, "v2_filter_hint")}</label>
+<input id="v2-inventory-filter" type="search" placeholder="{escape(text["v2_filter_hint"])}" oninput="filterV2Inventory()">
+<label for="v2-inventory-columns">{escape(text["v2_columns"])}</label><select id="v2-inventory-columns" multiple size="3" aria-label="{escape(text["v2_columns"])}"><option value="url" selected>URL</option><option value="status" selected>Status</option><option value="title" selected>Title</option><option value="depth">{escape(text["v2_sort_depth"])}</option><option value="anchor">{escape(text["v2_sort_anchor"])}</option></select>
+<button id="v2-inventory-next" type="button" class="secondary" onclick="loadNextV2Inventory()" hidden>{escape(text["v2_next_page"])}</button>
+<button type="button" class="secondary" onclick="saveV2InventoryView()">{escape(text["v2_save_view"])}</button>
+<label for="v2-saved-view">{escape(text["v2_saved_view"])}</label><select id="v2-saved-view" onchange="loadSavedV2View(this.value)"><option value="">—</option></select>
+<button type="button" class="secondary" onclick="deleteSavedV2View()">{escape(text["v2_delete_view"])}</button>
+<button type="button" class="secondary" onclick="exportSavedV2View()">{escape(text["v2_export_view"])}</button>
 <button type="button" class="secondary" onclick="compareV2Inventory()">{escape(text["v2_inventory_compare"])}</button>
 <button type="button" class="secondary" onclick="rescanV2Selection()">{escape(text["v2_inventory_rescan"])}</button>
 <button type="button" class="secondary" onclick="runV2InventoryJob()">{escape(text["v2_inventory_job"])}</button>
@@ -977,6 +1004,16 @@ function scanPayload() {{
 }}
 function setProgress(percent, message) {{ showResult(); progress.hidden = false; progressBar.style.width = percent + "%"; progressBar.setAttribute("aria-valuenow", String(percent)); progressBar.setAttribute("aria-valuetext", message); result.textContent = message; }}
 function setCrawlProgress(progressData) {{ if (!progressData) return; crawlProgress.hidden = false; crawlProgressPhase.textContent = translations[language.value].progress_crawl_phase.replace("{{phase}}", progressData.phase || "crawl"); crawlProgressCount.textContent = translations[language.value].progress_crawl.replace("{{fetched}}", String(progressData.fetched || 0)).replace("{{discovered}}", String(progressData.discovered || 0)); }}
+function logDashboardAction(action, details={{}}) {{
+  const entry = {{at:new Date().toISOString(), action, ...details}};
+  console.info("[DASHBOARD-ACTION]", entry);
+  try {{
+    const key = "agentready.dashboard.actions.v1";
+    const history = JSON.parse(localStorage.getItem(key) || "[]");
+    history.push(entry);
+    localStorage.setItem(key, JSON.stringify(history.slice(-200)));
+  }} catch (error) {{ console.warn("[DASHBOARD-ACTION] Unable to persist action", {{action, error:String(error)}}); }}
+}}
 function finishProgress(success) {{ const percent = success ? 100 : 0; progressBar.style.width = percent + "%"; progressBar.setAttribute("aria-valuenow", String(percent)); }}
 function hintIcon(text) {{ const span = document.createElement("span"); span.className = "hint"; span.tabIndex = 0; span.setAttribute("role", "img"); span.setAttribute("aria-label", text); span.dataset.tooltip = text; span.textContent = "?"; return span; }}
 function reportFilename(site) {{
@@ -998,6 +1035,7 @@ const v2ProfileDefaults = {{quick:3, standard:25, deep:100}};
 let v2LastProfile = document.getElementById("v2-profile").value;
 function selectedV2MaxPages() {{ const value = Number(document.getElementById("v2-max-pages").value); return Number.isFinite(value) && value >= 0 ? value : 3; }}
 function selectedV2Limits() {{ const value = document.getElementById("v2-max-depth").value.trim(); return value === "" ? {{check_limit:Number(document.getElementById("check-limit").value) || 0}} : {{check_limit:Number(document.getElementById("check-limit").value) || 0,max_depth:Math.max(0,Math.min(32,Number(value)))}}; }}
+function inventoryColumnLabel(column) {{ const labels = {{url:"URL",status:translations[language.value].v2_sort_status,depth:translations[language.value].v2_sort_depth,title:translations[language.value].v2_sort_title,anchor:translations[language.value].v2_sort_anchor,type:translations[language.value].v2_sort_type,resource:translations[language.value].v2_sort_resource}}; return labels[column] || column; }}
 function syncV2ProfileBudget() {{
   const profile = document.getElementById("v2-profile").value;
   const pageLimit = document.getElementById("v2-max-pages");
@@ -1145,6 +1183,8 @@ async function request(path, method="GET", body=null, html=false, showOutput=tru
 }}
 async function runScan() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
+  logDashboardAction("audit.start", {{target:document.getElementById("url").value, preset:document.getElementById("preset").value, profile:document.getElementById("v2-profile").value, max_pages:selectedV2MaxPages()}});
+  if (aiConversationHistory.length) {{ await startNewChat(); logDashboardAction("ai.context.reset", {{reason:"new-audit"}}); }}
   window.agentreadyV2Report = null;
   const preset = document.getElementById("preset").value;
   if (preset === "all") {{ await runAll(); return; }}
@@ -1184,6 +1224,7 @@ let v2InventoryKind = "pages";
 let v2InventoryCursor = null;
 let v2InventoryItems = [];
 let v2InventoryCounts = {{}};
+let v2InventoryOverviewRunId = null;
 async function loadV2Inventory(kind=null, cursor=null) {{
   const report = window.agentreadyV2Report;
   const runId = report && report.run ? report.run.id : null;
@@ -1192,8 +1233,13 @@ async function loadV2Inventory(kind=null, cursor=null) {{
   if (!runId) {{ panel.hidden = false; container.textContent = translations[language.value].v2_inventory_empty; return; }}
   panel.hidden = false;
   try {{
-    const overview = await (await fetch("/v2/runs/" + encodeURIComponent(runId) + "/overview")).json();
-    v2InventoryCounts = overview.inventory || {{}};
+    const status = document.getElementById("v2-inventory-status");
+    status.textContent = translations[language.value].v2_inventory_loading;
+    if (v2InventoryOverviewRunId !== runId) {{
+      const overview = await (await fetch("/v2/runs/" + encodeURIComponent(runId) + "/overview")).json();
+      v2InventoryCounts = overview.inventory || {{}};
+      v2InventoryOverviewRunId = runId;
+    }}
     if (kind) {{ v2InventoryKind = kind; document.getElementById("v2-inventory-kind").value = kind; v2InventoryCursor = null; }}
     if (cursor !== null) v2InventoryCursor = cursor;
     const limit = Number(document.getElementById("v2-inventory-limit").value) || 100;
@@ -1205,22 +1251,24 @@ async function loadV2Inventory(kind=null, cursor=null) {{
     if (!response.ok) throw new Error("HTTP " + response.status);
     const page = await response.json();
     v2InventoryItems = page.items || [];
+    logDashboardAction("inventory.load", {{run_id:runId, kind:v2InventoryKind, rows:v2InventoryItems.length, has_next:Boolean(page.next_cursor)}});
     const counts = Object.entries(v2InventoryCounts).map(([name, count]) => `<button type="button" class="secondary" onclick="loadV2Inventory('${{name.replace('_','-')}}')">${{name}} (${{count}})</button>`).join(" ");
     const selectedColumns = [...document.getElementById("v2-inventory-columns").selectedOptions].map(option => option.value);
     const availableColumns = [...new Set(v2InventoryItems.flatMap(item => Object.keys(item)))];
     const columns = (selectedColumns.length ? selectedColumns : availableColumns).filter(column => availableColumns.includes(column)).slice(0, 12);
-    container.innerHTML = `<p>${{counts}}</p><table><thead><tr>${{columns.map(column => `<th scope="col">${{escapeHtml(column)}}</th>`).join("")}}</tr></thead><tbody>${{v2InventoryItems.map((item, index) => `<tr data-v2-inventory-row="${{index}}">${{columns.map(column => `<td>${{escapeHtml(typeof item[column] === "object" ? JSON.stringify(item[column]) : (item[column] ?? ""))}}</td>`).join("")}}</tr>`).join("")}}</tbody></table>`;
+    container.innerHTML = `<p>${{counts}}</p><table><thead><tr>${{columns.map(column => `<th scope="col">${{escapeHtml(inventoryColumnLabel(column))}}</th>`).join("")}}</tr></thead><tbody>${{v2InventoryItems.map((item, index) => `<tr data-v2-inventory-row="${{index}}">${{columns.map(column => `<td>${{escapeHtml(typeof item[column] === "object" ? JSON.stringify(item[column]) : (item[column] ?? ""))}}</td>`).join("")}}</tr>`).join("")}}</tbody></table>`;
     const next = document.getElementById("v2-inventory-next");
     next.hidden = !page.next_cursor;
     next.dataset.cursor = page.next_cursor || "";
-    document.getElementById("v2-inventory-filter").value = "";
+    status.textContent = translations[language.value].v2_inventory_page.replace("{{count}}", String(v2InventoryItems.length));
   }} catch (error) {{
     container.textContent = translations[language.value].v2_inventory_error + ": " + error.message;
+    document.getElementById("v2-inventory-status").textContent = translations[language.value].v2_inventory_error;
   }}
 }}
 function loadNextV2Inventory() {{
   const cursor = document.getElementById("v2-inventory-next").dataset.cursor;
-  if (cursor) loadV2Inventory(null, cursor);
+  if (cursor) {{ logDashboardAction("inventory.next_page", {{kind:v2InventoryKind}}); loadV2Inventory(null, cursor); }}
 }}
 function filterV2Inventory() {{
   const query = document.getElementById("v2-inventory-filter").value.trim().toLowerCase();
@@ -2243,10 +2291,22 @@ function renderAiReport(data) {{
   fullReportLink.title = translations[language.value].ai_open_full_report_hint;
   fullReportLink.textContent = translations[language.value].ai_open_full_report;
   fullReportLink.setAttribute("aria-label", translations[language.value].ai_open_full_report_hint);
-  fullReportLink.onclick = () => {{
-    const blobUrl = URL.createObjectURL(new Blob([aiReportDocument()], {{type:"text/html;charset=utf-8"}}));
-    fullReportLink.href = blobUrl;
-    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  fullReportLink.onclick = event => {{
+    event.preventDefault();
+    const reportHtml = aiReportDocument();
+    const popup = window.open("", "_blank", "noopener,noreferrer");
+    if (popup) {{
+      popup.document.write(reportHtml);
+      popup.document.close();
+      popup.focus();
+      logDashboardAction("ai.full_report.open", {{mode:"window"}});
+      return;
+    }}
+    fullReport.hidden = false;
+    fullReportLink.href = "#ai-full-report";
+    fullReportLink.target = "_self";
+    fullReportLink.textContent = translations[language.value].ai_open_full_report_inline;
+    logDashboardAction("ai.full_report.open", {{mode:"inline-fallback"}});
   }};
   output.append(fullReportLink, fullReport);
   return output;
@@ -2265,6 +2325,7 @@ async function runAi(path="/ai/recommend", retry=false) {{
       aiLastUserMessage = message;
       appendChatMessage("user", message);
     }}
+    logDashboardAction("ai.request", {{operation:path === "/ai/chat" ? "chat" : "recommend", retry, has_report:Boolean(window.agentreadyV2Report), message_length:message ? message.length : 0}});
     setAiBusy(true);
     const controller = new AbortController();
     timeoutId = window.setTimeout(() => controller.abort(), 45000);

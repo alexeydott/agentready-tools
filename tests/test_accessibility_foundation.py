@@ -59,6 +59,14 @@ def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
         assert 'runV2Background' in html
         assert 'function captureV2Report' in html
         assert 'captureV2Report(html)' in html
+        assert 'ai.full_report.open' in html
+        assert 'ai_open_full_report_inline' in html
+        assert 'function logDashboardAction' in html
+        assert 'ai.context.reset' in html
+        assert 'DASHBOARD-ACTION' in html
+        assert 'inventory.load' in html
+        assert 'v2InventoryOverviewRunId' in html
+        assert 'inventory.next_page' in html
         assert 'agentready.dashboard.job.v2' in html
         assert 'Service health checked without resetting audit progress' in html
         assert 'const v2ProfileDefaults' in html

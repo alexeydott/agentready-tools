@@ -914,6 +914,13 @@ def _render_v2_dashboard(payload: dict) -> str:
         if isinstance(item, dict)
     )
     report_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+    status_counts = {status: sum(1 for item in findings if isinstance(item, dict) and item.get("status") == status) for status in ("fail", "warn", "pass", "skip", "error")}
+    summary_label = "Сводка для печати" if language == "ru" else "Print summary"
+    summary_text = (
+        f"Ошибки: {status_counts['fail'] + status_counts['error']} · предупреждения: {status_counts['warn']} · пройдено: {status_counts['pass']}"
+        if language == "ru"
+        else f"Errors: {status_counts['fail'] + status_counts['error']} · warnings: {status_counts['warn']} · passed: {status_counts['pass']}"
+    )
     return (
         "<!doctype html><html lang='"
         + html.escape(language)
@@ -922,6 +929,7 @@ def _render_v2_dashboard(payload: dict) -> str:
         + "</title>"
         + "<style>body{font:16px system-ui,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem}"
         + "table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccd;padding:.5rem;text-align:left}"
+        + "@media print{body{max-width:none;margin:0;padding:0;font-size:11pt}.check-help{display:none}.print-note{border:1px solid #ccd;padding:.4rem;margin:.8rem 0}table{font-size:10pt;page-break-inside:auto}tr{page-break-inside:avoid}h1{font-size:18pt}}"
         + "code{background:#f3f4f6;padding:.1rem .25rem}.check-help{display:inline-flex;align-items:center;justify-content:center;width:1.1em;height:1.1em;border:1px solid #9e2f0b;border-radius:50%;font-size:.75em;color:#9e2f0b;cursor:help}.check-help:focus::after,.check-help:hover::after{content:attr(title);position:absolute;z-index:2;background:#24130d;color:#fff;padding:.4rem;border-radius:.3rem;max-width:22rem}</style></head><body>"
         + "<main id='report-content'><h1>"
         + html.escape(labels["title"])
@@ -937,7 +945,11 @@ def _render_v2_dashboard(payload: dict) -> str:
         + html.escape(labels["fetched"])
         + " "
         + html.escape(str(coverage.get("urls_fetched", 0)))
-        + " URL(s).</p><table><thead><tr><th>"
+        + " URL(s).</p><section class='print-note'><strong>"
+        + html.escape(summary_label)
+        + "</strong><br>"
+        + html.escape(summary_text)
+        + "</section><table><thead><tr><th>"
         + html.escape(labels["finding"])
         + "</th><th>"
         + html.escape(labels["status"])
@@ -949,6 +961,15 @@ def _render_v2_dashboard(payload: dict) -> str:
         + report_json
         + "</script></body></html>"
     )
+
+
+def _run_and_save_v2_job(request: V2AuditRequest, progress_callback: object) -> dict:
+    """Run a background audit and persist standalone JSON and HTML artifacts."""
+    payload = _run_v2_scan(request, progress_callback=progress_callback)
+    json_path = save_report(payload, target=request.url, surface="job-v2", fmt="json")
+    html_path = save_report(_render_v2_dashboard(payload), target=request.url, surface="job-v2", fmt="html")
+    logger.info("background v2 report saved json=%s html=%s", json_path, html_path)
+    return payload
 
 
 @app.post("/v2/audit")
@@ -989,7 +1010,11 @@ def audit_v2_rescan_endpoint(request: V2AuditRequest) -> dict:
 def audit_v2_job_endpoint(request: V2AuditRequest) -> dict:
     try:
         job_ref: dict[str, str] = {}
-        job_id = _V2_JOBS.submit(lambda: _run_v2_scan(request, progress_callback=lambda values: _V2_JOBS.update_progress(job_ref["id"], **values)))
+        def update_job_progress(values: dict) -> None:
+            if job_ref.get("id"):
+                _V2_JOBS.update_progress(job_ref["id"], **values)
+
+        job_id = _V2_JOBS.submit(lambda: _run_and_save_v2_job(request, progress_callback=update_job_progress))
         job_ref["id"] = job_id
     except (RuntimeError, TargetError, ValueError) as exc:
         raise HTTPException(status_code=429 if isinstance(exc, RuntimeError) else 400, detail=str(exc)) from exc

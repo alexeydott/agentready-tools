@@ -14,7 +14,7 @@ from agentready.audit_core.store import (
     RunUrlRecord,
     RunUrlState,
 )
-from agentready.server import _render_v2_dashboard, app
+from agentready.server import _render_v2_dashboard, _run_and_save_v2_job, app
 
 
 def test_v2_dashboard_localizes_coverage_and_status_values():
@@ -27,6 +27,34 @@ def test_v2_dashboard_localizes_coverage_and_status_values():
     assert "Частичное — достигнут лимит страниц" in html
     assert "предупреждение" in html
     assert "partial_limit" not in html.split("<script", 1)[0]
+
+
+def test_v2_dashboard_print_projection_is_summary_oriented():
+    html = _render_v2_dashboard({
+        "request": {"language": "ru"},
+        "target": "https://example.test/",
+        "coverage": {"classification": "complete_within_scope", "urls_fetched": 1200},
+        "findings": [
+            {"id": "a", "status": "fail", "summary": "broken"},
+            {"id": "b", "status": "warn", "summary": "warning"},
+        ],
+    })
+    assert "Сводка для печати" in html
+    assert "Ошибки: 1" in html
+    assert "@media print" in html
+
+
+def test_background_v2_job_persists_json_and_html_artifacts(monkeypatch):
+    saved = []
+
+    def fake_scan(request, progress_callback=None):
+        return {"request": {"language": "ru"}, "target": request.url, "coverage": {}, "findings": []}
+
+    monkeypatch.setattr(server_module, "_run_v2_scan", fake_scan)
+    monkeypatch.setattr(server_module, "save_report", lambda content, **kwargs: saved.append(kwargs["fmt"]) or "report")
+    result = _run_and_save_v2_job(SimpleNamespace(url="https://example.test/"), lambda values: None)
+    assert result["target"] == "https://example.test/"
+    assert saved == ["json", "html"]
 
 
 def test_server_exposes_all_read_only_audit_modes():
