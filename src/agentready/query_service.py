@@ -10,14 +10,19 @@ from typing import Generic, TypeVar
 
 from .audit_core.store import (
     FindingRecord,
+    FindingStorageQuery,
     LinkOccurrenceRecord,
     MetricRecord,
     PageRecord,
+    PageStorageQuery,
     RedirectFact,
     ResourceOccurrenceRecord,
     RunUrlRecord,
     RunUrlState,
+    RunUrlStorageQuery,
     SiteStore,
+    StorageCursor,
+    _storage_query_hash,
 )
 
 logger = logging.getLogger(__name__)
@@ -274,6 +279,41 @@ class QueryService:
 
     def pages(self, query: PageQuery) -> QueryPage[PageRecord]:
         started = time.monotonic()
+        if (
+            hasattr(self.store, "query_pages_storage")
+            and query.sort_by == "url"
+            and not query.descending
+            and query.min_depth is None
+            and query.max_depth is None
+            and query.title_contains is None
+            and query.canonical is None
+        ):
+            storage_query = PageStorageQuery(
+                query.run_id,
+                limit=query.limit,
+                status_code=query.status_code,
+                locally_indexable=query.locally_indexable,
+            )
+            if query.cursor:
+                storage_query = replace(
+                    storage_query,
+                    cursor=StorageCursor(
+                        query.run_id,
+                        _storage_query_hash(storage_query),
+                        (query.cursor,),
+                    ).encode(),
+                )
+            result = self.store.query_pages_storage(storage_query)
+            logger.debug("[FIX:query-pushdown] view=pages run_id=%s rows=%d", query.run_id, len(result.items))
+            next_cursor = None
+            if result.next_cursor:
+                next_cursor = StorageCursor.decode(
+                    result.next_cursor,
+                    run_id=query.run_id,
+                    query_hash=_storage_query_hash(storage_query),
+                ).position[0]
+            self._log_query("pages", query, len(result.items), result.total or 0, started, status=query.status_code, sort=query.sort_by)
+            return QueryPage(tuple(result.items), next_cursor, result.total)
         rows = self.store.query_pages(query.run_id, status_code=query.status_code)
         rows = [
             row for row in rows
@@ -297,6 +337,28 @@ class QueryService:
 
     def run_urls(self, query: RunUrlQuery) -> QueryPage[RunUrlRecord]:
         started = time.monotonic()
+        if hasattr(self.store, "query_run_urls_storage"):
+            storage_query = RunUrlStorageQuery(query.run_id, limit=query.limit, state=query.state)
+            if query.cursor:
+                storage_query = replace(
+                    storage_query,
+                    cursor=StorageCursor(
+                        query.run_id,
+                        _storage_query_hash(storage_query),
+                        (query.cursor,),
+                    ).encode(),
+                )
+            result = self.store.query_run_urls_storage(storage_query)
+            logger.debug("[FIX:query-pushdown] view=run_urls run_id=%s rows=%d", query.run_id, len(result.items))
+            next_cursor = None
+            if result.next_cursor:
+                next_cursor = StorageCursor.decode(
+                    result.next_cursor,
+                    run_id=query.run_id,
+                    query_hash=_storage_query_hash(storage_query),
+                ).position[0]
+            self._log_query("run_urls", query, len(result.items), result.total or 0, started, state=query.state.value if query.state else None)
+            return QueryPage(tuple(result.items), next_cursor, result.total)
         rows = list(self.store.iter_run_urls(query.run_id))
         rows = [
             row
@@ -364,6 +426,38 @@ class QueryService:
 
     def findings(self, query: FindingQuery) -> QueryPage[FindingRecord]:
         started = time.monotonic()
+        if (
+            hasattr(self.store, "query_findings_storage")
+            and query.sort_by == "finding_id"
+            and not query.descending
+            and query.affected_url is None
+        ):
+            storage_query = FindingStorageQuery(
+                query.run_id,
+                limit=query.limit,
+                finding_id=query.finding_id,
+                status=query.status,
+            )
+            if query.cursor:
+                storage_query = replace(
+                    storage_query,
+                    cursor=StorageCursor(
+                        query.run_id,
+                        _storage_query_hash(storage_query),
+                        (query.cursor,),
+                    ).encode(),
+                )
+            result = self.store.query_findings_storage(storage_query)
+            logger.debug("[FIX:query-pushdown] view=findings run_id=%s rows=%d", query.run_id, len(result.items))
+            next_cursor = None
+            if result.next_cursor:
+                next_cursor = StorageCursor.decode(
+                    result.next_cursor,
+                    run_id=query.run_id,
+                    query_hash=_storage_query_hash(storage_query),
+                ).position[0]
+            self._log_query("findings", query, len(result.items), result.total or 0, started, finding_id=query.finding_id, status=query.status)
+            return QueryPage(tuple(result.items), next_cursor, result.total)
         rows = [
             row for row in self.store.iter_findings(query.run_id)
             if (query.finding_id is None or row.finding_id == query.finding_id)

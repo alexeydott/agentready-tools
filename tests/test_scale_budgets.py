@@ -13,6 +13,7 @@ import tracemalloc
 
 import pytest
 
+from agentready.audit_core.store import PageStorageQuery, RunRecord, SQLiteSiteStore
 from agentready.duplicates import cluster_signatures
 from agentready.exports import export_jsonl
 from agentready.link_graph import build_link_graph, diagnose_graph
@@ -50,6 +51,7 @@ def test_scale_fixtures_are_deterministic_and_bounded():
     assert len(inventory_rows(3)) == 3
 
 
+@pytest.mark.scale
 @pytest.mark.skipif(not SCALE_ENABLED, reason="set AGENTREADY_SCALE_TESTS=1 to run scale budgets")
 @pytest.mark.parametrize("size", SIZES)
 def test_scale_budget_operations(size: int):
@@ -73,6 +75,45 @@ def test_scale_budget_operations(size: int):
         if size == 100_000:
             assert duration_ms <= MAX_DURATION_SECONDS * 1000, f"{operation} exceeded wall-time budget"
             assert peak <= MAX_PEAK_BYTES, f"{operation} exceeded peak-memory budget"
+
+
+@pytest.mark.scale
+@pytest.mark.skipif(not SCALE_ENABLED, reason="set AGENTREADY_SCALE_TESTS=1 to run scale budgets")
+@pytest.mark.parametrize("size", SIZES)
+def test_sqlite_scale_query_write_and_pagination(size: int, tmp_path):
+    """Exercise the real SQLite keyset path without retaining generated databases."""
+    started = time.perf_counter()
+    tracemalloc.start()
+    store = SQLiteSiteStore(tmp_path / f"scale-{size}.sqlite")
+    try:
+        store.begin_run(RunRecord("scale-run", "config", "tool", "rules"))
+        rows = [
+            ("scale-run", f"https://scale.example/{index:06d}", f"https://scale.example/{index:06d}", 1, 200, None, None, None, None, None, None, None)
+            for index in range(size)
+        ]
+        with store._transaction():
+            store._connection.executemany(
+                "INSERT INTO pages(run_id,url_key,requested_url,final_url,depth,status_code,content_type,title,canonical,locally_indexable,content_hash,content) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                rows,
+            )
+        cursor = None
+        seen = 0
+        while True:
+            page = store.query_pages_storage(PageStorageQuery("scale-run", limit=1000, cursor=cursor))
+            seen += len(page.items)
+            if page.next_cursor is None:
+                break
+            cursor = page.next_cursor
+        _, peak = tracemalloc.get_traced_memory()
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        logger.info("scale operation=sqlite-query-write-pagination size=%d duration_ms=%d peak_bytes=%d rows=%d threshold_ms=%d threshold_bytes=%d", size, duration_ms, peak, seen, MAX_DURATION_SECONDS * 1000, MAX_PEAK_BYTES)
+        assert seen == size
+        if size == 100_000:
+            assert duration_ms <= MAX_DURATION_SECONDS * 1000
+            assert peak <= MAX_PEAK_BYTES
+    finally:
+        tracemalloc.stop()
+        store.close()
 
 
 def _query_pages(size: int):

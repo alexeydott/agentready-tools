@@ -1,7 +1,10 @@
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from agentready.audit_core.store import (
+    FindingStorageQuery,
     MemorySiteStore,
     MetricRecord,
     PageRecord,
@@ -10,6 +13,7 @@ from agentready.audit_core.store import (
     RunUrlRecord,
     RunUrlState,
     SQLiteSiteStore,
+    StorageCursor,
 )
 from agentready.exports import export_query
 from agentready.query_service import (
@@ -46,6 +50,21 @@ def test_query_spec_validation_accepts_only_allowlisted_typed_nodes(caplog):
     record = next(record for record in caplog.records if record.message.startswith("query view=pages"))
     assert "query_id=" in record.message
     assert "total=3" in record.message
+
+
+def test_storage_cursor_is_opaque_and_bound_to_run_and_query():
+    token = StorageCursor("run-1", "pages:v1", ("https://example.test/1",)).encode()
+    decoded = StorageCursor.decode(token, run_id="run-1", query_hash="pages:v1")
+    assert decoded.position == ("https://example.test/1",)
+    with pytest.raises(Exception, match="cursor"):
+        StorageCursor.decode(token, run_id="run-other", query_hash="pages:v1")
+
+
+def test_typed_storage_queries_validate_bounds_and_filters():
+    query = FindingStorageQuery("run-1", limit=10, status="fail")
+    assert query.status == "fail"
+    with pytest.raises(ValueError, match="limit"):
+        FindingStorageQuery("run-1", limit=0)
 
 
 def test_query_service_pages_has_stable_cursor_pagination():
