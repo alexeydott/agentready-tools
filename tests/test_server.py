@@ -15,7 +15,7 @@ from agentready.audit_core.store import (
     RunUrlRecord,
     RunUrlState,
 )
-from agentready.server import _V2_RUNS, _render_v2_dashboard, _run_and_save_v2_job, app
+from agentready.server import _V2_RUNS, _render_v2_dashboard, _run_and_save_v2_job, _resolve_rescan_selection, app
 
 
 def test_v2_dashboard_localizes_coverage_and_status_values():
@@ -28,6 +28,21 @@ def test_v2_dashboard_localizes_coverage_and_status_values():
     assert "Частичное — достигнут лимит страниц" in html
     assert "предупреждение" in html
     assert "partial_limit" not in html.split("<script", 1)[0]
+
+
+def test_selected_rescan_maps_findings_and_rejects_stale_selection():
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("parent-1", "config", "tool", "rules"))
+    store.put_run_url(RunUrlRecord("parent-1", "https://example.test/page", RunUrlState.FETCHED))
+    store.put_finding("parent-1", "title", {"id": "title", "status": "fail", "affected_urls": ["https://example.test/page"]})
+    _V2_RUNS.put("parent-1", store)
+    request = server_module.V2AuditRequest(url="https://example.test", rescan_of="parent-1", selected_finding_ids=["title"], confirm=True)
+    urls, selection_hash, ids = _resolve_rescan_selection(request, "parent-1")
+    assert urls == ["https://example.test/page"]
+    assert selection_hash and ids == ("title",)
+    stale = request.model_copy(update={"selection_hash": "stale-hash"})
+    with pytest.raises(ValueError, match="stale"):
+        _resolve_rescan_selection(stale, "parent-1")
 
 
 def test_v2_dashboard_print_projection_is_summary_oriented():

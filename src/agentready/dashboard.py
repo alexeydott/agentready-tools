@@ -1800,7 +1800,7 @@ async function rescanV2Selection() {{
   if (!urls.length) {{ status.textContent = translations[language.value].v2_inventory_empty; return; }}
   try {{
     const report = window.agentreadyV2Report;
-    const response = await fetch("/v2/rescan", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:urls.length,selected_urls:urls,rescan_of:report && report.run ? report.run.id : null}})}});
+    const response = await fetch("/v2/rescan", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:urls.length,selected_urls:urls,rescan_of:report && report.run ? report.run.id : null,confirm:true}})}});
     if (!response.ok) throw new Error("HTTP " + response.status);
     status.textContent = "Rescan complete";
   }} catch (error) {{ status.textContent = translations[language.value].v2_inventory_error + ": " + error.message; }}

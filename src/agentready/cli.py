@@ -127,6 +127,8 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     rescan.add_argument("--base-url", default="http://127.0.0.1:8765")
     rescan.add_argument("--rescan-of")
     rescan.add_argument("--select-url", action="append", default=[])
+    rescan.add_argument("--select-finding", action="append", default=[])
+    rescan.add_argument("--selection-hash")
     rescan.add_argument("--max-pages", type=int, default=25)
 
     compare = _add_command_parser(sub, "compare", help="Compare a v2 audit with a saved baseline")
@@ -956,6 +958,9 @@ def _cmd_rescan(args: argparse.Namespace) -> int:
         "profile": "standard",
         "max_pages": args.max_pages,
         "selected_urls": args.select_url,
+        "selected_finding_ids": args.select_finding,
+        "selection_hash": args.selection_hash,
+        "confirm": bool(args.select_url or args.select_finding),
         "rescan_of": args.rescan_of,
     }
     print(json.dumps(_http_json(args.base_url, "/v2/rescan", method="POST", payload=payload), ensure_ascii=False, indent=2))

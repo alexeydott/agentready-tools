@@ -9,6 +9,7 @@ import re
 import sys
 import threading
 from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -495,6 +496,9 @@ class V2AuditRequest(BaseModel):
     provider: str | None = None
     rescan_of: str | None = None
     selected_urls: list[str] = Field(default_factory=list)
+    selected_finding_ids: list[str] = Field(default_factory=list)
+    selection_hash: str | None = Field(default=None, min_length=8, max_length=128)
+    confirm: bool = False
     discovery_kind: Literal["single", "list", "sitemap", "robots-sitemap", "crawl"] = "single"
     discovery_urls: list[str] = Field(default_factory=list)
     discovery_sitemap_xml: str | None = None
@@ -984,6 +988,8 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None, p
         raise ValueError(f"max_pages must be between 0 and {HARD_CAPS.max_pages}")
     if max_pages == 0:
         max_pages = HARD_CAPS.max_pages
+    effective_parent = parent_run_id if parent_run_id is not None else request.rescan_of
+    selected_urls, selection_hash, selection_meta = _resolve_rescan_selection(request, effective_parent)
     store = _serve_sqlite_store() or MemorySiteStore()
     result = _AUDIT_SERVICE.run(
         AuditRequest(
@@ -998,8 +1004,8 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None, p
             render=request.render,
             provider=request.provider,
             language=request.language,
-            parent_run_id=parent_run_id if parent_run_id is not None else request.rescan_of,
-            selected_urls=tuple(request.selected_urls),
+            parent_run_id=effective_parent,
+            selected_urls=tuple(selected_urls),
             discovery_kind=request.discovery_kind,
             discovery_urls=tuple(request.discovery_urls),
             discovery_sitemap_xml=request.discovery_sitemap_xml,
@@ -1019,7 +1025,63 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None, p
         if coverage is not None:
             store.put_coverage(run_id, coverage.to_dict())
         _V2_RUNS.put(run_id, store)
-    return result.to_dict()
+    payload = result.to_dict()
+    if effective_parent is not None:
+        payload["rescan"] = {"parent_run_id": effective_parent, "selection_hash": selection_hash, "selected_count": len(selected_urls), "selected_urls": list(selected_urls), "selected_finding_ids": list(selection_meta), "remediation": _rescan_remediation(effective_parent, selection_meta)}
+    return payload
+
+
+def _rescan_remediation(parent_run_id: str, finding_ids: tuple[str, ...]) -> list[dict[str, object]]:
+    if not finding_ids:
+        return []
+    try:
+        records = {item.finding_id: item.payload for item in _V2_RUNS.get(parent_run_id).iter_findings(parent_run_id)}
+    except KeyError:
+        return []
+    return [{"finding_id": finding_id, "evidence": list(records[finding_id].get("evidence", ())), "agent_prompt": f"Fix finding {finding_id} using only the supplied evidence."} for finding_id in finding_ids if finding_id in records]
+
+
+def _resolve_rescan_selection(request: V2AuditRequest, parent_run_id: str | None) -> tuple[list[str], str | None, tuple[str, ...]]:
+    """Resolve and authenticate a bounded child-run selection against its parent."""
+    finding_ids = tuple(sorted(set(item.strip() for item in request.selected_finding_ids if item.strip())))
+    explicit_urls = tuple(dict.fromkeys(item.strip() for item in request.selected_urls if item.strip()))
+    if not finding_ids and not explicit_urls:
+        return [], None, ()
+    if parent_run_id is None:
+        if finding_ids:
+            raise ValueError("selected finding rescan requires parent run")
+        return list(explicit_urls), None, ()
+    if not request.confirm:
+        raise ValueError("selected rescan requires explicit confirmation")
+    try:
+        parent_store = _V2_RUNS.get(parent_run_id)
+    except KeyError as exc:
+        raise ValueError("parent run not found") from exc
+    known_urls = {item.url_key for item in parent_store.iter_run_urls(parent_run_id)} | {item.url_key for item in parent_store.iter_pages(parent_run_id)}
+    urls = set(explicit_urls)
+    if any(url not in known_urls for url in urls):
+        raise ValueError("selected URL is stale or not part of the parent run")
+    if finding_ids:
+        records = {item.finding_id: item.payload for item in parent_store.iter_findings(parent_run_id)}
+        missing = sorted(set(finding_ids) - set(records))
+        if missing:
+            raise ValueError("selected finding is stale or not part of the parent run")
+        for finding_id in finding_ids:
+            payload = records[finding_id]
+            for key in ("affected_urls", "urls"):
+                values = payload.get(key, ()) if isinstance(payload, Mapping) else ()
+                urls.update(item for item in values if isinstance(item, str) and item in known_urls)
+            for evidence in payload.get("evidence", ()) if isinstance(payload, Mapping) else ():
+                if isinstance(evidence, Mapping) and isinstance(evidence.get("url"), str) and evidence["url"] in known_urls:
+                    urls.add(evidence["url"])
+    ordered_urls = sorted(urls)
+    if not ordered_urls:
+        raise ValueError("selected findings have no affected URLs in the parent run")
+    digest = hashlib.sha256(json.dumps({"parent_run_id": parent_run_id, "finding_ids": finding_ids, "urls": ordered_urls}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    if request.selection_hash is not None and request.selection_hash != digest:
+        raise ValueError("selection is stale; selection hash does not match parent evidence")
+    logger.info("rescan selection parent_run_id=%s selection_hash=%s finding_count=%d url_count=%d", parent_run_id, digest[:16], len(finding_ids), len(ordered_urls))
+    return ordered_urls, digest, finding_ids
 
 
 def _render_v2_dashboard(payload: dict) -> str:

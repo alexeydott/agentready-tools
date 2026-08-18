@@ -157,10 +157,14 @@ with `GET /v2/saved-views/{view_id}` or export the exact same QuerySpec through
 `/v2/saved-views/{view_id}/export?format=csv` (also `json`, `jsonl`, `markdown`,
 and `html`). Saved views never accept SQL or executable filter expressions.
 
-For a selective child rescan, send `rescan_of` together with `selected_urls`.
-The crawler validates those URLs against the target origin and does not expand
-links from selected pages, so a three-URL rescan does not fetch the remaining
-run inventory.
+For a selective child rescan, send `rescan_of`, `confirm: true`, and either
+`selected_urls` or `selected_finding_ids`. Finding selections are resolved to
+the parent run's evidence URLs and returned with a deterministic
+`selection_hash` plus evidence-linked remediation prompts. A supplied hash is
+checked for staleness; deleted or unknown findings/URLs are rejected. The
+crawler validates the resulting URLs against the parent inventory and does not
+expand links from selected pages, so a three-URL rescan does not fetch the
+remaining run inventory.
 
 `POST /v2/jobs` returns a job identifier for bounded asynchronous execution.
 Poll `GET /v2/jobs/{job_id}` for a typed snapshot and use
