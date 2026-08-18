@@ -6,6 +6,9 @@ from agentready.custom_rules import (
     apply_rule,
     builtin_presets,
     debug_representation,
+    apply_rules,
+    compile_rules,
+    validate_rules,
 )
 
 
@@ -44,3 +47,32 @@ def test_css_rules_require_matches_from_shared_representation_and_presets_are_ed
     presets = builtin_presets()
     assert {"analytics", "schema"} <= set(presets)
     assert presets["analytics"] is not builtin_presets()["analytics"]
+
+
+def test_custom_rules_v1_document_compiles_with_stable_hash_and_applies_metadata():
+    document = """version: 1
+rules:
+  - id: product
+    title: Product text
+    scope: page
+    assert:
+      kind: text
+      pattern: Product
+    severity: high
+"""
+    first = compile_rules(document)
+    second = compile_rules(document)
+    assert first.rule_hash == second.rule_hash
+    result = apply_rules(first, text="Product page")
+    assert result["rule_hash"] == first.rule_hash
+    assert result["matches"][0]["severity"] == "high"
+    assert validate_rules(document)["valid"] is True
+
+
+def test_custom_rules_reject_expensive_regex_and_unknown_dsl_shape():
+    with pytest.raises(ValueError, match="unsupported or expensive"):
+        compile_rules({"version": 1, "rules": [{"id": "evil", "assert": {"kind": "regex", "pattern": "(a+)+"}}]})
+    with pytest.raises(ValueError):
+        compile_rules({"version": 2, "rules": []})
+    with pytest.raises(ValueError):
+        compile_rules({"version": 1, "rules": [{"id": "x", "when": {"eval": "1"}, "assert": {"kind": "text", "pattern": "x"}}]})

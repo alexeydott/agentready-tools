@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+
+import yaml
 
 
 class CustomRuleKind(StrEnum):
@@ -23,6 +26,9 @@ _SENSITIVE_HEADERS = frozenset(
     {"authorization", "cookie", "set-cookie", "proxy-authorization", "x-api-key"}
 )
 logger = logging.getLogger(__name__)
+CUSTOM_RULE_VERSION = "1"
+MAX_RULES = 100
+MAX_INPUT_BYTES = 1_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +37,10 @@ class CustomRule:
     kind: CustomRuleKind
     pattern: str
     max_matches: int = 100
+    title: str = ""
+    scope: str = "page"
+    severity: str = "info"
+    url_regex: str | None = None
 
     def __post_init__(self) -> None:
         if not self.id.strip() or not self.pattern:
@@ -39,11 +49,24 @@ class CustomRule:
             raise ValueError("custom rule pattern must not exceed 2048 characters")
         if self.max_matches <= 0 or self.max_matches > 1000:
             raise ValueError("custom rule max_matches must be between 1 and 1000")
+        if self.scope != "page":
+            raise ValueError("custom rule scope must be page")
+        if self.severity not in {"info", "low", "medium", "high", "critical"}:
+            raise ValueError("unsupported custom rule severity")
         if self.kind is CustomRuleKind.REGEX:
+            if _unsafe_regex(self.pattern):
+                raise ValueError("custom rule regex contains unsupported or expensive construct")
             try:
                 re.compile(self.pattern)
             except re.error as exc:
                 raise ValueError(f"invalid custom rule regex: {exc}") from exc
+        if self.url_regex:
+            if _unsafe_regex(self.url_regex):
+                raise ValueError("custom rule URL regex contains unsupported or expensive construct")
+            try:
+                re.compile(self.url_regex)
+            except re.error as exc:
+                raise ValueError(f"invalid custom rule URL regex: {exc}") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +77,107 @@ class CustomRuleMatch:
     @property
     def count(self) -> int:
         return len(self.matches)
+
+
+@dataclass(frozen=True, slots=True)
+class CustomRuleDocument:
+    version: str
+    rules: tuple[CustomRule, ...]
+    rule_hash: str
+
+
+def _unsafe_regex(pattern: str) -> bool:
+    """Reject constructs with poor or implementation-dependent worst cases."""
+    return bool(
+        re.search(r"\\[1-9]", pattern)
+        or re.search(r"\(\?[=!<]", pattern)
+        or re.search(r"\([^)]*[+*]\)[+*?]", pattern)
+        or re.search(r"\{\d{4,}(?:,\d*)?\}", pattern)
+    )
+
+
+def _document_payload(payload: Mapping[str, object] | str) -> Mapping[str, object]:
+    if isinstance(payload, str):
+        if len(payload.encode("utf-8")) > MAX_INPUT_BYTES:
+            raise ValueError("custom rules document exceeds input limit")
+        try:
+            loaded = yaml.safe_load(payload)
+        except yaml.YAMLError as exc:
+            raise ValueError(f"invalid custom rules document: {exc}") from exc
+    else:
+        loaded = payload
+    if not isinstance(loaded, Mapping):
+        raise ValueError("custom rules document must be a mapping")
+    return loaded
+
+
+def compile_rules(payload: Mapping[str, object] | str) -> CustomRuleDocument:
+    """Validate and compile the declarative v1 rules document without eval."""
+    document = _document_payload(payload)
+    version = str(document.get("version", ""))
+    if version != CUSTOM_RULE_VERSION:
+        raise ValueError("unsupported custom rules version")
+    raw_rules = document.get("rules")
+    if not isinstance(raw_rules, list) or not raw_rules or len(raw_rules) > MAX_RULES:
+        raise ValueError("rules must contain between 1 and 100 entries")
+    compiled: list[CustomRule] = []
+    seen: set[str] = set()
+    for raw in raw_rules:
+        if not isinstance(raw, Mapping):
+            raise ValueError("each custom rule must be a mapping")
+        unknown_fields = set(raw) - {"id", "title", "scope", "when", "assert", "severity"}
+        if unknown_fields:
+            raise ValueError("unsupported custom rule fields")
+        rule_id = str(raw.get("id", ""))
+        if rule_id in seen:
+            raise ValueError("custom rule ids must be unique")
+        assertion = raw.get("assert")
+        if not isinstance(assertion, Mapping):
+            raise ValueError("custom rule assert must be a mapping")
+        if set(assertion) - {"kind", "pattern", "max_matches"}:
+            raise ValueError("unsupported custom rule assertion fields")
+        when = raw.get("when", {})
+        if not isinstance(when, Mapping) or set(when) - {"url_regex"}:
+            raise ValueError("unsupported custom rule condition")
+        kind = CustomRuleKind(str(assertion.get("kind", "")))
+        pattern = str(assertion.get("pattern", ""))
+        max_matches = int(assertion.get("max_matches", 100))
+        compiled.append(CustomRule(
+            rule_id,
+            kind,
+            pattern,
+            max_matches,
+            str(raw.get("title", "")),
+            str(raw.get("scope", "page")),
+            str(raw.get("severity", "info")),
+            str(when["url_regex"]) if "url_regex" in when else None,
+        ))
+        seen.add(rule_id)
+    canonical = {"version": version, "rules": [{"id": item.id, "title": item.title, "scope": item.scope, "when": {"url_regex": item.url_regex} if item.url_regex else {}, "assert": {"kind": item.kind.value, "pattern": item.pattern, "max_matches": item.max_matches}, "severity": item.severity} for item in sorted(compiled, key=lambda rule: rule.id)]}
+    rule_hash = hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    logger.info("custom rules compiled version=%s rules=%d hash=%s", version, len(compiled), rule_hash[:16])
+    return CustomRuleDocument(version, tuple(compiled), rule_hash)
+
+
+def validate_rules(payload: Mapping[str, object] | str) -> dict[str, object]:
+    document = compile_rules(payload)
+    return {"valid": True, "version": document.version, "rule_hash": document.rule_hash, "rules": [rule.id for rule in document.rules]}
+
+
+def apply_rules(document: CustomRuleDocument, **representation: object) -> dict[str, object]:
+    text = str(representation.get("text", ""))
+    if len(text.encode("utf-8")) > MAX_INPUT_BYTES:
+        raise ValueError("custom rule representation exceeds input limit")
+    url = str(representation.get("url", ""))
+    matches = []
+    for rule in document.rules:
+        url_regex = rule.url_regex
+        if url_regex and not re.search(str(url_regex), url):
+            continue
+        values = apply_rule(document_rule := rule, text=text, headers=representation.get("headers"), structured_data=representation.get("structured_data", ()), links=representation.get("links", ()), resources=representation.get("resources", ()), css_matches=representation.get("css_matches", ()))
+        matches.append({"rule_id": rule.id, "title": rule.title, "severity": rule.severity, "matches": list(values), "count": len(values), "rule_version": document.version, "rule_hash": document.rule_hash})
+    logger.info("custom rules applied version=%s hash=%s rules=%d matches=%d", document.version, document.rule_hash[:16], len(document.rules), sum(item["count"] for item in matches))
+    return {"version": document.version, "rule_hash": document.rule_hash, "matches": matches}
 
 
 def apply_rule(

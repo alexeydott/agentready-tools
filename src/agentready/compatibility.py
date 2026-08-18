@@ -15,6 +15,7 @@ V2_SCHEMAS = (
     "agentready.protocol-findings.v2",
     "agentready.robots-simulation.v2",
     "agentready.sitemap-reconciliation.v2",
+    "agentready.custom-rules.v2",
     "agentready.ai-assistant.v2",
 )
 V2_SURFACES = (
@@ -37,6 +38,9 @@ V2_SURFACES = (
     "/v2/runs/{run_id}/provider-jobs",
     "/v2/runs/{run_id}/robots/simulate",
     "/v2/runs/{run_id}/sitemap/reconcile",
+    "/v2/custom-rules/validate",
+    "/v2/custom-rules/debug",
+    "/v2/custom-rules/apply",
     "/v2/diff",
     "/v2/export",
     "/v2/saved-views",

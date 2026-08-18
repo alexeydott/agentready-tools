@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentready.custom-rules.v2",
+  "type": "object",
+  "required": ["version", "rule_hash", "matches"],
+  "properties": {
+    "version": {"const": "1"},
+    "rule_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "matches": {"type": "array", "maxItems": 100, "items": {"type": "object", "required": ["rule_id", "count", "rule_version", "rule_hash"], "properties": {"rule_id": {"type": "string"}, "count": {"type": "integer", "minimum": 0}, "rule_version": {"const": "1"}, "rule_hash": {"type": "string"}, "matches": {"type": "array", "maxItems": 1000}}}}
+  },
+  "additionalProperties": true
+}

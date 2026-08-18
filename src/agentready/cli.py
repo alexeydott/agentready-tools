@@ -161,6 +161,20 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     reconcile.add_argument("--base-url", default="http://127.0.0.1:8765")
     reconcile.add_argument("--output", "-o")
 
+    rules = _add_command_parser(sub, "rules", help="Validate or test bounded declarative custom rules")
+    rules_commands = rules.add_subparsers(dest="rules_command", required=True)
+    validate = _add_command_parser(rules_commands, "validate", help="Validate a rules YAML document")
+    validate.add_argument("rules_file")
+    validate.add_argument("--base-url", default="http://127.0.0.1:8765")
+    validate.add_argument("--output", "-o")
+    test_rules = _add_command_parser(rules_commands, "test", help="Apply rules to a supplied representation")
+    test_rules.add_argument("rules_file")
+    test_rules.add_argument("run_id")
+    test_rules.add_argument("--text", default="")
+    test_rules.add_argument("--url", default="")
+    test_rules.add_argument("--base-url", default="http://127.0.0.1:8765")
+    test_rules.add_argument("--output", "-o")
+
 
 def build_parser() -> argparse.ArgumentParser:
     logger.debug("Building CLI parser: frozen=%s", bool(getattr(sys, "frozen", False)))
@@ -823,6 +837,19 @@ def _cmd_sitemap(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_rules(args: argparse.Namespace) -> int:
+    rules_text = Path(args.rules_file).read_text(encoding="utf-8")
+    if args.rules_command == "validate":
+        result = _http_json(args.base_url, "/v2/custom-rules/validate", method="POST", payload={"rules": rules_text})
+    elif args.rules_command == "test":
+        result = _http_json(args.base_url, "/v2/custom-rules/debug", method="POST", payload={"rules": rules_text, "url": args.url, "text": args.text})
+    else:
+        raise ValueError("unsupported rules command")
+    _write_cli_output(json.dumps(result, ensure_ascii=False, indent=2), args.output)
+    logger.info("CLI custom rules command=%s", args.rules_command)
+    return 0
+
+
 def _cmd_rescan(args: argparse.Namespace) -> int:
     payload = {
         "url": args.url,
@@ -901,6 +928,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_robots(args)
         if args.command == "sitemap":
             return _cmd_sitemap(args)
+        if args.command == "rules":
+            return _cmd_rules(args)
         if args.command == "ai":
             return _cmd_ai(args)
         if args.command == "checks":

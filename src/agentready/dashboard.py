@@ -849,6 +849,19 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <button type="button" class="secondary" onclick="reconcileSitemap()">Reconcile sitemap</button>
 <div id="sitemap-reconciliation-status" role="status" aria-live="polite"></div><div id="sitemap-reconciliation-result" role="region" aria-live="polite"></div>
 </section>
+<section id="custom-rules-panel" class="panel" aria-labelledby="custom-rules-title">
+<h2 id="custom-rules-title">Custom rules debugger</h2>
+<p>Validate and preview bounded declarative rules against the current saved representation. Editing a rule never starts a crawl.</p>
+<label for="custom-rules-document">Rules YAML</label><textarea id="custom-rules-document" rows="8">version: 1
+rules:
+  - id: example
+    title: Example text
+    assert:
+      kind: text
+      pattern: agent</textarea>
+<div><button type="button" class="secondary" onclick="validateCustomRules()">Validate rules</button><button type="button" class="secondary" onclick="debugCustomRules()">Preview matches</button></div>
+<div id="custom-rules-status" role="status" aria-live="polite"></div><pre id="custom-rules-result" role="region" aria-live="polite"></pre>
+</section>
 <section id="ai-assistant-panel" class="panel ai-workspace" hidden aria-labelledby="ai-workspace-title">
 <div class="ai-workspace-header"><div class="ai-header-title"><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><div class="ai-header-meta"><small>{escape(text["ai_hint"])}</small><span id="ai-model-chip" class="ai-model-chip" title="{escape(text["ai_model_chip"])}">{escape(text["ai_model_chip"])}: —</span></div></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" title="{escape(text["ai_saved_chats"])}" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><div class="ai-mode-segmented" role="group" aria-label="{escape(text["ai_mode"])}"><button type="button" data-ai-mode="both" title="{escape(text["ai_mode_both_hint"])}" onclick="setAiMode('both')">{escape(text["ai_mode_both"])}</button><button type="button" data-ai-mode="seo" title="{escape(text["ai_mode_seo_hint"])}" onclick="setAiMode('seo')">{escape(text["ai_mode_seo"])}</button><button type="button" data-ai-mode="geo" title="{escape(text["ai_mode_geo_hint"])}" onclick="setAiMode('geo')">{escape(text["ai_mode_geo"])}</button></div><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
 <div class="ai-workspace-grid">
@@ -1326,6 +1339,27 @@ async function reconcileSitemap() {{
     status.textContent = "Reconciliation complete";
     logDashboardAction("sitemap.reconcile", {{run_id:runId, sitemap_id:payload.sitemap_id, classifications:payload.classifications}});
   }} catch (error) {{ status.textContent = "Reconciliation failed: " + error.message; }}
+}}
+
+async function validateCustomRules() {{
+  const status = document.getElementById("custom-rules-status");
+  try {{
+    const response = await fetch("/v2/custom-rules/validate", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{rules:document.getElementById("custom-rules-document").value}})}});
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "validation failed");
+    document.getElementById("custom-rules-result").textContent = JSON.stringify(payload, null, 2);
+    status.textContent = "Rules are valid";
+  }} catch (error) {{ status.textContent = "Validation failed: " + error.message; }}
+}}
+async function debugCustomRules() {{
+  const status = document.getElementById("custom-rules-status");
+  try {{
+    const response = await fetch("/v2/custom-rules/debug", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{rules:document.getElementById("custom-rules-document").value, url:document.getElementById("url").value, text:(window.agentreadyV2Report || {{}}).target || ""}})}});
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "debug failed");
+    document.getElementById("custom-rules-result").textContent = JSON.stringify(payload, null, 2);
+    status.textContent = "Preview complete; no crawl started";
+  }} catch (error) {{ status.textContent = "Preview failed: " + error.message; }}
 }}
 async function loadSitemapCategory(category) {{
   const state = window.sitemapReconciliation;

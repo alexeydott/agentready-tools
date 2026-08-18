@@ -79,6 +79,18 @@ def test_server_exposes_all_read_only_audit_modes():
     } <= paths
 
 
+def test_custom_rules_endpoints_validate_and_debug_without_crawl():
+    client = TestClient(app)
+    rules = "version: 1\nrules:\n  - id: text\n    assert:\n      kind: text\n      pattern: agent\n"
+    validated = client.post("/v2/custom-rules/validate", json={"rules": rules})
+    assert validated.status_code == 200
+    assert validated.json()["valid"] is True
+    debugged = client.post("/v2/custom-rules/debug", json={"rules": rules, "text": "agent ready"})
+    assert debugged.status_code == 200
+    assert debugged.json()["matches"][0]["count"] == 1
+    assert "/v2/custom-rules/apply" in {route.path for route in app.routes}
+
+
 def test_server_rejects_removed_v1_audit_routes():
     client = TestClient(app)
     for path in ("/scan", "/scan/dashboard", "/seo/audit", "/mobile/audit"):

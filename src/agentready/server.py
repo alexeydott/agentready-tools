@@ -26,6 +26,7 @@ from .ai_prompts import ai_skill_catalog
 from .audit_core.store import MemorySiteStore, RunUrlState, SQLiteSiteStore
 from .audit_service import AuditRequest, AuditService
 from .compatibility import COMPATIBILITY
+from .custom_rules import apply_rules, compile_rules, validate_rules
 from .crawl_profiles import HARD_CAPS
 from .dashboard import render_dashboard
 from .exports import export_query
@@ -463,6 +464,19 @@ class SitemapReconciliationRequest(BaseModel):
     limit: int = Field(default=100, ge=1, le=1000)
     format: Literal["json", "csv"] = "json"
     sitemap_id: str | None = Field(default=None, max_length=80)
+
+
+class CustomRulesRequest(BaseModel):
+    rules: str | dict = Field(min_length=1)
+    url: str = Field(default="", max_length=2048)
+    text: str = Field(default="", max_length=1_000_000)
+    headers: dict[str, str] = Field(default_factory=dict, max_length=100)
+    structured_data: list[dict] = Field(default_factory=list, max_length=100)
+    links: list[str] = Field(default_factory=list, max_length=1000)
+    resources: list[str] = Field(default_factory=list, max_length=1000)
+    css_matches: list[str] = Field(default_factory=list, max_length=1000)
+    run_id: str | None = Field(default=None, max_length=128)
+    url_key: str | None = Field(default=None, max_length=2048)
 
 
 class SeoRequest(BaseModel):
@@ -1106,6 +1120,44 @@ def sitemap_reconcile_endpoint(run_id: str, request: SitemapReconciliationReques
             return {"run_id": run_id, "sitemap_id": report.sitemap_id, "category": request.category, "format": "csv", "content": report.export(request.category, "csv")}
         page = report.page(request.category, cursor=request.cursor, limit=request.limit)
         return {"run_id": run_id, "sitemap_id": report.sitemap_id, "source_count": report.source_count, "sitemap_urls": list(report.sitemap_urls), "classifications": {key: len(value) for key, value in report.classifications.categories.items()}, **page}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/v2/custom-rules/validate")
+def custom_rules_validate_endpoint(request: CustomRulesRequest) -> dict[str, object]:
+    try:
+        return validate_rules(request.rules)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/v2/custom-rules/debug")
+def custom_rules_debug_endpoint(request: CustomRulesRequest) -> dict[str, object]:
+    try:
+        document = compile_rules(request.rules)
+        return apply_rules(document, url=request.url, text=request.text, headers=request.headers, structured_data=request.structured_data, links=request.links, resources=request.resources, css_matches=request.css_matches)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/v2/custom-rules/apply")
+def custom_rules_apply_endpoint(request: CustomRulesRequest) -> dict[str, object]:
+    """Apply declarative rules to a supplied representation; no crawl is started."""
+    try:
+        document = compile_rules(request.rules)
+        result = apply_rules(document, url=request.url, text=request.text, headers=request.headers, structured_data=request.structured_data, links=request.links, resources=request.resources, css_matches=request.css_matches)
+        if request.run_id:
+            store = _V2_RUNS.get(request.run_id)
+            affected_url = request.url_key or request.url
+            for item in result["matches"]:
+                if item["count"]:
+                    finding_id = f"custom-rule:{item['rule_id']}"
+                    store.put_finding(request.run_id, finding_id, {"id": finding_id, "status": "fail", "rule_version": document.version, "rule_hash": document.rule_hash, "affected_urls": [affected_url] if affected_url else [], "match_count": item["count"]})
+            logger.info("custom rules findings persisted run_id=%s rule_hash=%s", request.run_id, document.rule_hash[:16])
+        return result
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="run not found") from exc
     except (TypeError, ValueError) as exc:

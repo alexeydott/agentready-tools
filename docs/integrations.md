@@ -92,6 +92,15 @@ Duplicate and cross-origin URLs are handled deterministically; CSV/JSON output
 uses the same URL set as the table, and no generated sitemap is submitted
 automatically.
 
+Custom Rules use the versioned YAML DSL (`version: 1`) with `text`, `regex`,
+`header`, `json-ld`, `link`, `resource`, and `css` selectors. Validate with
+`agentready rules validate rules.yml`; preview a bounded representation with
+`agentready rules test rules.yml RUN_ID --text "..."`. The API exposes
+`/v2/custom-rules/validate`, `/debug`, and `/apply`. Rules are compiled without
+`eval`/`exec`, reject expensive regex constructs, redact sensitive headers, and
+return a deterministic rule hash/version with each match. These operations are
+read-only and never start a crawl or access the network.
+
 The `/dashboard` v2 preset uses `POST /v2/audit/dashboard` and renders the
 canonical `AuditService` result in an escaped HTML projection. The dashboard's
 advanced panel exposes the vNext crawl profile (`quick`, `standard`, `deep`),
