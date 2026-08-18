@@ -48,6 +48,7 @@ V2_SURFACES = (
     "/v2/projects/{project_id}",
     "/v2/projects/{project_id}/runs",
     "/v2/projects/{project_id}/baseline",
+    "/v2/projects/{project_id}/access-log",
     "/v2/custom-rules/validate",
     "/v2/custom-rules/debug",
     "/v2/custom-rules/apply",

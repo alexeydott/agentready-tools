@@ -247,6 +247,13 @@ provenance. Missing observations become explicit `insufficient_data` or
 `unavailable` states; freshness is retained with each evidence record, and
 performance metrics remain external enrichment with no readiness-score impact.
 
+Project AI-bot access-log analysis accepts only caller-supplied local lines at
+`POST /v2/projects/{project_id}/access-log` (or `agentready logs ai-bots` for
+the standalone summary). It matches requests to the project origin, supports
+timezone-aware windows and optional independently verified IPs, keeps observed
+versus verified identity separate, buckets cross-origin/malformed/out-of-window
+and duplicate records, and never stores raw lines or query values.
+
 Generic inventory parity:
 
 ```bash

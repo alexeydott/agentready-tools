@@ -24,6 +24,7 @@ except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Server dependencies missing. Install: pip install 'agentready-tools[server]'") from exc
 
 from .ai_prompts import ai_skill_catalog
+from .accesslog import analyze_project_ai_bot_log
 from .audit_core.store import MemorySiteStore, ProjectRecord, RunUrlState, SQLiteSiteStore
 from .audit_service import AuditRequest, AuditService
 from .compatibility import COMPATIBILITY
@@ -614,6 +615,13 @@ class PageSpeedRequest(BaseModel):
     max_urls: int = Field(default=100, ge=1, le=1000)
     version: str = Field(default="psi-v5", min_length=1, max_length=80)
     observed_at: str | None = Field(default=None, max_length=80)
+
+
+class ProjectAccessLogRequest(BaseModel):
+    lines: list[str] = Field(min_length=1, max_length=100_000)
+    start_at: str | None = Field(default=None, max_length=80)
+    end_at: str | None = Field(default=None, max_length=80)
+    verified_ips: dict[str, set[str]] = Field(default_factory=dict)
 
 
 class AIRequest(BaseModel):
@@ -1418,6 +1426,18 @@ def project_baseline_endpoint(project_id: str, payload: dict) -> dict[str, objec
         return project_run_to_dict(relation)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="project run not found") from exc
+
+
+@app.post("/v2/projects/{project_id}/access-log")
+def project_access_log_endpoint(project_id: str, request: ProjectAccessLogRequest) -> dict[str, object]:
+    """Analyze only user-supplied local logs for a project's target origin."""
+    try:
+        project = ProjectService(_project_store()).get(project_id)
+        return {"project_id": project_id, **analyze_project_ai_bot_log(request.lines, project_target=project.target, start_at=request.start_at, end_at=request.end_at, verified_ips=request.verified_ips)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="project not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/v2/audit/dashboard", response_class=HTMLResponse)

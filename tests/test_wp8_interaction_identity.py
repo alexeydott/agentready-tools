@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agentready.accesslog import analyze_ai_bot_log
+from agentready.accesslog import analyze_ai_bot_log, analyze_project_ai_bot_log
 from agentready.crawler_identity import (
     CrawlerIntent,
     IdentityConfidence,
@@ -74,3 +74,19 @@ def test_access_log_separates_observed_verified_and_redacts_query_values() -> No
     assert result["verified_traffic"]["GPTBot"] == 1
     assert bot["identity"]["confidence"] == "verified"
     assert all("secret" not in item["path"] for item in bot["top_paths"])
+
+
+def test_project_access_log_matches_origin_windows_and_unmatched_buckets() -> None:
+    lines = [
+        '[18/Aug/2026:10:00:00 +0000] 198.51.100.10 - - "GET /docs?token=secret HTTP/1.1" 200 - "GPTBot/1.0"',
+        '[18/Aug/2026:10:00:00 +0000] 198.51.100.10 - - "GET https://other.test/no HTTP/1.1" 200 - "GPTBot/1.0"',
+        '[18/Aug/2026:12:00:00 +0000] 198.51.100.10 - - "GET /late HTTP/1.1" 200 - "GPTBot/1.0"',
+        '[18/Aug/2026:10:00:00 +0000] 198.51.100.10 - - "GET /docs?token=secret HTTP/1.1" 200 - "GPTBot/1.0"',
+    ]
+    result = analyze_project_ai_bot_log(lines, project_target="https://example.test", end_at="2026-08-18T11:00:00+00:00", verified_ips={"GPTBot": {"198.51.100.10"}})
+    assert result["totals"]["matched_requests"] == 1
+    assert result["totals"]["duplicate_lines"] == 1
+    assert result["unmatched"]["cross_origin"] == 1
+    assert result["unmatched"]["out_of_window"] == 1
+    assert result["bots"]["GPTBot"]["verified_requests"] == 1
+    assert all("secret" not in str(result).lower() for _ in [0])
