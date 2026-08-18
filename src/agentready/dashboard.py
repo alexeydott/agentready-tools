@@ -868,6 +868,12 @@ rules:
 <div><label><input id="link-graph-dead-end" type="checkbox"> Dead ends</label><label><input id="link-graph-disconnected" type="checkbox"> Disconnected</label><button type="button" class="secondary" onclick="loadLinkGraph()">Load graph</button></div>
 <div id="link-graph-status" role="status" aria-live="polite"></div><div id="link-graph-result" role="region" aria-live="polite"></div>
 </section>
+<section id="duplicate-clusters-panel" class="panel" hidden aria-labelledby="duplicate-clusters-title">
+<h2 id="duplicate-clusters-title">Duplicate clusters</h2>
+<p>Compare exact and near-duplicate content signatures from the stored run. No new crawl is started.</p>
+<div><select id="duplicate-clusters-kind"><option value="all">All</option><option value="exact">Exact</option><option value="near">Near</option></select><button type="button" class="secondary" onclick="loadDuplicateClusters()">Load clusters</button></div>
+<div id="duplicate-clusters-status" role="status" aria-live="polite"></div><div id="duplicate-clusters-result" role="region" aria-live="polite"></div>
+</section>
 <section id="ai-assistant-panel" class="panel ai-workspace" hidden aria-labelledby="ai-workspace-title">
 <div class="ai-workspace-header"><div class="ai-header-title"><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><div class="ai-header-meta"><small>{escape(text["ai_hint"])}</small><span id="ai-model-chip" class="ai-model-chip" title="{escape(text["ai_model_chip"])}">{escape(text["ai_model_chip"])}: —</span></div></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" title="{escape(text["ai_saved_chats"])}" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><div class="ai-mode-segmented" role="group" aria-label="{escape(text["ai_mode"])}"><button type="button" data-ai-mode="both" title="{escape(text["ai_mode_both_hint"])}" onclick="setAiMode('both')">{escape(text["ai_mode_both"])}</button><button type="button" data-ai-mode="seo" title="{escape(text["ai_mode_seo_hint"])}" onclick="setAiMode('seo')">{escape(text["ai_mode_seo"])}</button><button type="button" data-ai-mode="geo" title="{escape(text["ai_mode_geo_hint"])}" onclick="setAiMode('geo')">{escape(text["ai_mode_geo"])}</button></div><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
 <div class="ai-workspace-grid">
@@ -1228,6 +1234,8 @@ function captureV2Report(reportText, required=false) {{
       if (sitemapPanel) sitemapPanel.hidden = false;
       const graphPanel = document.getElementById("link-graph-panel");
       if (graphPanel) graphPanel.hidden = false;
+      const duplicatePanel = document.getElementById("duplicate-clusters-panel");
+      if (duplicatePanel) duplicatePanel.hidden = false;
       console.info("[FIX:ai-audit-context] Embedded audit report captured", {{bytes:reportText.length, findings:(window.agentreadyV2Report.findings || []).length}});
       return window.agentreadyV2Report;
     }}
@@ -1389,6 +1397,22 @@ async function loadLinkGraphNode(url) {{
   const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/graph/node?url=" + encodeURIComponent(url));
   const payload = await response.json();
   if (response.ok) document.getElementById("link-graph-status").textContent = `${{payload.node.url}}: ${{payload.inbound.length}} inbound, ${{payload.outbound.length}} outbound`;
+}}
+
+async function loadDuplicateClusters() {{
+  const status = document.getElementById("duplicate-clusters-status");
+  const output = document.getElementById("duplicate-clusters-result");
+  if (!runId) {{ status.textContent = "Run an audit first"; return; }}
+  const kind = document.getElementById("duplicate-clusters-kind").value;
+  try {{
+    const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/duplicates?kind=" + encodeURIComponent(kind) + "&limit=100");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "duplicate query failed");
+    document.getElementById("duplicate-clusters-panel").hidden = false;
+    output.innerHTML = (payload.items || []).map(item => `<article class="panel"><h3>${{escapeHtml(item.cluster_id)}}${{item.near_duplicate ? " (near)" : " (exact)"}}</h3><ul>${{item.members.map(member => `<li>${{escapeHtml(member.url)}} — ${{member.similarity}}</li>`).join("")}}</ul></article>`).join("");
+    status.textContent = `Loaded ${{(payload.items || []).length}} of ${{payload.total || 0}} clusters`;
+    logDashboardAction("duplicates.load", {{run_id:runId, clusters:(payload.items || []).length, fingerprint:payload.fingerprint}});
+  }} catch (error) {{ status.textContent = "Duplicate query failed: " + error.message; }}
 }}
 async function loadSitemapCategory(category) {{
   const state = window.sitemapReconciliation;

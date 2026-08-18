@@ -101,6 +101,14 @@ and its inbound/outbound URLs. The CLI equivalent is
 `agentready graph RUN_ID --dead-end`; the dashboard keeps only the current
 bounded page in the DOM.
 
+Duplicate clusters are projected from stored page content signatures. Use
+`GET /v2/runs/{run_id}/duplicates?kind=exact|near|all&threshold=3` for the
+bounded cluster list and `/duplicates/{cluster_id}` for details; the CLI
+equivalent is `agentready duplicates RUN_ID --kind near`. The dashboard shows
+the same cluster/member sets. Exact and near clusters include algorithm,
+threshold, similarity, and fingerprint provenance; candidate generation is
+bounded and does not start another crawl.
+
 Custom Rules use the versioned YAML DSL (`version: 1`) with `text`, `regex`,
 `header`, `json-ld`, `link`, `resource`, and `css` selectors. Validate with
 `agentready rules validate rules.yml`; preview a bounded representation with

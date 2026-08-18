@@ -187,6 +187,16 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     graph.add_argument("--format", choices=["json", "csv"], default="json")
     graph.add_argument("--output", "-o")
 
+    duplicates = _add_command_parser(sub, "duplicates", help="Inspect bounded exact and near-duplicate clusters")
+    duplicates.add_argument("run_id")
+    duplicates.add_argument("--base-url", default="http://127.0.0.1:8765")
+    duplicates.add_argument("--kind", choices=["all", "exact", "near"], default="all")
+    duplicates.add_argument("--threshold", type=int, default=3)
+    duplicates.add_argument("--cursor")
+    duplicates.add_argument("--limit", type=int, default=100)
+    duplicates.add_argument("--cluster")
+    duplicates.add_argument("--output", "-o")
+
 
 def build_parser() -> argparse.ArgumentParser:
     logger.debug("Building CLI parser: frozen=%s", bool(getattr(sys, "frozen", False)))
@@ -888,6 +898,21 @@ def _cmd_graph(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_duplicates(args: argparse.Namespace) -> int:
+    base = f"/v2/runs/{urllib.parse.quote(args.run_id, safe='')}/duplicates"
+    if args.cluster:
+        path = base + "/" + urllib.parse.quote(args.cluster, safe="") + "?" + urllib.parse.urlencode({"threshold": args.threshold})
+    else:
+        params = {"kind": args.kind, "threshold": args.threshold, "limit": args.limit}
+        if args.cursor:
+            params["cursor"] = args.cursor
+        path = base + "?" + urllib.parse.urlencode(params)
+    result = _http_json(args.base_url, path)
+    _write_cli_output(json.dumps(result, ensure_ascii=False, indent=2), args.output)
+    logger.info("CLI duplicate query run_id=%s cluster=%s", args.run_id, bool(args.cluster))
+    return 0
+
+
 def _cmd_rescan(args: argparse.Namespace) -> int:
     payload = {
         "url": args.url,
@@ -970,6 +995,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_rules(args)
         if args.command == "graph":
             return _cmd_graph(args)
+        if args.command == "duplicates":
+            return _cmd_duplicates(args)
         if args.command == "ai":
             return _cmd_ai(args)
         if args.command == "checks":

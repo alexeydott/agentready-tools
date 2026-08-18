@@ -29,6 +29,7 @@ from .compatibility import COMPATIBILITY
 from .custom_rules import apply_rules, compile_rules, validate_rules
 from .crawl_profiles import HARD_CAPS
 from .dashboard import render_dashboard
+from .duplicates import DuplicateAnalysis, analyze_signatures, signature
 from .exports import export_query
 from .i18n import (
     category_name,
@@ -164,6 +165,7 @@ class _V2RunRegistry:
 _V2_RUNS = _V2RunRegistry()
 _V2_SAVED_VIEWS = SavedViewRegistry()
 _V2_GRAPH_CACHE: OrderedDict[tuple[str, str], LinkGraphProjection] = OrderedDict()
+_V2_DUPLICATE_CACHE: OrderedDict[tuple[str, int], DuplicateAnalysis] = OrderedDict()
 
 
 def _serve_sqlite_store() -> SQLiteSiteStore | None:
@@ -199,6 +201,25 @@ def _link_graph_projection(run_id: str, origin: str | None = None) -> LinkGraphP
     while len(_V2_GRAPH_CACHE) > 32:
         _V2_GRAPH_CACHE.popitem(last=False)
     return projection
+
+
+def _duplicate_analysis(run_id: str, threshold: int = 3) -> DuplicateAnalysis:
+    key = (run_id, threshold)
+    cached = _V2_DUPLICATE_CACHE.get(key)
+    if cached is not None:
+        _V2_DUPLICATE_CACHE.move_to_end(key)
+        return cached
+    store = _V2_RUNS.get(run_id)
+    signatures = tuple(
+        signature(page.url_key, page.content or page.content_hash or "")
+        for page in store.iter_pages(run_id)
+        if page.content or page.content_hash
+    )
+    analysis = analyze_signatures(signatures, max_hamming_distance=threshold)
+    _V2_DUPLICATE_CACHE[key] = analysis
+    while len(_V2_DUPLICATE_CACHE) > 32:
+        _V2_DUPLICATE_CACHE.popitem(last=False)
+    return analysis
 
 
 def _saved_views_path() -> Path:
@@ -1527,6 +1548,40 @@ def audit_v2_graph_node_endpoint(run_id: str, url: str, origin: str | None = Non
         raise HTTPException(status_code=404, detail="run or graph node not found") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/runs/{run_id}/duplicates")
+def audit_v2_duplicates_endpoint(
+    run_id: str,
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    kind: Literal["all", "exact", "near"] = "all",
+    threshold: int = Query(default=3, ge=0, le=64),
+) -> dict:
+    try:
+        analysis = _duplicate_analysis(run_id, threshold)
+        clusters = tuple(item for item in analysis.clusters if kind == "all" or (kind == "near") is item.near_duplicate)
+        if cursor:
+            clusters = tuple(item for item in clusters if item.cluster_id > cursor)
+        selected = clusters[: limit + 1]
+        items = selected[:limit]
+        return {"run_id": run_id, "algorithm_version": analysis.algorithm_version, "threshold": analysis.threshold, "fingerprint": analysis.fingerprint, "candidate_comparisons": analysis.candidate_comparisons, "items": [{"cluster_id": item.cluster_id, "near_duplicate": item.near_duplicate, "members": [{"url": member.url, "kind": member.kind, "similarity": member.similarity, "exact_hash": member.exact_hash} for member in item.members]} for item in items], "next_cursor": items[-1].cluster_id if len(selected) > limit else None, "total": len(clusters)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/runs/{run_id}/duplicates/{cluster_id}")
+def audit_v2_duplicate_cluster_endpoint(run_id: str, cluster_id: str, threshold: int = Query(default=3, ge=0, le=64)) -> dict:
+    try:
+        analysis = _duplicate_analysis(run_id, threshold)
+        cluster = next(item for item in analysis.clusters if item.cluster_id == cluster_id)
+        return {"run_id": run_id, "algorithm_version": analysis.algorithm_version, "threshold": analysis.threshold, "cluster": {"cluster_id": cluster.cluster_id, "near_duplicate": cluster.near_duplicate, "members": [{"url": member.url, "kind": member.kind, "similarity": member.similarity, "exact_hash": member.exact_hash} for member in cluster.members]}}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run or cluster not found") from exc
+    except StopIteration as exc:
+        raise HTTPException(status_code=404, detail="duplicate cluster not found") from exc
 
 
 @app.get("/v2/runs/{run_id}/run-urls")

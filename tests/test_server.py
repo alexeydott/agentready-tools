@@ -7,6 +7,7 @@ import agentready.server as server_module
 from agentready.ai_provider import ProviderModel
 from agentready.audit_core.store import (
     MemorySiteStore,
+    ContentRetention,
     MetricRecord,
     PageRecord,
     RedirectFact,
@@ -92,7 +93,7 @@ def test_custom_rules_endpoints_validate_and_debug_without_crawl():
 
 
 def test_link_graph_endpoints_project_cached_occurrences_and_node_detail():
-    store = MemorySiteStore()
+    store = MemorySiteStore(retention=ContentRetention.FULL_CONTENT)
     run_id = "graph-api-run"
     store.put_page(PageRecord(run_id, "https://example.test/", "https://example.test/", depth=0))
     store.put_page(PageRecord(run_id, "https://example.test/a", "https://example.test/a", depth=1))
@@ -107,6 +108,23 @@ def test_link_graph_endpoints_project_cached_occurrences_and_node_detail():
     node = client.get(f"/v2/runs/{run_id}/graph/node", params={"url": "https://example.test/a"})
     assert node.status_code == 200
     assert node.json()["node"]["nofollow_inlinks"] == 1
+
+
+def test_duplicate_cluster_endpoints_use_stored_page_content_and_detail():
+    store = MemorySiteStore(retention=ContentRetention.FULL_CONTENT)
+    run_id = "duplicate-api-run"
+    store.put_page(PageRecord(run_id, "https://example.test/a", "https://example.test/a", content="same body"))
+    store.put_page(PageRecord(run_id, "https://example.test/b", "https://example.test/b", content="same body"))
+    _V2_RUNS.put(run_id, store)
+    client = TestClient(app)
+    response = client.get(f"/v2/runs/{run_id}/duplicates")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    cluster_id = payload["items"][0]["cluster_id"]
+    detail = client.get(f"/v2/runs/{run_id}/duplicates/{cluster_id}")
+    assert detail.status_code == 200
+    assert len(detail.json()["cluster"]["members"]) == 2
 
 
 def test_server_rejects_removed_v1_audit_routes():

@@ -1,6 +1,6 @@
 import pytest
 
-from agentready.duplicates import cluster_signatures, signature
+from agentready.duplicates import analyze_signatures, cluster_signatures, signature
 
 
 def test_duplicate_signatures_cluster_exact_content_without_quadratic_comparison():
@@ -58,3 +58,16 @@ def test_duplicate_clustering_rejects_unbounded_distance_and_input_limits():
         cluster_signatures([item], max_hamming_distance=65)
     with pytest.raises(ValueError, match="duplicate limit"):
         cluster_signatures([item], limit=0)
+
+
+def test_duplicate_analysis_adds_provenance_similarity_and_candidate_bound():
+    first = signature("https://example.test/a", "same content")
+    second = signature("https://example.test/b", "same content")
+    analysis = analyze_signatures([second, first], max_hamming_distance=3)
+    assert len(analysis.clusters) == 1
+    assert analysis.clusters[0].cluster_id
+    assert {member.kind for member in analysis.clusters[0].members} == {"exact"}
+    assert analysis.clusters[0].members[0].similarity == 1.0
+    assert analysis.fingerprint
+    with pytest.raises(ValueError, match="candidate comparison"):
+        analyze_signatures([first, second], max_candidate_comparisons=0)

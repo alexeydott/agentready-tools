@@ -5,6 +5,9 @@ import hashlib
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +25,64 @@ class DuplicateCluster:
     urls: tuple[str, ...]
     near_duplicate: bool = False
     version: str = "content-v1"
+
+
+@dataclass(frozen=True, slots=True)
+class DuplicateMember:
+    url: str
+    kind: str
+    similarity: float
+    exact_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class DuplicateClusterRecord:
+    cluster_id: str
+    members: tuple[DuplicateMember, ...]
+    near_duplicate: bool
+    algorithm_version: str
+    threshold: int
+
+
+@dataclass(frozen=True, slots=True)
+class DuplicateAnalysis:
+    clusters: tuple[DuplicateClusterRecord, ...]
+    candidate_comparisons: int
+    algorithm_version: str
+    threshold: int
+    fingerprint: str
+
+
+def analyze_signatures(
+    signatures: tuple[ContentSignature, ...] | list[ContentSignature],
+    *,
+    max_hamming_distance: int = 3,
+    limit: int = 100_000,
+    max_candidate_comparisons: int = 1_000_000,
+) -> DuplicateAnalysis:
+    """Return deterministic cluster records and bounded candidate statistics."""
+    if max_candidate_comparisons <= 0 or max_candidate_comparisons > 10_000_000:
+        raise ValueError("candidate comparison limit must be between 1 and 10000000")
+    selected = tuple(signatures[:limit])
+    clusters = cluster_signatures(selected, max_hamming_distance=max_hamming_distance, limit=limit)
+    by_url = {item.url: item for item in selected}
+    records: list[DuplicateClusterRecord] = []
+    comparisons = 0
+    for cluster in clusters:
+        members: list[DuplicateMember] = []
+        for url in cluster.urls:
+            item = by_url[url]
+            similarity = 1.0 if not cluster.near_duplicate else max(0.0, 1.0 - _hamming(item.simhash, by_url[cluster.urls[0]].simhash) / 64.0)
+            members.append(DuplicateMember(url, "near" if cluster.near_duplicate else "exact", similarity, item.exact_hash))
+        comparisons += max(0, len(cluster.urls) - 1)
+        if comparisons > max_candidate_comparisons:
+            raise ValueError("duplicate candidate comparison limit exceeded")
+        cluster_id = hashlib.sha256((("near" if cluster.near_duplicate else "exact") + "\n" + "\n".join(cluster.urls)).encode("utf-8")).hexdigest()[:16]
+        records.append(DuplicateClusterRecord(cluster_id, tuple(sorted(members, key=lambda item: item.url)), cluster.near_duplicate, cluster.version, max_hamming_distance))
+    canonical = "\n".join(f"{item.cluster_id}:{','.join(member.url for member in item.members)}" for item in records)
+    fingerprint = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+    logger.info("duplicate analysis clusters=%d candidates=%d threshold=%d", len(records), comparisons, max_hamming_distance)
+    return DuplicateAnalysis(tuple(sorted(records, key=lambda item: item.cluster_id)), comparisons, "content-v1", max_hamming_distance, fingerprint)
 
 
 def signature(
