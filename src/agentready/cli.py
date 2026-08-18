@@ -175,6 +175,18 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     test_rules.add_argument("--base-url", default="http://127.0.0.1:8765")
     test_rules.add_argument("--output", "-o")
 
+    graph = _add_command_parser(sub, "graph", help="Inspect the bounded cached link graph of a v2 run")
+    graph.add_argument("run_id")
+    graph.add_argument("--base-url", default="http://127.0.0.1:8765")
+    graph.add_argument("--origin")
+    graph.add_argument("--node")
+    graph.add_argument("--cursor")
+    graph.add_argument("--limit", type=int, default=100)
+    graph.add_argument("--dead-end", action="store_true")
+    graph.add_argument("--disconnected", action="store_true")
+    graph.add_argument("--format", choices=["json", "csv"], default="json")
+    graph.add_argument("--output", "-o")
+
 
 def build_parser() -> argparse.ArgumentParser:
     logger.debug("Building CLI parser: frozen=%s", bool(getattr(sys, "frozen", False)))
@@ -850,6 +862,32 @@ def _cmd_rules(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_graph(args: argparse.Namespace) -> int:
+    params = {"limit": args.limit}
+    if args.origin:
+        params["origin"] = args.origin
+    if args.cursor:
+        params["cursor"] = args.cursor
+    if args.dead_end:
+        params["dead_end"] = "true"
+    if args.disconnected:
+        params["disconnected"] = "true"
+    path = f"/v2/runs/{urllib.parse.quote(args.run_id, safe='')}/graph"
+    if args.node:
+        path += "/node?" + urllib.parse.urlencode({"url": args.node, **({"origin": args.origin} if args.origin else {})})
+    else:
+        path += "?" + urllib.parse.urlencode(params)
+    result = _http_json(args.base_url, path)
+    if args.format == "csv" and not args.node:
+        rows = result.get("items", [])
+        content = "url,inlinks,outlinks,unique_inlinks,unique_outlinks,depth,dead_end,disconnected,authority\n" + "\n".join(",".join(str(row.get(key, "")) for key in ("url", "inlinks", "outlinks", "unique_inlinks", "unique_outlinks", "depth", "dead_end", "disconnected", "authority")) for row in rows) + "\n"
+    else:
+        content = json.dumps(result, ensure_ascii=False, indent=2)
+    _write_cli_output(content, args.output)
+    logger.info("CLI graph query run_id=%s node=%s", args.run_id, bool(args.node))
+    return 0
+
+
 def _cmd_rescan(args: argparse.Namespace) -> int:
     payload = {
         "url": args.url,
@@ -930,6 +968,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_sitemap(args)
         if args.command == "rules":
             return _cmd_rules(args)
+        if args.command == "graph":
+            return _cmd_graph(args)
         if args.command == "ai":
             return _cmd_ai(args)
         if args.command == "checks":

@@ -38,6 +38,8 @@ V2_SURFACES = (
     "/v2/runs/{run_id}/provider-jobs",
     "/v2/runs/{run_id}/robots/simulate",
     "/v2/runs/{run_id}/sitemap/reconcile",
+    "/v2/runs/{run_id}/graph",
+    "/v2/runs/{run_id}/graph/node",
     "/v2/custom-rules/validate",
     "/v2/custom-rules/debug",
     "/v2/custom-rules/apply",

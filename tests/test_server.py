@@ -14,7 +14,7 @@ from agentready.audit_core.store import (
     RunUrlRecord,
     RunUrlState,
 )
-from agentready.server import _render_v2_dashboard, _run_and_save_v2_job, app
+from agentready.server import _V2_RUNS, _render_v2_dashboard, _run_and_save_v2_job, app
 
 
 def test_v2_dashboard_localizes_coverage_and_status_values():
@@ -89,6 +89,24 @@ def test_custom_rules_endpoints_validate_and_debug_without_crawl():
     assert debugged.status_code == 200
     assert debugged.json()["matches"][0]["count"] == 1
     assert "/v2/custom-rules/apply" in {route.path for route in app.routes}
+
+
+def test_link_graph_endpoints_project_cached_occurrences_and_node_detail():
+    store = MemorySiteStore()
+    run_id = "graph-api-run"
+    store.put_page(PageRecord(run_id, "https://example.test/", "https://example.test/", depth=0))
+    store.put_page(PageRecord(run_id, "https://example.test/a", "https://example.test/a", depth=1))
+    store.put_page(PageRecord(run_id, "https://example.test/isolated", "https://example.test/isolated", depth=1))
+    store.put_link(run_id, "https://example.test/", "/a", ordinal=0, target_key="https://example.test/a", rel="nofollow")
+    _V2_RUNS.put(run_id, store)
+    client = TestClient(app)
+    response = client.get(f"/v2/runs/{run_id}/graph?limit=10")
+    assert response.status_code == 200
+    payload = response.json()
+    assert any(item["url"].endswith("/isolated") and item["disconnected"] for item in payload["items"])
+    node = client.get(f"/v2/runs/{run_id}/graph/node", params={"url": "https://example.test/a"})
+    assert node.status_code == 200
+    assert node.json()["node"]["nofollow_inlinks"] == 1
 
 
 def test_server_rejects_removed_v1_audit_routes():

@@ -39,6 +39,7 @@ from .i18n import (
     normalize_language,
 )
 from .jobs_v2 import AuditJobManager
+from .link_graph import LinkGraphProjection, project_link_graph
 from .metrics import (
     ExternalMetric,
     ProviderConfig,
@@ -162,6 +163,7 @@ class _V2RunRegistry:
 
 _V2_RUNS = _V2RunRegistry()
 _V2_SAVED_VIEWS = SavedViewRegistry()
+_V2_GRAPH_CACHE: OrderedDict[tuple[str, str], LinkGraphProjection] = OrderedDict()
 
 
 def _serve_sqlite_store() -> SQLiteSiteStore | None:
@@ -172,6 +174,31 @@ def _serve_sqlite_store() -> SQLiteSiteStore | None:
     path.parent.mkdir(parents=True, exist_ok=True)
     logger.info("[FIX:serve-recovery] durable SQLite serve history path=%s", path)
     return SQLiteSiteStore(path)
+
+
+def _link_graph_projection(run_id: str, origin: str | None = None) -> LinkGraphProjection:
+    store = _V2_RUNS.get(run_id)
+    pages = tuple(store.iter_pages(run_id))
+    resolved_origin = origin or (urlsplit(pages[0].url_key).scheme + "://" + urlsplit(pages[0].url_key).netloc if pages else "")
+    if not resolved_origin:
+        raise ValueError("origin is required when run has no pages")
+    key = (run_id, resolved_origin)
+    cached = _V2_GRAPH_CACHE.get(key)
+    if cached is not None:
+        _V2_GRAPH_CACHE.move_to_end(key)
+        return cached
+    projection = project_link_graph(
+        tuple(store.iter_link_occurrences(run_id)),
+        run_id=run_id,
+        origin=resolved_origin,
+        known_pages=tuple(page.url_key for page in pages),
+        page_depths={page.url_key: page.depth for page in pages},
+        redirect_sources=tuple(item.from_url for item in store.iter_redirects(run_id)),
+    )
+    _V2_GRAPH_CACHE[key] = projection
+    while len(_V2_GRAPH_CACHE) > 32:
+        _V2_GRAPH_CACHE.popitem(last=False)
+    return projection
 
 
 def _saved_views_path() -> Path:
@@ -1464,6 +1491,42 @@ def audit_v2_overview_endpoint(run_id: str) -> dict:
         "run_id": run_id,
         "inventory": {name: service.count(query) for name, query in queries.items()},
     }
+
+
+@app.get("/v2/runs/{run_id}/graph")
+def audit_v2_graph_endpoint(
+    run_id: str,
+    origin: str | None = None,
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    dead_end: bool | None = None,
+    disconnected: bool | None = None,
+) -> dict:
+    """Return the cached bounded link graph node projection."""
+    try:
+        projection = _link_graph_projection(run_id, origin)
+        nodes = tuple(item for item in projection.nodes if (dead_end is None or item.dead_end is dead_end) and (disconnected is None or item.disconnected is disconnected))
+        if cursor:
+            nodes = tuple(item for item in nodes if item.url > cursor)
+        selected = nodes[: limit + 1]
+        items = selected[:limit]
+        return {"run_id": run_id, "version": projection.version, "fingerprint": projection.fingerprint, "algorithm_version": projection.graph.algorithm_version, "items": [{"url": item.url, "inlinks": item.inlinks, "outlinks": item.outlinks, "unique_inlinks": item.unique_inlinks, "unique_outlinks": item.unique_outlinks, "depth": item.depth, "dead_end": item.dead_end, "disconnected": item.disconnected, "nofollow_inlinks": item.nofollow_inlinks, "redirect_inlinks": item.redirect_inlinks, "authority": item.authority} for item in items], "next_cursor": items[-1].url if len(selected) > limit else None, "total": len(nodes)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/runs/{run_id}/graph/node")
+def audit_v2_graph_node_endpoint(run_id: str, url: str, origin: str | None = None) -> dict:
+    try:
+        projection = _link_graph_projection(run_id, origin)
+        node = projection.node(url)
+        return {"run_id": run_id, "version": projection.version, "algorithm_version": projection.graph.algorithm_version, "node": {"url": node.url, "inlinks": node.inlinks, "outlinks": node.outlinks, "unique_inlinks": node.unique_inlinks, "unique_outlinks": node.unique_outlinks, "depth": node.depth, "dead_end": node.dead_end, "disconnected": node.disconnected, "nofollow_inlinks": node.nofollow_inlinks, "redirect_inlinks": node.redirect_inlinks, "authority": node.authority}, "inbound": [edge.source for edge in projection.graph.edges if edge.target == url], "outbound": [edge.target for edge in projection.graph.edges if edge.source == url]}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run or graph node not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/v2/runs/{run_id}/run-urls")

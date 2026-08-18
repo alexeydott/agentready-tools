@@ -92,6 +92,15 @@ Duplicate and cross-origin URLs are handled deterministically; CSV/JSON output
 uses the same URL set as the table, and no generated sitemap is submitted
 automatically.
 
+The Link Graph explorer projects the canonical `link_occurrences` inventory
+without another crawl. `GET /v2/runs/{run_id}/graph` returns bounded,
+cursor-paginated nodes with inbound/outbound counts, unique degrees, depth,
+dead-end/disconnected flags, nofollow/redirect inlinks, and normalized internal
+authority. `GET /v2/runs/{run_id}/graph/node?url=...` returns the selected node
+and its inbound/outbound URLs. The CLI equivalent is
+`agentready graph RUN_ID --dead-end`; the dashboard keeps only the current
+bounded page in the DOM.
+
 Custom Rules use the versioned YAML DSL (`version: 1`) with `text`, `regex`,
 `header`, `json-ld`, `link`, `resource`, and `css` selectors. Validate with
 `agentready rules validate rules.yml`; preview a bounded representation with

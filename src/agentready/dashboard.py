@@ -862,6 +862,12 @@ rules:
 <div><button type="button" class="secondary" onclick="validateCustomRules()">Validate rules</button><button type="button" class="secondary" onclick="debugCustomRules()">Preview matches</button></div>
 <div id="custom-rules-status" role="status" aria-live="polite"></div><pre id="custom-rules-result" role="region" aria-live="polite"></pre>
 </section>
+<section id="link-graph-panel" class="panel" hidden aria-labelledby="link-graph-title">
+<h2 id="link-graph-title">Link Graph</h2>
+<p>Cached graph projection from stored link occurrences. Filters keep only the current bounded page in the DOM.</p>
+<div><label><input id="link-graph-dead-end" type="checkbox"> Dead ends</label><label><input id="link-graph-disconnected" type="checkbox"> Disconnected</label><button type="button" class="secondary" onclick="loadLinkGraph()">Load graph</button></div>
+<div id="link-graph-status" role="status" aria-live="polite"></div><div id="link-graph-result" role="region" aria-live="polite"></div>
+</section>
 <section id="ai-assistant-panel" class="panel ai-workspace" hidden aria-labelledby="ai-workspace-title">
 <div class="ai-workspace-header"><div class="ai-header-title"><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><div class="ai-header-meta"><small>{escape(text["ai_hint"])}</small><span id="ai-model-chip" class="ai-model-chip" title="{escape(text["ai_model_chip"])}">{escape(text["ai_model_chip"])}: —</span></div></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" title="{escape(text["ai_saved_chats"])}" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><div class="ai-mode-segmented" role="group" aria-label="{escape(text["ai_mode"])}"><button type="button" data-ai-mode="both" title="{escape(text["ai_mode_both_hint"])}" onclick="setAiMode('both')">{escape(text["ai_mode_both"])}</button><button type="button" data-ai-mode="seo" title="{escape(text["ai_mode_seo_hint"])}" onclick="setAiMode('seo')">{escape(text["ai_mode_seo"])}</button><button type="button" data-ai-mode="geo" title="{escape(text["ai_mode_geo_hint"])}" onclick="setAiMode('geo')">{escape(text["ai_mode_geo"])}</button></div><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
 <div class="ai-workspace-grid">
@@ -1220,6 +1226,8 @@ function captureV2Report(reportText, required=false) {{
       if (robotsPanel) robotsPanel.hidden = false;
       const sitemapPanel = document.getElementById("sitemap-reconciliation-panel");
       if (sitemapPanel) sitemapPanel.hidden = false;
+      const graphPanel = document.getElementById("link-graph-panel");
+      if (graphPanel) graphPanel.hidden = false;
       console.info("[FIX:ai-audit-context] Embedded audit report captured", {{bytes:reportText.length, findings:(window.agentreadyV2Report.findings || []).length}});
       return window.agentreadyV2Report;
     }}
@@ -1360,6 +1368,27 @@ async function debugCustomRules() {{
     document.getElementById("custom-rules-result").textContent = JSON.stringify(payload, null, 2);
     status.textContent = "Preview complete; no crawl started";
   }} catch (error) {{ status.textContent = "Preview failed: " + error.message; }}
+}}
+
+async function loadLinkGraph() {{
+  const status = document.getElementById("link-graph-status");
+  const output = document.getElementById("link-graph-result");
+  if (!runId) {{ status.textContent = "Run an audit first"; return; }}
+  const query = new URLSearchParams({{limit:"100", dead_end:String(document.getElementById("link-graph-dead-end").checked), disconnected:String(document.getElementById("link-graph-disconnected").checked)}});
+  try {{
+    const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/graph?" + query.toString());
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "graph request failed");
+    document.getElementById("link-graph-panel").hidden = false;
+    output.innerHTML = `<p>Authority algorithm: ${{escapeHtml(payload.algorithm_version || "")}}</p><table><thead><tr><th>URL</th><th>In</th><th>Out</th><th>Authority</th></tr></thead><tbody>${{(payload.items || []).map(item => `<tr><td><button type="button" class="text-link" onclick="loadLinkGraphNode(this.dataset.url)" data-url="${{escapeHtml(item.url)}}">${{escapeHtml(item.url)}}</button></td><td>${{item.inlinks}}</td><td>${{item.outlinks}}</td><td>${{item.authority}}</td></tr>`).join("")}}</tbody></table>`;
+    status.textContent = `Loaded ${{(payload.items || []).length}} of ${{payload.total || 0}} nodes`;
+    logDashboardAction("graph.load", {{run_id:runId, nodes:(payload.items || []).length, fingerprint:payload.fingerprint}});
+  }} catch (error) {{ status.textContent = "Graph failed: " + error.message; }}
+}}
+async function loadLinkGraphNode(url) {{
+  const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/graph/node?url=" + encodeURIComponent(url));
+  const payload = await response.json();
+  if (response.ok) document.getElementById("link-graph-status").textContent = `${{payload.node.url}}: ${{payload.inbound.length}} inbound, ${{payload.outbound.length}} outbound`;
 }}
 async function loadSitemapCategory(category) {{
   const state = window.sitemapReconciliation;

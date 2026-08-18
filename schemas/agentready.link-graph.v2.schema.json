@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentready.link-graph.v2",
+  "type": "object",
+  "required": ["run_id", "version", "algorithm_version", "items", "next_cursor", "total"],
+  "properties": {
+    "run_id": {"type": "string"},
+    "version": {"const": "link-graph-v1"},
+    "algorithm_version": {"type": "string"},
+    "fingerprint": {"type": "string"},
+    "items": {"type": "array", "maxItems": 1000, "items": {"type": "object", "required": ["url", "inlinks", "outlinks", "unique_inlinks", "unique_outlinks", "dead_end", "disconnected", "authority"], "properties": {"url": {"type": "string", "format": "uri"}, "inlinks": {"type": "integer", "minimum": 0}, "outlinks": {"type": "integer", "minimum": 0}, "unique_inlinks": {"type": "integer", "minimum": 0}, "unique_outlinks": {"type": "integer", "minimum": 0}, "depth": {"type": ["integer", "null"]}, "dead_end": {"type": "boolean"}, "disconnected": {"type": "boolean"}, "nofollow_inlinks": {"type": "integer", "minimum": 0}, "redirect_inlinks": {"type": "integer", "minimum": 0}, "authority": {"type": "number", "minimum": 0}}}},
+    "next_cursor": {"type": ["string", "null"]},
+    "total": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}
