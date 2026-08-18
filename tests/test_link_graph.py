@@ -66,3 +66,20 @@ def test_link_graph_projection_exposes_nodes_filters_and_normalized_authority():
     assert nodes["https://example.test/c"].dead_end is True
     assert nodes["https://example.test/isolated"].disconnected is True
     assert abs(sum(value for _, value in projection.graph.authority) - 1.0) < 1e-9
+
+
+def test_link_graph_projection_treats_missing_rel_flags_as_zero():
+    occurrence = LinkOccurrenceRecord(
+        "run",
+        "https://example.test/",
+        0,
+        "/a",
+        target_key="https://example.test/a",
+        rel_flags=None,
+    )
+
+    projection = project_link_graph(
+        [occurrence], run_id="run", origin="https://example.test"
+    )
+
+    assert projection.nodes[0].nofollow_inlinks == 0

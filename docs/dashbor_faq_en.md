@@ -74,6 +74,25 @@ project's recent audit runs. The table uses these columns:
 An empty history is a valid result: it means that no run has been saved for the
 selected project yet.
 
+## Virtual Robots simulation
+
+Open **Virtual Robots simulation** to compare the stored and proposed robots
+policies for selected user agents. Paste both documents and click
+**Simulate policy**. This is an offline comparison: it does not fetch or publish
+`robots.txt`.
+
+## Sitemap reconciliation
+
+Paste bounded sitemap XML and choose the origin associated with the stored run,
+then click **Reconcile sitemap**. The result compares sitemap entries with the saved
+inventory. This control does not fetch or submit a sitemap.
+
+## Link Graph
+
+Click **Load graph** to display a bounded projection of stored link
+occurrences. **Dead ends** and **Disconnected** filter only the displayed
+projection; they do not start a crawl.
+
 ## Links below the settings
 
 - **Refresh check catalog** reloads the checks available for the selected

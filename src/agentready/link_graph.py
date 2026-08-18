@@ -142,7 +142,7 @@ def project_link_graph(
             continue
         in_sources[item.target_key].add(item.source_key)
         out_targets[item.source_key].add(item.target_key)
-        if (item.rel and "nofollow" in item.rel.lower()) or item.rel_flags & 1:
+        if (item.rel and "nofollow" in item.rel.lower()) or (item.rel_flags or 0) & 1:
             nofollow[item.target_key] += 1
     authority = dict(graph.authority)
     nodes = tuple(

@@ -105,8 +105,30 @@ def test_dashboard_added_workspaces_have_localized_descriptions_and_help():
         projects_panel = html.split('id="projects-panel"', 1)[1].split('</section>', 1)[0]
         assert '<details class="section-help">' not in custom_panel
         assert '<details class="section-help">' not in projects_panel
+        tools_open = '<details id="tools-panel" class="panel tools-panel">'
+        assert tools_open in html
+        assert 'id="tools-panel" class="panel tools-panel" open' not in html
+        tools_summary = html.split(tools_open, 1)[1].split('</summary>', 1)[0]
+        assert not any(f"<{tag}" in tools_summary for tag in ("button", "input", "select", "textarea"))
+        tools_group = html.split(tools_open, 1)[1].split('</div>\n</details>', 1)[0]
+        for panel_id in (
+            "robots-simulation-panel",
+            "sitemap-reconciliation-panel",
+            "custom-rules-panel",
+            "link-graph-panel",
+            "duplicate-clusters-panel",
+            "projects-panel",
+        ):
+            assert f'id="{panel_id}"' in tools_group
+        for panel_id in ("robots-simulation-panel", "sitemap-reconciliation-panel", "link-graph-panel"):
+            panel = html.split(f'id="{panel_id}"', 1)[1].split('</section>', 1)[0]
+            assert '<details class="section-help">' not in panel
         assert ("Custom rules debugger" in html) if language == "en" else ("Отладчик пользовательских правил" in html)
         assert ("Projects and run history" in html) if language == "en" else ("Проекты и история запусков" in html)
+        assert ("Virtual Robots simulation" in html) if language == "en" else ("Симуляция Virtual Robots" in html)
+        assert ("Sitemap reconciliation" in html) if language == "en" else ("Сверка sitemap" in html)
+        assert ("Link Graph" in html) if language == "en" else ("Граф ссылок" in html)
+        assert ("Open the bounded offline" in html) if language == "en" else ("Откройте ограниченные офлайн-инструменты" in html)
 
 
 def test_dashboard_workspace_guidance_is_documented_in_localized_faqs():
@@ -117,8 +139,37 @@ def test_dashboard_workspace_guidance_is_documented_in_localized_faqs():
     assert "## Projects and run history" in english
     assert "## Отладчик пользовательских правил" in russian
     assert "## Проекты и история запусков" in russian
+    assert "## Virtual Robots simulation" in english
+    assert "## Sitemap reconciliation" in english
+    assert "## Link Graph" in english
+    assert "## Симуляция Virtual Robots" in russian
+    assert "## Сверка sitemap" in russian
+    assert "## Граф ссылок" in russian
     assert "Preview matches" in english and "Предпросмотр совпадений" in russian
     assert "Baseline" in english and "Базовый запуск" in russian
+
+
+def test_dashboard_stored_run_tools_resolve_run_id_per_action():
+    html = render_dashboard("en")
+    assert "function dashboardRunId()" in html
+    for function_name in ("reconcileSitemap", "loadLinkGraph", "loadLinkGraphNode", "loadDuplicateClusters", "loadSitemapCategory"):
+        function_start = html.index(f"async function {function_name}")
+        function_body = html[function_start : function_start + 900]
+        assert "const runId = dashboardRunId();" in function_body
+
+
+def test_dashboard_tools_localize_visible_controls_and_statuses():
+    english = render_dashboard("en")
+    russian = render_dashboard("ru")
+    for value in ("Dead ends", "Disconnected", "Load graph", "All", "Exact", "Near", "Load clusters", "Change", "Authority algorithm"):
+        assert value in english
+    for value in ("Тупиковые страницы", "Изолированные страницы", "Загрузить граф", "Все", "Точные", "Близкие", "Загрузить кластеры", "Изменение", "Алгоритм авторитетности"):
+        assert value in russian
+    tools_group = russian.split('<details id="tools-panel"', 1)[1].split('</details>', 1)[0]
+    for value in ("Dead ends", "Disconnected", "Load graph", "Load clusters", "Rules are valid", "Reconciliation complete", "Project saved"):
+        assert value not in tools_group
+    assert "t.graph_loaded.replace" in russian
+    assert "translations[language.value].history_failed" in russian
 
 
 def test_dashboard_resets_inventory_cursor_when_query_shape_changes():

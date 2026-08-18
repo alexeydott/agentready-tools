@@ -228,6 +228,8 @@ _TEXT = {
         "print_report": "Print report",
         "result": "Operation result",
         "ready": "Configure an audit and choose an operation.",
+        "tools": "Tools",
+        "tools_hint": "Open the bounded offline and stored-run tools: robots simulation, sitemap reconciliation, custom rules, link graph, duplicate clusters, and project history.",
         "v2_inventory": "Run inventory",
         "robots_simulation": "Virtual Robots simulation",
         "robots_simulation_hint": "Compare the stored robots policy with a proposed policy for selected user agents. This is an offline simulation and does not publish robots.txt.",
@@ -237,6 +239,7 @@ _TEXT = {
         "robots_simulate": "Simulate policy",
         "robots_empty": "Run an audit before simulating robots policy.",
         "robots_result": "Robots simulation result",
+        "robots_change": "Change", "robots_url": "URL", "robots_no_changes": "No URL changes", "robots_newly_blocked": "Newly blocked", "robots_newly_allowed": "Newly allowed",
         "v2_discovery": "Discovery source",
         "v2_discovery_single": "Single URL",
         "v2_discovery_list": "URL list",
@@ -249,16 +252,20 @@ _TEXT = {
         "sitemap_origin": "Origin",
         "sitemap_documents": "Sitemap XML (one or more documents separated by a blank line)",
         "sitemap_reconcile": "Reconcile sitemap",
+        "run_audit_first": "Run an audit first", "sitemap_reconcile_complete": "Reconciliation complete", "sitemap_reconcile_failed": "Reconciliation failed",
         "custom_rules": "Custom rules debugger",
         "custom_rules_hint": "Validate a declarative rules document, then preview matches against the saved audit representation. These actions do not start a crawl.",
         "custom_rules_help": "Use version 1 YAML with a stable rule id and an assertion. Validate catches schema errors; Preview matches evaluates the rule against saved evidence.",
         "custom_rules_document": "Rules YAML",
         "custom_rules_validate": "Validate rules",
         "custom_rules_preview": "Preview matches",
+        "custom_rules_valid": "Rules are valid", "custom_rules_validation_failed": "Validation failed", "custom_rules_preview_complete": "Preview complete; no crawl started", "custom_rules_preview_failed": "Preview failed",
         "link_graph": "Link Graph",
         "link_graph_hint": "Load a bounded graph projection from stored link occurrences. Filters affect only the displayed page and do not start a crawl.",
+        "graph_dead_ends": "Dead ends", "graph_disconnected": "Disconnected", "graph_load": "Load graph", "graph_algorithm": "Authority algorithm", "graph_url": "URL", "graph_in": "In", "graph_out": "Out", "graph_authority": "Authority", "graph_loaded": "Loaded {loaded} of {total} nodes", "graph_failed": "Graph failed", "graph_node_inbound": "inbound", "graph_node_outbound": "outbound",
         "duplicate_clusters": "Duplicate clusters",
         "duplicate_clusters_hint": "Compare exact and near-duplicate content signatures from the stored run. Loading results does not start a new crawl.",
+        "duplicate_all": "All", "duplicate_exact": "Exact", "duplicate_near": "Near", "duplicate_load": "Load clusters", "duplicates_loaded": "Loaded {loaded} of {total} clusters", "duplicate_failed": "Duplicate query failed",
         "projects": "Projects and run history",
         "projects_hint": "Create or update a local project and review its stored audit runs. No remote project service is contacted.",
         "project_id": "Project ID",
@@ -271,6 +278,7 @@ _TEXT = {
         "history_baseline_yes": "Yes",
         "history_baseline_no": "No",
         "projects_count": "Projects: {count}",
+        "project_saved": "Project saved", "project_failed": "Project failed", "history_failed": "History failed", "project_default_name": "Default project", "custom_rules_example_title": "Example text",
         "runs_count": "Audit runs: {count}",
         "history_explanation": "Started by shows what created each audit; Baseline marks the run used for comparison.",
         "v2_inventory_load": "Load inventory",
@@ -526,6 +534,8 @@ _TEXT = {
         "print_report": "Распечатать отчёт",
         "result": "Результат операции",
         "ready": "Настройте аудит и выберите операцию.",
+        "tools": "Инструменты",
+        "tools_hint": "Откройте ограниченные офлайн-инструменты и инструменты сохранённых запусков: robots, sitemap, пользовательские правила, граф ссылок, дубликаты и историю проектов.",
         "v2_inventory": "Инвентарь запуска",
         "robots_simulation": "Симуляция Virtual Robots",
         "robots_simulation_hint": "Сравнивает сохранённую и предлагаемую политику robots для выбранных user-agent. Это офлайн-симуляция, robots.txt не публикуется.",
@@ -535,6 +545,7 @@ _TEXT = {
         "robots_simulate": "Симулировать политику",
         "robots_empty": "Сначала выполните аудит, затем симулируйте robots-политику.",
         "robots_result": "Результат симуляции robots",
+        "robots_change": "Изменение", "robots_url": "URL", "robots_no_changes": "Изменений URL нет", "robots_newly_blocked": "Новые блокировки", "robots_newly_allowed": "Новые разрешения",
         "v2_discovery": "Источник обнаружения",
         "v2_discovery_single": "Один URL",
         "v2_discovery_list": "Список URL",
@@ -547,16 +558,20 @@ _TEXT = {
         "sitemap_origin": "Источник",
         "sitemap_documents": "XML sitemap (несколько документов разделяйте пустой строкой)",
         "sitemap_reconcile": "Сверить sitemap",
+        "run_audit_first": "Сначала выполните аудит", "sitemap_reconcile_complete": "Сверка завершена", "sitemap_reconcile_failed": "Ошибка сверки",
         "custom_rules": "Отладчик пользовательских правил",
         "custom_rules_hint": "Проверяет декларативный документ правил и показывает совпадения с сохранённым представлением аудита. Эти действия не запускают обход.",
         "custom_rules_help": "Используйте YAML версии 1 со стабильным идентификатором правила и утверждением. Проверка находит ошибки схемы, а предпросмотр оценивает правило по сохранённым доказательствам.",
         "custom_rules_document": "YAML правил",
         "custom_rules_validate": "Проверить правила",
         "custom_rules_preview": "Предпросмотр совпадений",
+        "custom_rules_valid": "Правила корректны", "custom_rules_validation_failed": "Ошибка проверки", "custom_rules_preview_complete": "Предпросмотр завершён; обход не запускался", "custom_rules_preview_failed": "Ошибка предпросмотра",
         "link_graph": "Граф ссылок",
         "link_graph_hint": "Загружает ограниченную проекцию графа по сохранённым вхождениям ссылок. Фильтры влияют только на экран и не запускают обход.",
+        "graph_dead_ends": "Тупиковые страницы", "graph_disconnected": "Изолированные страницы", "graph_load": "Загрузить граф", "graph_algorithm": "Алгоритм авторитетности", "graph_url": "URL", "graph_in": "Входящие", "graph_out": "Исходящие", "graph_authority": "Авторитетность", "graph_loaded": "Загружено узлов: {loaded} из {total}", "graph_failed": "Ошибка графа", "graph_node_inbound": "входящих", "graph_node_outbound": "исходящих",
         "duplicate_clusters": "Кластеры дубликатов",
         "duplicate_clusters_hint": "Сравнивает точные и близкие сигнатуры дубликатов сохранённого запуска. Загрузка результатов не запускает новый обход.",
+        "duplicate_all": "Все", "duplicate_exact": "Точные", "duplicate_near": "Близкие", "duplicate_load": "Загрузить кластеры", "duplicates_loaded": "Загружено кластеров: {loaded} из {total}", "duplicate_failed": "Ошибка запроса дубликатов",
         "projects": "Проекты и история запусков",
         "projects_hint": "Создаёт или обновляет локальный проект и показывает сохранённые запуски аудита. Внешний сервис проектов не используется.",
         "project_id": "Идентификатор проекта",
@@ -569,6 +584,7 @@ _TEXT = {
         "history_baseline_yes": "Да",
         "history_baseline_no": "Нет",
         "projects_count": "Проектов: {count}",
+        "project_saved": "Проект сохранён", "project_failed": "Ошибка проекта", "history_failed": "Ошибка истории", "project_default_name": "Проект по умолчанию", "custom_rules_example_title": "Пример текста",
         "runs_count": "Запусков аудита: {count}",
         "history_explanation": "«Источник запуска» показывает, что создало аудит; «Базовый запуск» отмечает запуск для сравнения.",
         "v2_inventory_load": "Загрузить инвентарь",
@@ -643,12 +659,25 @@ empty history is valid and means no run is saved for that project.</p>
 <p>The result shows progress, score, maturity, checks, recommendations, URLs,
 pages, resources, and metrics. Use <strong>Download report</strong> or
 <strong>Print report</strong> beside the report.</p>
-<h3>6. Use the AI assistant</h3>
+<h3>6. Virtual Robots simulation</h3>
+<p>Open <strong>Virtual Robots simulation</strong> to compare stored and
+proposed robots policies for selected user agents. Paste both documents and
+click <strong>Simulate</strong>. This is an offline comparison: it neither
+fetches nor publishes <code>robots.txt</code>.</p>
+<h3>7. Sitemap reconciliation</h3>
+<p>Paste bounded sitemap XML and choose the origin used by the stored run,
+then click <strong>Reconcile</strong>. The result compares sitemap entries
+with the saved inventory. This control does not fetch or submit a sitemap.</p>
+<h3>8. Link Graph</h3>
+<p>Click <strong>Load graph</strong> to display a bounded projection of stored
+link occurrences. The dead-end and disconnected filters change only the
+displayed projection; they do not start a crawl.</p>
+<h3>9. Use the AI assistant</h3>
 <p>After an audit, choose SEO, GEO, or SEO/GEO mode, then select a provider and
 model. Enter a request or use the prompt library. Skills, MCP context, file
 attachments, chat history, saved chats, and OpenAI/DeepSeek JSON export are
 available in the AI panel.</p>
-<h3>7. Language and troubleshooting</h3>
+<h3>10. Language and troubleshooting</h3>
 <p>The interface follows the selected language. Without an explicit URL
 parameter, Russian is used for a Russian browser locale and English otherwise.
 For errors, check the URL, click <strong>Check service health</strong>, enable
@@ -687,12 +716,25 @@ YAML-документ до использования в рабочем проц
 <p>В результате отображаются прогресс, балл, уровень зрелости, проверки,
 рекомендации, URL, страницы, ресурсы и метрики. Рядом с отчётом доступны
 <strong>Скачать отчёт</strong> и <strong>Распечатать отчёт</strong>.</p>
-<h3>6. AI-помощник</h3>
+<h3>6. Симуляция Virtual Robots</h3>
+<p>Откройте <strong>Симуляция Virtual Robots</strong>, чтобы сравнить
+сохранённую и предлагаемую политики robots для выбранных user-agent.
+Вставьте оба документа и нажмите <strong>Симулировать</strong>. Это офлайн-
+сравнение: инструмент не загружает и не публикует <code>robots.txt</code>.</p>
+<h3>7. Сверка sitemap</h3>
+<p>Вставьте XML sitemap и укажите origin сохранённого запуска, затем нажмите
+<strong>Сверить</strong>. Результат сравнивает записи sitemap с сохранённым
+инвентарём. Инструмент ничего не загружает и не отправляет на публикацию.</p>
+<h3>8. Граф ссылок</h3>
+<p>Нажмите <strong>Загрузить граф</strong>, чтобы показать ограниченную
+проекцию сохранённых вхождений ссылок. Фильтры тупиков и disconnected меняют
+только отображение и не запускают обход.</p>
+<h3>9. AI-помощник</h3>
 <p>После аудита выберите режим SEO, GEO или SEO/GEO, затем провайдера и
 модель. Напишите запрос или выберите prompt из библиотеки. В AI-панели также
 доступны skills, контекст MCP, вложения, история и сохранение чатов, а также
 экспорт OpenAI/DeepSeek JSON.</p>
-<h3>7. Язык и диагностика</h3>
+<h3>10. Язык и диагностика</h3>
 <p>Интерфейс использует выбранный язык. Если язык не указан в URL, для русской
 локали браузера выбирается русский, для остальных — английский. При ошибке
 проверьте URL, нажмите <strong>Проверить состояние сервиса</strong>, включите
@@ -857,6 +899,7 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 .help-content {{ max-height:calc(100vh - 150px); overflow:auto; }}
 .help-content h2 {{ margin-top:0; }} .help-content h3 {{ margin:18px 0 8px; }}
 .help-content p,.help-content li {{ line-height:1.5; }}
+.tools-panel {{ padding:0; }} .tools-panel > summary {{ padding:18px 20px; font-size:1.1rem; font-weight:700; cursor:pointer; }} .tools-panel > summary .hint {{ margin-left:6px; }} .tools-content {{ display:grid; gap:14px; padding:0 14px 14px; }} .tools-content > .panel {{ margin:0; }}
 header .header-actions {{ display:flex; align-items:center; gap:8px; }}
 header .help-header-button {{ width:auto; min-width:120px; }}
 @media (max-width:900px) {{ .dashboard-layout,.dashboard-layout.help-open {{ grid-template-columns:1fr; }} .help-sidebar,.dashboard-layout:not(.help-open) .help-sidebar {{ position:static; width:auto; max-width:none; min-width:0; min-height:0; resize:none; }} .help-content {{ max-height:none; }} .form-grid,.form-grid.three,.form-grid.four,.inventory-toolbar {{ grid-template-columns:1fr 1fr; }} }}
@@ -926,16 +969,17 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div id="v2-inventory-status" role="status" aria-live="polite"></div>
 <div id="v2-inventory" role="region" aria-live="polite">{escape(text["v2_inventory_empty"])}</div>
 </section>
+<details id="tools-panel" class="panel tools-panel">
+<summary>{escape(text["tools"])} {_hint(text, "tools_hint")}</summary>
+<div class="tools-content">
 <section id="robots-simulation-panel" class="panel" hidden aria-labelledby="robots-simulation-title">
 <h2 id="robots-simulation-title">{escape(text["robots_simulation"])} {_hint(text, "robots_simulation_hint")}</h2>
-<details class="section-help"><summary>{escape(text["help"])}</summary><p>{escape(text["robots_simulation_hint"])}</p></details>
 <div class="form-grid three"><label for="robots-live">{escape(text["robots_live"])}<textarea id="robots-live" rows="5"></textarea></label><label for="robots-proposed">{escape(text["robots_proposed"])}<textarea id="robots-proposed" rows="5"></textarea></label><div><label for="robots-user-agents">{escape(text["robots_user_agents"])}</label><input id="robots-user-agents" value="*"><button type="button" class="secondary" onclick="simulateRobots()">{escape(text["robots_simulate"])}</button></div></div>
 <div id="robots-simulation-status" role="status" aria-live="polite">{escape(text["robots_empty"])}</div><div id="robots-simulation-result" role="region" aria-live="polite"></div>
 </section>
 <section id="sitemap-reconciliation-panel" class="panel" hidden aria-labelledby="sitemap-reconciliation-title">
 <h2 id="sitemap-reconciliation-title">{escape(text["sitemap_reconciliation"])} {_hint(text, "sitemap_reconciliation_hint")}</h2>
 <p class="section-hint">{escape(text["sitemap_reconciliation_hint"])}</p>
-<details class="section-help"><summary>{escape(text["help"])}</summary><p>{escape(text["sitemap_reconciliation_hint"])}</p></details>
 <label for="sitemap-reconciliation-origin">{escape(text["sitemap_origin"])}</label><input id="sitemap-reconciliation-origin" type="url" placeholder="https://example.test">
 <label for="sitemap-reconciliation-xml">{escape(text["sitemap_documents"])}</label><textarea id="sitemap-reconciliation-xml" rows="6"></textarea>
 <button type="button" class="secondary" onclick="reconcileSitemap()">{escape(text["sitemap_reconcile"])}</button>
@@ -947,7 +991,7 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <label for="custom-rules-document">{escape(text["custom_rules_document"])}</label><textarea id="custom-rules-document" rows="8">version: 1
 rules:
   - id: example
-    title: Example text
+    title: {text["custom_rules_example_title"]}
     assert:
       kind: text
       pattern: agent</textarea>
@@ -957,23 +1001,24 @@ rules:
 <section id="link-graph-panel" class="panel" hidden aria-labelledby="link-graph-title">
 <h2 id="link-graph-title">{escape(text["link_graph"])} {_hint(text, "link_graph_hint")}</h2>
 <p class="section-hint">{escape(text["link_graph_hint"])}</p>
-<details class="section-help"><summary>{escape(text["help"])}</summary><p>{escape(text["link_graph_hint"])}</p></details>
-<div><label><input id="link-graph-dead-end" type="checkbox"> Dead ends</label><label><input id="link-graph-disconnected" type="checkbox"> Disconnected</label><button type="button" class="secondary" onclick="loadLinkGraph()">Load graph</button></div>
+<div><label><input id="link-graph-dead-end" type="checkbox"> {escape(text["graph_dead_ends"])}</label><label><input id="link-graph-disconnected" type="checkbox"> {escape(text["graph_disconnected"])}</label><button type="button" class="secondary" onclick="loadLinkGraph()">{escape(text["graph_load"])}</button></div>
 <div id="link-graph-status" role="status" aria-live="polite"></div><div id="link-graph-result" role="region" aria-live="polite"></div>
 </section>
 <section id="duplicate-clusters-panel" class="panel" hidden aria-labelledby="duplicate-clusters-title">
 <h2 id="duplicate-clusters-title">{escape(text["duplicate_clusters"])} {_hint(text, "duplicate_clusters_hint")}</h2>
 <p class="section-hint">{escape(text["duplicate_clusters_hint"])}</p>
 <details class="section-help"><summary>{escape(text["help"])}</summary><p>{escape(text["duplicate_clusters_hint"])}</p></details>
-<div><select id="duplicate-clusters-kind"><option value="all">All</option><option value="exact">Exact</option><option value="near">Near</option></select><button type="button" class="secondary" onclick="loadDuplicateClusters()">Load clusters</button></div>
+<div><select id="duplicate-clusters-kind"><option value="all">{escape(text["duplicate_all"])}</option><option value="exact">{escape(text["duplicate_exact"])}</option><option value="near">{escape(text["duplicate_near"])}</option></select><button type="button" class="secondary" onclick="loadDuplicateClusters()">{escape(text["duplicate_load"])}</button></div>
 <div id="duplicate-clusters-status" role="status" aria-live="polite"></div><div id="duplicate-clusters-result" role="region" aria-live="polite"></div>
 </section>
 <section id="projects-panel" class="panel" aria-labelledby="projects-title">
 <h2 id="projects-title">{escape(text["projects"])} {_hint(text, "projects_hint")}</h2>
 <p class="section-hint">{escape(text["projects_hint"])}</p>
-<div><label for="project-id">{escape(text["project_id"])}</label><input id="project-id" value="default-project"><label for="project-name">{escape(text["project_name"])}</label><input id="project-name" value="Default project"><button type="button" class="secondary" onclick="createDashboardProject()">{escape(text["project_save"])}</button><button type="button" class="secondary" onclick="loadDashboardProjects()">{escape(text["project_load_history"])}</button></div>
+<div><label for="project-id">{escape(text["project_id"])}</label><input id="project-id" value="default-project"><label for="project-name">{escape(text["project_name"])}</label><input id="project-name" value="{escape(text["project_default_name"])}"><button type="button" class="secondary" onclick="createDashboardProject()">{escape(text["project_save"])}</button><button type="button" class="secondary" onclick="loadDashboardProjects()">{escape(text["project_load_history"])}</button></div>
 <div id="projects-status" role="status" aria-live="polite"></div><div id="projects-result" role="region" aria-live="polite"></div>
 </section>
+</div>
+</details>
 <section id="ai-assistant-panel" class="panel ai-workspace" hidden aria-labelledby="ai-workspace-title">
 <div class="ai-workspace-header"><div class="ai-header-title"><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><div class="ai-header-meta"><small>{escape(text["ai_hint"])}</small><span id="ai-model-chip" class="ai-model-chip" title="{escape(text["ai_model_chip"])}">{escape(text["ai_model_chip"])}: —</span></div></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" title="{escape(text["ai_saved_chats"])}" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><div class="ai-mode-segmented" role="group" aria-label="{escape(text["ai_mode"])}"><button type="button" data-ai-mode="both" title="{escape(text["ai_mode_both_hint"])}" onclick="setAiMode('both')">{escape(text["ai_mode_both"])}</button><button type="button" data-ai-mode="seo" title="{escape(text["ai_mode_seo_hint"])}" onclick="setAiMode('seo')">{escape(text["ai_mode_seo"])}</button><button type="button" data-ai-mode="geo" title="{escape(text["ai_mode_geo_hint"])}" onclick="setAiMode('geo')">{escape(text["ai_mode_geo"])}</button></div><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
 <div class="ai-workspace-grid">
@@ -1421,6 +1466,10 @@ let v2InventoryCursor = null;
 let v2InventoryItems = [];
 let v2InventoryCounts = {{}};
 let v2InventoryOverviewRunId = null;
+function dashboardRunId() {{
+  const report = window.agentreadyV2Report;
+  return report && report.run ? report.run.id : null;
+}}
 async function simulateRobots() {{
   const report = window.agentreadyV2Report;
   const status = document.getElementById("robots-simulation-status");
@@ -1433,8 +1482,9 @@ async function simulateRobots() {{
     const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/robots/simulate", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{live_robots:document.getElementById("robots-live").value,proposed_robots:document.getElementById("robots-proposed").value,user_agents:userAgents.length ? userAgents : ["*"]}})}});
     if (!response.ok) throw new Error("HTTP " + response.status);
     const data = await response.json();
-    const rows = data.newly_blocked.map(url => "<tr><td>newly blocked</td><td>" + escapeHtml(url) + "</td></tr>").join("") + data.newly_allowed.map(url => "<tr><td>newly allowed</td><td>" + escapeHtml(url) + "</td></tr>").join("");
-    output.innerHTML = "<p>" + escapeHtml(data.label) + "</p><table><thead><tr><th>Change</th><th>URL</th></tr></thead><tbody>" + (rows || "<tr><td colspan='2'>No URL changes</td></tr>") + "</tbody></table>";
+    const t = translations[language.value];
+    const rows = data.newly_blocked.map(url => "<tr><td>" + escapeHtml(t.robots_newly_blocked) + "</td><td>" + escapeHtml(url) + "</td></tr>").join("") + data.newly_allowed.map(url => "<tr><td>" + escapeHtml(t.robots_newly_allowed) + "</td><td>" + escapeHtml(url) + "</td></tr>").join("");
+    output.innerHTML = "<p>" + escapeHtml(t.robots_result) + "</p><table><thead><tr><th>" + escapeHtml(t.robots_change) + "</th><th>" + escapeHtml(t.robots_url) + "</th></tr></thead><tbody>" + (rows || "<tr><td colspan='2'>" + escapeHtml(t.robots_no_changes) + "</td></tr>") + "</tbody></table>";
     status.textContent = translations[language.value].robots_result;
   }} catch (error) {{ status.textContent = translations[language.value].robots_result + ": " + error.message; }}
 }}
@@ -1442,7 +1492,8 @@ async function simulateRobots() {{
 async function reconcileSitemap() {{
   const status = document.getElementById("sitemap-reconciliation-status");
   const output = document.getElementById("sitemap-reconciliation-result");
-  if (!runId) {{ status.textContent = "Run an audit first"; return; }}
+  const runId = dashboardRunId();
+  if (!runId) {{ status.textContent = translations[language.value].run_audit_first; return; }}
   const documents = document.getElementById("sitemap-reconciliation-xml").value.split(/\n\s*\n/).map(value => value.trim()).filter(Boolean);
   const origin = document.getElementById("sitemap-reconciliation-origin").value.trim();
   try {{
@@ -1450,11 +1501,12 @@ async function reconcileSitemap() {{
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "request failed");
     document.getElementById("sitemap-reconciliation-panel").hidden = false;
-    output.innerHTML = Object.entries(payload.classifications || {{}}).map(([category, count]) => `<button type="button" class="secondary" data-sitemap-category="${{escapeHtml(category)}}" onclick="loadSitemapCategory(this.dataset.sitemapCategory)">${{escapeHtml(category)}}: ${{count}}</button>`).join(" ") + `<pre>${{escapeHtml(JSON.stringify(payload.items || [], null, 2))}}</pre>`;
+    const categoryLabels = {{sitemap_only: language.value === "ru" ? "Только sitemap" : "Sitemap only", crawl_only: language.value === "ru" ? "Только обход" : "Crawl only", broken: language.value === "ru" ? "Битые" : "Broken", redirects: language.value === "ru" ? "Перенаправления" : "Redirects", blocked: language.value === "ru" ? "Заблокированные" : "Blocked", noindex: language.value === "ru" ? "Noindex" : "Noindex", noncanonical: language.value === "ru" ? "Неканонические" : "Non-canonical", out_of_scope: language.value === "ru" ? "Вне области" : "Out of scope", orphan_candidate: language.value === "ru" ? "Кандидаты в сироты" : "Orphan candidates"}};
+    output.innerHTML = Object.entries(payload.classifications || {{}}).map(([category, count]) => `<button type="button" class="secondary" data-sitemap-category="${{escapeHtml(category)}}" onclick="loadSitemapCategory(this.dataset.sitemapCategory)">${{escapeHtml(categoryLabels[category] || category)}}: ${{count}}</button>`).join(" ") + `<pre>${{escapeHtml(JSON.stringify(payload.items || [], null, 2))}}</pre>`;
     window.sitemapReconciliation = payload;
-    status.textContent = "Reconciliation complete";
+    status.textContent = translations[language.value].sitemap_reconcile_complete;
     logDashboardAction("sitemap.reconcile", {{run_id:runId, sitemap_id:payload.sitemap_id, classifications:payload.classifications}});
-  }} catch (error) {{ status.textContent = "Reconciliation failed: " + error.message; }}
+  }} catch (error) {{ status.textContent = translations[language.value].sitemap_reconcile_failed + ": " + error.message; }}
 }}
 
 async function validateCustomRules() {{
@@ -1464,8 +1516,8 @@ async function validateCustomRules() {{
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "validation failed");
     document.getElementById("custom-rules-result").textContent = JSON.stringify(payload, null, 2);
-    status.textContent = "Rules are valid";
-  }} catch (error) {{ status.textContent = "Validation failed: " + error.message; }}
+    status.textContent = translations[language.value].custom_rules_valid;
+  }} catch (error) {{ status.textContent = translations[language.value].custom_rules_validation_failed + ": " + error.message; }}
 }}
 async function debugCustomRules() {{
   const status = document.getElementById("custom-rules-status");
@@ -1474,45 +1526,51 @@ async function debugCustomRules() {{
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "debug failed");
     document.getElementById("custom-rules-result").textContent = JSON.stringify(payload, null, 2);
-    status.textContent = "Preview complete; no crawl started";
-  }} catch (error) {{ status.textContent = "Preview failed: " + error.message; }}
+    status.textContent = translations[language.value].custom_rules_preview_complete;
+  }} catch (error) {{ status.textContent = translations[language.value].custom_rules_preview_failed + ": " + error.message; }}
 }}
 
 async function loadLinkGraph() {{
   const status = document.getElementById("link-graph-status");
   const output = document.getElementById("link-graph-result");
-  if (!runId) {{ status.textContent = "Run an audit first"; return; }}
+  const runId = dashboardRunId();
+  if (!runId) {{ status.textContent = translations[language.value].run_audit_first; return; }}
   const query = new URLSearchParams({{limit:"100", dead_end:String(document.getElementById("link-graph-dead-end").checked), disconnected:String(document.getElementById("link-graph-disconnected").checked)}});
   try {{
     const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/graph?" + query.toString());
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "graph request failed");
     document.getElementById("link-graph-panel").hidden = false;
-    output.innerHTML = `<p>Authority algorithm: ${{escapeHtml(payload.algorithm_version || "")}}</p><table><thead><tr><th>URL</th><th>In</th><th>Out</th><th>Authority</th></tr></thead><tbody>${{(payload.items || []).map(item => `<tr><td><button type="button" class="text-link" onclick="loadLinkGraphNode(this.dataset.url)" data-url="${{escapeHtml(item.url)}}">${{escapeHtml(item.url)}}</button></td><td>${{item.inlinks}}</td><td>${{item.outlinks}}</td><td>${{item.authority}}</td></tr>`).join("")}}</tbody></table>`;
-    status.textContent = `Loaded ${{(payload.items || []).length}} of ${{payload.total || 0}} nodes`;
+    const t = translations[language.value];
+    output.innerHTML = `<p>${{escapeHtml(t.graph_algorithm)}}: ${{escapeHtml(payload.algorithm_version || "")}}</p><table><thead><tr><th>${{escapeHtml(t.graph_url)}}</th><th>${{escapeHtml(t.graph_in)}}</th><th>${{escapeHtml(t.graph_out)}}</th><th>${{escapeHtml(t.graph_authority)}}</th></tr></thead><tbody>${{(payload.items || []).map(item => `<tr><td><button type="button" class="text-link" onclick="loadLinkGraphNode(this.dataset.url)" data-url="${{escapeHtml(item.url)}}">${{escapeHtml(item.url)}}</button></td><td>${{item.inlinks}}</td><td>${{item.outlinks}}</td><td>${{item.authority}}</td></tr>`).join("")}}</tbody></table>`;
+    status.textContent = t.graph_loaded.replace("{{loaded}}", String((payload.items || []).length)).replace("{{total}}", String(payload.total || 0));
     logDashboardAction("graph.load", {{run_id:runId, nodes:(payload.items || []).length, fingerprint:payload.fingerprint}});
-  }} catch (error) {{ status.textContent = "Graph failed: " + error.message; }}
+  }} catch (error) {{ status.textContent = translations[language.value].graph_failed + ": " + error.message; }}
 }}
 async function loadLinkGraphNode(url) {{
+  const runId = dashboardRunId();
+  if (!runId) return;
   const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/graph/node?url=" + encodeURIComponent(url));
   const payload = await response.json();
-  if (response.ok) document.getElementById("link-graph-status").textContent = `${{payload.node.url}}: ${{payload.inbound.length}} inbound, ${{payload.outbound.length}} outbound`;
+  if (response.ok) {{ const t = translations[language.value]; document.getElementById("link-graph-status").textContent = `${{payload.node.url}}: ${{payload.inbound.length}} ${{t.graph_node_inbound}}, ${{payload.outbound.length}} ${{t.graph_node_outbound}}`; }}
 }}
 
 async function loadDuplicateClusters() {{
   const status = document.getElementById("duplicate-clusters-status");
   const output = document.getElementById("duplicate-clusters-result");
-  if (!runId) {{ status.textContent = "Run an audit first"; return; }}
+  const runId = dashboardRunId();
+  if (!runId) {{ status.textContent = translations[language.value].run_audit_first; return; }}
   const kind = document.getElementById("duplicate-clusters-kind").value;
   try {{
     const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/duplicates?kind=" + encodeURIComponent(kind) + "&limit=100");
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "duplicate query failed");
     document.getElementById("duplicate-clusters-panel").hidden = false;
-    output.innerHTML = (payload.items || []).map(item => `<article class="panel"><h3>${{escapeHtml(item.cluster_id)}}${{item.near_duplicate ? " (near)" : " (exact)"}}</h3><ul>${{item.members.map(member => `<li>${{escapeHtml(member.url)}} — ${{member.similarity}}</li>`).join("")}}</ul></article>`).join("");
-    status.textContent = `Loaded ${{(payload.items || []).length}} of ${{payload.total || 0}} clusters`;
+    const duplicateKindLabel = item => item.near_duplicate ? translations[language.value].duplicate_near.toLowerCase() : translations[language.value].duplicate_exact.toLowerCase();
+    output.innerHTML = (payload.items || []).map(item => `<article class="panel"><h3>${{escapeHtml(item.cluster_id)}} (${{escapeHtml(duplicateKindLabel(item))}})</h3><ul>${{item.members.map(member => `<li>${{escapeHtml(member.url)}} — ${{member.similarity}}</li>`).join("")}}</ul></article>`).join("");
+    status.textContent = translations[language.value].duplicates_loaded.replace("{{loaded}}", String((payload.items || []).length)).replace("{{total}}", String(payload.total || 0));
     logDashboardAction("duplicates.load", {{run_id:runId, clusters:(payload.items || []).length, fingerprint:payload.fingerprint}});
-  }} catch (error) {{ status.textContent = "Duplicate query failed: " + error.message; }}
+  }} catch (error) {{ status.textContent = translations[language.value].duplicate_failed + ": " + error.message; }}
 }}
 
 async function createDashboardProject() {{
@@ -1520,8 +1578,8 @@ async function createDashboardProject() {{
   try {{
     const response = await fetch("/v2/projects", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{project_id:document.getElementById("project-id").value.trim(), name:document.getElementById("project-name").value.trim(), target:safeDashboardTarget(document.getElementById("url").value), default_profile:document.getElementById("v2-profile").value}})}});
     const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || "project request failed");
-    status.textContent = "Project saved"; loadDashboardProjects();
-  }} catch (error) {{ status.textContent = "Project failed: " + error.message; }}
+    status.textContent = translations[language.value].project_saved; loadDashboardProjects();
+  }} catch (error) {{ status.textContent = translations[language.value].project_failed + ": " + error.message; }}
 }}
 async function loadDashboardProjects() {{
   const status = document.getElementById("projects-status");
@@ -1535,13 +1593,14 @@ async function loadDashboardProjects() {{
     const project = projects.find(item => item.project_id === document.getElementById("project-id").value.trim());
     if (!project) {{ output.textContent = JSON.stringify(projects, null, 2); status.textContent = translations[language.value].projects_count.replace("{{count}}", String(projects.length)); return; }}
     const response = await fetch("/v2/projects/" + encodeURIComponent(project.project_id) + "/runs?limit=50");
-    const history = await response.json(); if (!response.ok) throw new Error(history.detail || "history request failed");
+    const history = await response.json(); if (!response.ok) throw new Error(history.detail || translations[language.value].history_failed);
     output.innerHTML = `<p>${{escapeHtml(project.name)}} — ${{escapeHtml(project.target)}}</p><p class="section-hint">${{escapeHtml(translations[language.value].history_explanation)}}</p><table><thead><tr><th>${{escapeHtml(translations[language.value].history_run)}}</th><th>${{escapeHtml(translations[language.value].history_trigger)}}</th><th>${{escapeHtml(translations[language.value].history_baseline)}}</th></tr></thead><tbody>${{(history.items || []).map(item => `<tr><td>${{escapeHtml(item.run_id)}}</td><td>${{escapeHtml(item.trigger || "—")}}</td><td>${{item.baseline_run_id ? escapeHtml(translations[language.value].history_baseline_yes) : escapeHtml(translations[language.value].history_baseline_no)}}</td></tr>`).join("")}}</tbody></table>`;
     status.textContent = translations[language.value].runs_count.replace("{{count}}", String(history.total || 0));
-  }} catch (error) {{ status.textContent = "History failed: " + error.message; }}
+  }} catch (error) {{ status.textContent = translations[language.value].history_failed + ": " + error.message; }}
 }}
 async function loadSitemapCategory(category) {{
   const state = window.sitemapReconciliation;
+  const runId = dashboardRunId();
   if (!state || !runId) return;
   const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/sitemap/reconcile", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{documents:[document.getElementById("sitemap-reconciliation-xml").value], origin:document.getElementById("sitemap-reconciliation-origin").value, category, limit:100}})}});
   const payload = await response.json();

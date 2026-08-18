@@ -2,7 +2,7 @@
 
 # Development
 
-The current release is **0.13.3**. The package version, compatibility manifest,
+The current release is **0.13.4**. The package version, compatibility manifest,
 report defaults, and Win64 file metadata are synchronized from the same release
 change.
 

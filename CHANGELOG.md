@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.4
+
+### Grouped dashboard tools and graph reliability
+
+- Grouped Virtual Robots, sitemap reconciliation, custom rules, Link Graph,
+  duplicate clusters, and project history under one collapsed Tools area.
+- Kept the Tools summary text-only and preserved all existing panel actions.
+- Hardened dashboard tool actions to resolve the current v2 run explicitly.
+- Fixed Link Graph projections when stored relation flags are missing.
+- Added localized FAQ/help and browser/regression coverage for the six tools.
+
 ## 0.13.3
 
 ### Shared dashboard workspace guidance
