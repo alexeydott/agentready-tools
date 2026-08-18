@@ -69,6 +69,7 @@ from .seo_crawler import CRAWL_CHECK_METADATA
 from .seo_report import render_seo_html
 from .seo_scanner import audit_seo
 from .target import TargetError
+from .workflows import InventoryRequest
 
 logger = logging.getLogger(__name__)
 
@@ -410,6 +411,12 @@ def dashboard(request: Request, language: Literal["en", "ru"] | None = None) -> 
         lang = "ru" if browser_language.lower().split("-", 1)[0] == "ru" else "en"
     logger.debug("Serving interactive dashboard: language=%s explicit=%s", lang, explicit_language)
     return HTMLResponse(render_dashboard(lang))
+
+
+@app.get("/v2/capabilities")
+def v2_capabilities() -> dict:
+    """Discover canonical v2 product-workflow capabilities and version."""
+    return _AUDIT_SERVICE.workflow_capabilities()
 
 
 class V2AuditRequest(BaseModel):
@@ -1300,18 +1307,17 @@ def audit_v2_inventory_endpoint(
     descending: bool = False,
 ) -> dict:
     """Dispatch only to the fixed, typed inventory projections."""
-    default_sort = {"pages": "url", "run-urls": "url", "links": "source", "resources": "page", "redirects": "from_url", "findings": "finding_id", "metrics": "url"}[kind]
-    requested_sort = sort_by or default_sort
-    queries = {
-        "pages": PageQuery(run_id, cursor=cursor, limit=limit, title_contains=search, sort_by=requested_sort if requested_sort in {"url", "status", "depth", "title", "canonical", "content_hash"} else "url", descending=descending),
-        "run-urls": RunUrlQuery(run_id, cursor=cursor, limit=limit),
-        "links": LinkQuery(run_id, cursor=cursor, limit=limit, anchor_contains=search, sort_by=requested_sort if requested_sort in {"source", "target", "anchor", "ordinal"} else "source", descending=descending),
-        "resources": ResourceQuery(run_id, cursor=cursor, limit=limit, resource_type=search, sort_by=requested_sort if requested_sort in {"page", "resource", "type", "status"} else "page", descending=descending),
-        "redirects": RedirectQuery(run_id, cursor=cursor, limit=limit, to_url=search, sort_by=requested_sort if requested_sort in {"from_url", "to_url", "status"} else "from_url", descending=descending),
-        "findings": FindingQuery(run_id, cursor=cursor, limit=limit, affected_url=search, sort_by=requested_sort if requested_sort in {"finding_id", "status", "affected_url"} else "finding_id", descending=descending),
-        "metrics": MetricQuery(run_id, cursor=cursor, limit=limit, name=search, sort_by=requested_sort if requested_sort in {"url", "provider", "name", "value"} else "url", descending=descending),
-    }
-    return _inventory_response(run_id, queries[kind])
+    try:
+        store = _V2_RUNS.get(run_id)
+        response = _AUDIT_SERVICE.query_inventory(
+            InventoryRequest(run_id, kind=kind, limit=limit, cursor=cursor, search=search, sort_by=sort_by, descending=descending),
+            store=store,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"run_id": response.run_id, "kind": response.kind, "items": [_inventory_item(item) for item in response.items], "next_cursor": response.next_cursor, "total": response.total}
 
 
 @app.get("/v2/runs/{run_id}/links")

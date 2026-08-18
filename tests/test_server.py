@@ -70,6 +70,7 @@ def test_server_exposes_all_read_only_audit_modes():
         "/ai/providers/{provider_id}/models",
         "/checks",
         "/seo/checks",
+        "/v2/capabilities",
             "/v2/audit/dashboard",
             "/v2/seo/audit",
             "/v2/seo/audit/dashboard",

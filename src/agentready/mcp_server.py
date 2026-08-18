@@ -22,18 +22,10 @@ from .audit_service import AuditRequest, AuditService
 from .exports import export_query
 from .metrics import ExternalMetric, ProviderStatus, cached_result
 from .mobile_scanner import audit_mobile
-from .query_service import (
-    FindingQuery,
-    LinkQuery,
-    MetricQuery,
-    PageQuery,
-    QueryService,
-    RedirectQuery,
-    ResourceQuery,
-    RunUrlQuery,
-)
+from .query_service import QueryService
 from .report_storage import save_report
 from .seo_scanner import audit_seo
+from .workflows import InventoryRequest
 
 logger = logging.getLogger(__name__)
 
@@ -183,32 +175,17 @@ def run_inventory_v2(
     export_format: str | None = None,
 ) -> dict:
     """Query or export one bounded typed inventory projection for a v2 run."""
-    if limit < 1 or limit > 1000:
-        raise ValueError("limit must be between 1 and 1000")
-    if kind not in {"pages", "run-urls", "links", "resources", "redirects", "findings", "metrics"}:
-        raise ValueError("unsupported inventory kind")
     from . import server as server_module
 
     store = server_module._V2_RUNS.get(run_id)
-    query_args = {"run_id": run_id, "cursor": cursor, "limit": limit, "descending": descending}
-    if kind == "pages":
-        query = PageQuery(title_contains=search, sort_by=sort_by or "url", **query_args)
-    elif kind == "run-urls":
-        query = RunUrlQuery(**{key: value for key, value in query_args.items() if key != "descending"})
-    elif kind == "links":
-        query = LinkQuery(anchor_contains=search, sort_by=sort_by or "source", **query_args)
-    elif kind == "resources":
-        query = ResourceQuery(resource_type=search, sort_by=sort_by or "page", **query_args)
-    elif kind == "redirects":
-        query = RedirectQuery(to_url=search, sort_by=sort_by or "from_url", **query_args)
-    elif kind == "findings":
-        query = FindingQuery(affected_url=search, sort_by=sort_by or "finding_id", **query_args)
-    else:
-        query = MetricQuery(name=search, sort_by=sort_by or "url", **query_args)
-    page = QueryService(store).execute(query)
-    payload = {"run_id": run_id, "kind": kind, "items": [server_module._inventory_item(item) for item in page.items], "next_cursor": page.next_cursor}
+    response = AuditService().query_inventory(
+        InventoryRequest(run_id, kind=kind, limit=limit, cursor=cursor, search=search, sort_by=sort_by, descending=descending),
+        store=store,
+    )
+    payload = {"run_id": response.run_id, "kind": response.kind, "items": [server_module._inventory_item(item) for item in response.items], "next_cursor": response.next_cursor, "total": response.total}
     if export_format:
-        payload["export"] = export_query(QueryService(store), query, format=export_format, limit=1000)
+        from .workflows import inventory_query
+        payload["export"] = export_query(QueryService(store), inventory_query(InventoryRequest(run_id, kind=kind, limit=limit, cursor=cursor, search=search, sort_by=sort_by, descending=descending)), format=export_format, limit=1000)
         payload["export_format"] = export_format
     logger.debug("MCP inventory query run_id=%s kind=%s limit=%d", run_id, kind, limit)
     return payload

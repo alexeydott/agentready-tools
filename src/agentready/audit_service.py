@@ -23,6 +23,12 @@ from .report_v2 import (
     FindingStatus,
 )
 from .target import parse_target
+from .workflows import (
+    InventoryRequest,
+    InventoryResponse,
+    InventoryWorkflow,
+    workflow_capabilities,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +156,24 @@ class AuditResult:
 
 class AuditService:
     """Run every v2 audit through one bounded application boundary."""
+
+    @staticmethod
+    def workflow_capabilities() -> dict[str, Any]:
+        """Describe reusable v2 product workflows and their bounded contracts."""
+        return workflow_capabilities(__version__)
+
+    @staticmethod
+    def query_inventory(request: InventoryRequest, *, store: Any) -> InventoryResponse:
+        """Execute an inventory workflow through QueryService, never transport SQL."""
+        response = InventoryWorkflow(store).execute(request)
+        logger.info(
+            "v2 inventory workflow run_id=%s kind=%s limit=%d rows=%d",
+            request.run_id,
+            request.kind,
+            request.limit,
+            len(response.items),
+        )
+        return response
 
     @staticmethod
     def _apply_check_limit(checks: list[Any], limits: Mapping[str, Any]) -> list[Any]:

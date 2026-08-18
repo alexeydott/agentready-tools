@@ -26,6 +26,7 @@ V2_SURFACES = (
     "cli.mcp",
     "/v2/audit",
     "/v2/audit/dashboard",
+    "/v2/capabilities",
     "/v2/rescan",
     "/v2/jobs",
     "/v2/jobs/{job_id}",

@@ -56,6 +56,13 @@ limits are enforced server-side; incompatible baselines are rejected rather
 than silently compared. The canonical CLI equivalent is
 `agentready audit https://example.com --fail-on-checks`.
 
+Product-workflow adapters expose their contract and supported inventory kinds
+through `GET /v2/capabilities`. The response identifies the
+`agentready.workflow.v2` contract, release version, opaque keyset cursor
+semantics, and shared limit bound. CLI/API/MCP/dashboard transports validate
+edge input only and delegate filtering, sorting, and pagination to the same
+`AuditService`/`QueryService` workflow.
+
 The `/dashboard` v2 preset uses `POST /v2/audit/dashboard` and renders the
 canonical `AuditService` result in an escaped HTML projection. The dashboard's
 advanced panel exposes the vNext crawl profile (`quick`, `standard`, `deep`),
