@@ -874,6 +874,11 @@ rules:
 <div><select id="duplicate-clusters-kind"><option value="all">All</option><option value="exact">Exact</option><option value="near">Near</option></select><button type="button" class="secondary" onclick="loadDuplicateClusters()">Load clusters</button></div>
 <div id="duplicate-clusters-status" role="status" aria-live="polite"></div><div id="duplicate-clusters-result" role="region" aria-live="polite"></div>
 </section>
+<section id="projects-panel" class="panel" aria-labelledby="projects-title">
+<h2 id="projects-title">Projects and run history</h2>
+<div><label for="project-id">Project ID</label><input id="project-id" value="default-project"><label for="project-name">Name</label><input id="project-name" value="Default project"><button type="button" class="secondary" onclick="createDashboardProject()">Create/update project</button><button type="button" class="secondary" onclick="loadDashboardProjects()">Load history</button></div>
+<div id="projects-status" role="status" aria-live="polite"></div><div id="projects-result" role="region" aria-live="polite"></div>
+</section>
 <section id="ai-assistant-panel" class="panel ai-workspace" hidden aria-labelledby="ai-workspace-title">
 <div class="ai-workspace-header"><div class="ai-header-title"><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><div class="ai-header-meta"><small>{escape(text["ai_hint"])}</small><span id="ai-model-chip" class="ai-model-chip" title="{escape(text["ai_model_chip"])}">{escape(text["ai_model_chip"])}: —</span></div></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" title="{escape(text["ai_saved_chats"])}" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><div class="ai-mode-segmented" role="group" aria-label="{escape(text["ai_mode"])}"><button type="button" data-ai-mode="both" title="{escape(text["ai_mode_both_hint"])}" onclick="setAiMode('both')">{escape(text["ai_mode_both"])}</button><button type="button" data-ai-mode="seo" title="{escape(text["ai_mode_seo_hint"])}" onclick="setAiMode('seo')">{escape(text["ai_mode_seo"])}</button><button type="button" data-ai-mode="geo" title="{escape(text["ai_mode_geo_hint"])}" onclick="setAiMode('geo')">{escape(text["ai_mode_geo"])}</button></div><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
 <div class="ai-workspace-grid">
@@ -1413,6 +1418,28 @@ async function loadDuplicateClusters() {{
     status.textContent = `Loaded ${{(payload.items || []).length}} of ${{payload.total || 0}} clusters`;
     logDashboardAction("duplicates.load", {{run_id:runId, clusters:(payload.items || []).length, fingerprint:payload.fingerprint}});
   }} catch (error) {{ status.textContent = "Duplicate query failed: " + error.message; }}
+}}
+
+async function createDashboardProject() {{
+  const status = document.getElementById("projects-status");
+  try {{
+    const response = await fetch("/v2/projects", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{project_id:document.getElementById("project-id").value.trim(), name:document.getElementById("project-name").value.trim(), target:safeDashboardTarget(document.getElementById("url").value), default_profile:document.getElementById("v2-profile").value}})}});
+    const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || "project request failed");
+    status.textContent = "Project saved"; loadDashboardProjects();
+  }} catch (error) {{ status.textContent = "Project failed: " + error.message; }}
+}}
+async function loadDashboardProjects() {{
+  const status = document.getElementById("projects-status");
+  const output = document.getElementById("projects-result");
+  try {{
+    const projects = await (await fetch("/v2/projects")).json();
+    const project = projects.find(item => item.project_id === document.getElementById("project-id").value.trim());
+    if (!project) {{ output.textContent = JSON.stringify(projects, null, 2); status.textContent = `Projects: ${{projects.length}}`; return; }}
+    const response = await fetch("/v2/projects/" + encodeURIComponent(project.project_id) + "/runs?limit=50");
+    const history = await response.json(); if (!response.ok) throw new Error(history.detail || "history request failed");
+    output.innerHTML = `<p>${{escapeHtml(project.name)}} — ${{escapeHtml(project.target)}}</p><table><thead><tr><th>Run</th><th>Trigger</th><th>Baseline</th></tr></thead><tbody>${{(history.items || []).map(item => `<tr><td>${{escapeHtml(item.run_id)}}</td><td>${{escapeHtml(item.trigger)}}</td><td>${{item.baseline_run_id ? "yes" : "no"}}</td></tr>`).join("")}}</tbody></table>`;
+    status.textContent = `Runs: ${{history.total || 0}}`;
+  }} catch (error) {{ status.textContent = "History failed: " + error.message; }}
 }}
 async function loadSitemapCategory(category) {{
   const state = window.sitemapReconciliation;

@@ -306,6 +306,7 @@ class SiteStore(Protocol):
     def get_project(self, project_id: str) -> ProjectRecord: ...
     def iter_projects(self) -> Iterator[ProjectRecord]: ...
     def put_project_run(self, relation: ProjectRunRecord) -> ProjectRunRecord: ...
+    def update_project_run(self, relation: ProjectRunRecord) -> ProjectRunRecord: ...
     def iter_project_runs(self, project_id: str) -> Iterator[ProjectRunRecord]: ...
     def delete_project(self, project_id: str) -> None: ...
     def update_run_state(self, run_id: str, state: str, *, finished_at: str | None = None) -> None: ...
@@ -378,9 +379,6 @@ class MemorySiteStore:
         return run
 
     def put_project(self, project: ProjectRecord) -> ProjectRecord:
-        existing = self._projects.get(project.project_id)
-        if existing is not None:
-            return existing
         self._projects[project.project_id] = project
         logger.info("project created project_id=%s", project.project_id)
         return project
@@ -399,6 +397,14 @@ class MemorySiteStore:
         key = (relation.project_id, relation.run_id)
         self._project_runs.setdefault(key, relation)
         return self._project_runs[key]
+
+    def update_project_run(self, relation: ProjectRunRecord) -> ProjectRunRecord:
+        self.get_project(relation.project_id)
+        key = (relation.project_id, relation.run_id)
+        if key not in self._project_runs:
+            raise KeyError("project run not found")
+        self._project_runs[key] = relation
+        return relation
 
     def iter_project_runs(self, project_id: str) -> Iterator[ProjectRunRecord]:
         rows = [item for (owner, _), item in self._project_runs.items() if owner == project_id]
@@ -725,7 +731,7 @@ class SQLiteSiteStore:
         self._write_guard()
         with self._transaction():
             self._connection.execute(
-                "INSERT OR IGNORE INTO projects(project_id,name,target,default_profile,default_ruleset,created_at,retention_policy) VALUES (?,?,?,?,?,?,?)",
+                "INSERT INTO projects(project_id,name,target,default_profile,default_ruleset,created_at,retention_policy) VALUES (?,?,?,?,?,?,?) ON CONFLICT(project_id) DO UPDATE SET name=excluded.name,default_profile=excluded.default_profile,default_ruleset=excluded.default_ruleset,retention_policy=excluded.retention_policy",
                 (project.project_id, project.name, project.target, project.default_profile, project.default_ruleset, project.created_at, project.retention_policy),
             )
         return self.get_project(project.project_id)
@@ -749,6 +755,18 @@ class SQLiteSiteStore:
                 (relation.project_id, relation.run_id, relation.parent_run_id, relation.baseline_run_id, relation.trigger, relation.created_at),
             )
         return next(item for item in self.iter_project_runs(relation.project_id) if item.run_id == relation.run_id)
+
+    def update_project_run(self, relation: ProjectRunRecord) -> ProjectRunRecord:
+        self._write_guard()
+        self.get_project(relation.project_id)
+        with self._transaction():
+            updated = self._connection.execute(
+                "UPDATE project_runs SET parent_run_id=?, baseline_run_id=?, trigger=? WHERE project_id=? AND run_id=?",
+                (relation.parent_run_id, relation.baseline_run_id, relation.trigger, relation.project_id, relation.run_id),
+            ).rowcount
+        if not updated:
+            raise KeyError("project run not found")
+        return relation
 
     def iter_project_runs(self, project_id: str) -> Iterator[ProjectRunRecord]:
         for row in self._connection.execute("SELECT * FROM project_runs WHERE project_id=? ORDER BY created_at DESC, run_id DESC", (project_id,)):

@@ -127,6 +127,22 @@ def test_duplicate_cluster_endpoints_use_stored_page_content_and_detail():
     assert len(detail.json()["cluster"]["members"]) == 2
 
 
+def test_project_api_crud_and_history_contract():
+    client = TestClient(app)
+    project_id = "api-project-contract"
+    created = client.post("/v2/projects", json={"project_id": project_id, "name": "Example", "target": "https://example.test/", "default_profile": "quick"})
+    assert created.status_code == 200
+    updated = client.patch(f"/v2/projects/{project_id}", json={"name": "Renamed"})
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Renamed"
+    listed = client.get("/v2/projects")
+    assert any(item["project_id"] == project_id for item in listed.json())
+    history = client.get(f"/v2/projects/{project_id}/runs")
+    assert history.status_code == 200
+    deleted = client.delete(f"/v2/projects/{project_id}")
+    assert deleted.json()["runs_retained"] is True
+
+
 def test_server_rejects_removed_v1_audit_routes():
     client = TestClient(app)
     for path in ("/scan", "/scan/dashboard", "/seo/audit", "/mobile/audit"):

@@ -197,6 +197,21 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     duplicates.add_argument("--cluster")
     duplicates.add_argument("--output", "-o")
 
+    projects = _add_command_parser(sub, "projects", help="Manage local v2 projects and run history")
+    project_commands = projects.add_subparsers(dest="projects_command", required=True)
+    project_list = _add_command_parser(project_commands, "list", help="List local projects")
+    project_list.add_argument("--base-url", default="http://127.0.0.1:8765")
+    project_list.add_argument("--output", "-o")
+    project_create = _add_command_parser(project_commands, "create", help="Create a local project")
+    project_create.add_argument("project_id"); project_create.add_argument("name"); project_create.add_argument("target")
+    project_create.add_argument("--profile", default="standard", choices=["quick", "standard", "deep", "custom"]); project_create.add_argument("--ruleset"); project_create.add_argument("--base-url", default="http://127.0.0.1:8765"); project_create.add_argument("--output", "-o")
+    project_runs = _add_command_parser(project_commands, "runs", help="List project run history")
+    project_runs.add_argument("project_id"); project_runs.add_argument("--limit", type=int, default=100); project_runs.add_argument("--cursor"); project_runs.add_argument("--base-url", default="http://127.0.0.1:8765"); project_runs.add_argument("--output", "-o")
+    project_start = _add_command_parser(project_commands, "start", help="Start an audit using project settings")
+    project_start.add_argument("project_id"); project_start.add_argument("--profile", choices=["quick", "standard", "deep", "custom"]); project_start.add_argument("--max-pages", type=int, default=25); project_start.add_argument("--parent-run-id"); project_start.add_argument("--base-url", default="http://127.0.0.1:8765"); project_start.add_argument("--output", "-o")
+    project_baseline = _add_command_parser(project_commands, "baseline", help="Choose a project baseline run")
+    project_baseline.add_argument("project_id"); project_baseline.add_argument("run_id"); project_baseline.add_argument("--base-url", default="http://127.0.0.1:8765"); project_baseline.add_argument("--output", "-o")
+
 
 def build_parser() -> argparse.ArgumentParser:
     logger.debug("Building CLI parser: frozen=%s", bool(getattr(sys, "frozen", False)))
@@ -913,6 +928,27 @@ def _cmd_duplicates(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_projects(args: argparse.Namespace) -> int:
+    base = args.base_url.rstrip("/")
+    if args.projects_command == "list":
+        result = _http_json(base, "/v2/projects")
+    elif args.projects_command == "create":
+        result = _http_json(base, "/v2/projects", method="POST", payload={"project_id": args.project_id, "name": args.name, "target": args.target, "default_profile": args.profile, "default_ruleset": args.ruleset})
+    elif args.projects_command == "runs":
+        params = {"limit": args.limit};
+        if args.cursor: params["cursor"] = args.cursor
+        result = _http_json(base, f"/v2/projects/{urllib.parse.quote(args.project_id, safe='')}/runs?" + urllib.parse.urlencode(params))
+    elif args.projects_command == "start":
+        result = _http_json(base, f"/v2/projects/{urllib.parse.quote(args.project_id, safe='')}/runs", method="POST", payload={"profile": args.profile, "max_pages": args.max_pages, "parent_run_id": args.parent_run_id})
+    elif args.projects_command == "baseline":
+        result = _http_json(base, f"/v2/projects/{urllib.parse.quote(args.project_id, safe='')}/baseline", method="POST", payload={"run_id": args.run_id})
+    else:
+        raise ValueError("unsupported projects command")
+    _write_cli_output(json.dumps(result, ensure_ascii=False, indent=2), args.output)
+    logger.info("CLI project command=%s", args.projects_command)
+    return 0
+
+
 def _cmd_rescan(args: argparse.Namespace) -> int:
     payload = {
         "url": args.url,
@@ -997,6 +1033,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_graph(args)
         if args.command == "duplicates":
             return _cmd_duplicates(args)
+        if args.command == "projects":
+            return _cmd_projects(args)
         if args.command == "ai":
             return _cmd_ai(args)
         if args.command == "checks":

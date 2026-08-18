@@ -92,6 +92,15 @@ Duplicate and cross-origin URLs are handled deterministically; CSV/JSON output
 uses the same URL set as the table, and no generated sitemap is submitted
 automatically.
 
+Local project history uses the same v2 repository as runs. Create/update a
+project with `POST /v2/projects`, start an audit with
+`POST /v2/projects/{project_id}/runs`, inspect bounded history at
+`GET /v2/projects/{project_id}/runs`, and choose a baseline with
+`POST /v2/projects/{project_id}/baseline`. CLI equivalents are
+`agentready projects create`, `projects start`, `projects runs`, and
+`projects baseline`. Only non-secret target/profile/ruleset references are
+stored; credentials are never accepted or persisted.
+
 The Link Graph explorer projects the canonical `link_occurrences` inventory
 without another crawl. `GET /v2/runs/{run_id}/graph` returns bounded,
 cursor-paginated nodes with inbound/outbound counts, unique degrees, depth,

@@ -23,7 +23,7 @@ except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Server dependencies missing. Install: pip install 'agentready-tools[server]'") from exc
 
 from .ai_prompts import ai_skill_catalog
-from .audit_core.store import MemorySiteStore, RunUrlState, SQLiteSiteStore
+from .audit_core.store import MemorySiteStore, ProjectRecord, RunUrlState, SQLiteSiteStore
 from .audit_service import AuditRequest, AuditService
 from .compatibility import COMPATIBILITY
 from .custom_rules import apply_rules, compile_rules, validate_rules
@@ -64,6 +64,7 @@ from .query_service import (
     ResourceQuery,
     RunUrlQuery,
 )
+from .projects import ProjectService, project_run_to_dict, project_to_dict
 from .registry import CHECKS
 from .remediation import remediation_for
 from .report_storage import save_report
@@ -166,6 +167,7 @@ _V2_RUNS = _V2RunRegistry()
 _V2_SAVED_VIEWS = SavedViewRegistry()
 _V2_GRAPH_CACHE: OrderedDict[tuple[str, str], LinkGraphProjection] = OrderedDict()
 _V2_DUPLICATE_CACHE: OrderedDict[tuple[str, int], DuplicateAnalysis] = OrderedDict()
+_V2_PROJECT_STORE: MemorySiteStore | SQLiteSiteStore | None = None
 
 
 def _serve_sqlite_store() -> SQLiteSiteStore | None:
@@ -176,6 +178,13 @@ def _serve_sqlite_store() -> SQLiteSiteStore | None:
     path.parent.mkdir(parents=True, exist_ok=True)
     logger.info("[FIX:serve-recovery] durable SQLite serve history path=%s", path)
     return SQLiteSiteStore(path)
+
+
+def _project_store() -> MemorySiteStore | SQLiteSiteStore:
+    global _V2_PROJECT_STORE
+    if _V2_PROJECT_STORE is None:
+        _V2_PROJECT_STORE = _serve_sqlite_store() or MemorySiteStore()
+    return _V2_PROJECT_STORE
 
 
 def _link_graph_projection(run_id: str, origin: str | None = None) -> LinkGraphProjection:
@@ -491,6 +500,32 @@ class V2AuditRequest(BaseModel):
     discovery_sitemap_xml: str | None = None
     discovery_sitemap_urls: list[str] = Field(default_factory=list)
     discovery_limit: int = Field(default=1000, ge=1, le=100_000)
+
+
+class ProjectCreateRequest(BaseModel):
+    project_id: str = Field(min_length=1, max_length=128)
+    name: str = Field(min_length=1, max_length=200)
+    target: str = Field(min_length=1, max_length=2048)
+    default_profile: Literal["quick", "standard", "deep", "custom"] = "standard"
+    default_ruleset: str | None = Field(default=None, max_length=2048)
+    retention_policy: str = Field(default="metadata-only", max_length=64)
+
+
+class ProjectUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    default_profile: Literal["quick", "standard", "deep", "custom"] | None = None
+    default_ruleset: str | None = Field(default=None, max_length=2048)
+    retention_policy: str | None = Field(default=None, max_length=64)
+
+
+class ProjectRunRequest(BaseModel):
+    profile: Literal["quick", "standard", "deep", "custom"] | None = None
+    preset: Literal["all", "content", "api", "ai-search"] = "all"
+    language: Literal["en", "ru"] = "en"
+    max_pages: int = Field(default=25, ge=0, le=25_000)
+    parent_run_id: str | None = Field(default=None, max_length=128)
+    trigger: str = Field(default="manual", max_length=40)
+    baseline_run_id: str | None = Field(default=None, max_length=128)
 
 
 class RobotsSimulationRequest(BaseModel):
@@ -1222,6 +1257,94 @@ def audit_v2_endpoint(request: V2AuditRequest) -> dict:
         return payload
     except (TargetError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/v2/projects")
+def create_project_endpoint(request: ProjectCreateRequest) -> dict[str, object]:
+    try:
+        project = ProjectService(_project_store()).create(ProjectRecord(request.project_id, request.name, request.target, request.default_profile, request.default_ruleset, retention_policy=request.retention_policy))
+        return project_to_dict(project)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/projects")
+def list_projects_endpoint() -> list[dict[str, object]]:
+    return [project_to_dict(project) for project in ProjectService(_project_store()).list()]
+
+
+@app.get("/v2/projects/{project_id}")
+def get_project_endpoint(project_id: str) -> dict[str, object]:
+    try:
+        return project_to_dict(ProjectService(_project_store()).get(project_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="project not found") from exc
+
+
+@app.patch("/v2/projects/{project_id}")
+def update_project_endpoint(project_id: str, request: ProjectUpdateRequest) -> dict[str, object]:
+    try:
+        project = ProjectService(_project_store()).update(project_id, name=request.name, default_profile=request.default_profile, default_ruleset=request.default_ruleset, retention_policy=request.retention_policy)
+        return project_to_dict(project)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="project not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/v2/projects/{project_id}")
+def delete_project_endpoint(project_id: str) -> dict[str, object]:
+    try:
+        service = ProjectService(_project_store())
+        service.get(project_id)
+        service.delete_metadata(project_id)
+        return {"project_id": project_id, "deleted": True, "runs_retained": True}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="project not found") from exc
+
+
+@app.post("/v2/projects/{project_id}/runs")
+def start_project_run_endpoint(project_id: str, request: ProjectRunRequest) -> dict[str, object]:
+    try:
+        service = ProjectService(_project_store())
+        project = service.get(project_id)
+        audit_request = V2AuditRequest(url=project.target, preset=request.preset, profile=request.profile or project.default_profile, language=request.language, max_pages=request.max_pages, rescan_of=request.parent_run_id)
+        payload = _run_v2_scan(audit_request, parent_run_id=request.parent_run_id)
+        run_id = str(payload.get("run", {}).get("id", ""))
+        if not run_id:
+            raise ValueError("audit did not return a run id")
+        relation = service.attach_run(project_id, run_id, target=project.target, parent_run_id=request.parent_run_id, baseline_run_id=request.baseline_run_id, trigger=request.trigger)
+        return {"project": project_to_dict(project), "run": project_run_to_dict(relation), "audit": payload}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="project or run not found") from exc
+    except (TargetError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/projects/{project_id}/runs")
+def project_history_endpoint(project_id: str, cursor: str | None = None, limit: int = Query(default=100, ge=1, le=1000)) -> dict[str, object]:
+    try:
+        service = ProjectService(_project_store())
+        rows = service.history(project_id, limit=1000)
+        if cursor:
+            rows = tuple(item for item in rows if f"{item.created_at}:{item.run_id}" < cursor)
+        selected = rows[: limit + 1]
+        items = selected[:limit]
+        return {"project_id": project_id, "items": [project_run_to_dict(item) for item in items], "next_cursor": f"{items[-1].created_at}:{items[-1].run_id}" if len(selected) > limit else None, "total": len(rows)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="project not found") from exc
+
+
+@app.post("/v2/projects/{project_id}/baseline")
+def project_baseline_endpoint(project_id: str, payload: dict) -> dict[str, object]:
+    run_id = str(payload.get("run_id", ""))
+    if not run_id:
+        raise HTTPException(status_code=400, detail="run_id is required")
+    try:
+        relation = ProjectService(_project_store()).set_baseline(project_id, run_id)
+        return project_run_to_dict(relation)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="project run not found") from exc
 
 
 @app.post("/v2/audit/dashboard", response_class=HTMLResponse)

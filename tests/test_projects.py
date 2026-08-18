@@ -6,6 +6,7 @@ def test_project_service_enforces_origin_and_retains_runs_on_metadata_delete():
     store = MemorySiteStore()
     service = ProjectService(store)
     service.create(ProjectRecord("p1", "Example", "https://example.test/"))
+    assert service.update("p1", name="Renamed").name == "Renamed"
     store.begin_run(RunRecord("run-1", "config-hash", "tool", "rules"))
     service.attach_run("p1", "run-1", target="https://example.test/page", trigger="manual")
     try:

@@ -28,6 +28,14 @@ class ProjectService:
     def list(self) -> tuple[ProjectRecord, ...]:
         return tuple(self.store.iter_projects())
 
+    def update(self, project_id: str, *, name: str | None = None, default_profile: str | None = None, default_ruleset: str | None = None, retention_policy: str | None = None) -> ProjectRecord:
+        current = self.get(project_id)
+        profile = default_profile or current.default_profile
+        if profile not in {"quick", "standard", "deep", "custom"}:
+            raise ValueError("unsupported project profile")
+        updated = ProjectRecord(project_id, name or current.name, current.target, profile, default_ruleset if default_ruleset is not None else current.default_ruleset, current.created_at, retention_policy or current.retention_policy)
+        return self.store.put_project(updated)
+
     def attach_run(
         self,
         project_id: str,
@@ -52,6 +60,13 @@ class ProjectService:
             raise ValueError("project history limit must be between 1 and 1000")
         self.get(project_id)
         return tuple(item for index, item in enumerate(self.store.iter_project_runs(project_id)) if index < limit)
+
+    def set_baseline(self, project_id: str, run_id: str) -> ProjectRunRecord:
+        self.get(project_id)
+        for relation in self.store.iter_project_runs(project_id):
+            if relation.run_id == run_id:
+                return self.store.update_project_run(ProjectRunRecord(relation.project_id, relation.run_id, relation.parent_run_id, run_id, relation.trigger, relation.created_at))
+        raise KeyError("project run not found")
 
     def delete_metadata(self, project_id: str) -> None:
         """Delete project metadata and memberships; immutable runs remain."""
