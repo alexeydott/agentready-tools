@@ -38,6 +38,7 @@ from .i18n import (
     check_hint,
     check_title,
     crawl_classification_label,
+    detail_text,
     guidance,
     normalize_language,
 )
@@ -91,7 +92,47 @@ def default_data_dir() -> Path:
 
 _SERVER_DATA_DIR = default_data_dir()
 _V2_JOBS = AuditJobManager(max_jobs=8)
+_V2_ROBOTS: dict[str, str] = {}
 _AUDIT_SERVICE = AuditService()
+_DASHBOARD_STATE_FIELDS = {
+    "robots-live", "robots-proposed", "robots-user-agents",
+    "sitemap-reconciliation-origin", "sitemap-reconciliation-xml",
+    "custom-rules-document", "link-graph-dead-end", "link-graph-disconnected",
+    "duplicate-clusters-kind", "project-id", "project-name",
+    "tools-open",
+}
+_DASHBOARD_STATE_LIMIT = 64 * 1024
+
+
+def _dashboard_state_path() -> Path:
+    return _SERVER_DATA_DIR / "dashboard-state.json"
+
+
+def _sanitize_dashboard_state(payload: object) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        return {}
+    state: dict[str, object] = {}
+    for key in _DASHBOARD_STATE_FIELDS:
+        value = payload.get(key)
+        if isinstance(value, bool):
+            state[key] = value
+        elif isinstance(value, str) and len(value) <= _DASHBOARD_STATE_LIMIT:
+            state[key] = value
+    return state
+
+
+def _read_dashboard_state() -> dict[str, object]:
+    path = _dashboard_state_path()
+    try:
+        return _sanitize_dashboard_state(json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {}
+
+
+def _write_dashboard_state(state: dict[str, object]) -> None:
+    path = _dashboard_state_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 class _V2RunRegistry:
@@ -476,7 +517,7 @@ class V2AuditRequest(BaseModel):
     profile: Literal["quick", "standard", "deep", "custom"] = "standard"
     language: Literal["en", "ru"] = "en"
     timeout: float = Field(default=5.0, ge=1.0, le=30.0)
-    max_pages: int = Field(default=25, ge=0, le=25_000)
+    max_pages: int = Field(default=25, ge=0, le=25_000, description="Maximum pages to fetch; 0 uses the server hard cap for all discovered same-origin pages.")
     limits: dict[str, int | float] = Field(default_factory=dict)
     include: list[str] = Field(default_factory=list)
     exclude: list[str] = Field(default_factory=list)
@@ -487,7 +528,7 @@ class V2AuditRequest(BaseModel):
     selected_finding_ids: list[str] = Field(default_factory=list)
     selection_hash: str | None = Field(default=None, min_length=8, max_length=128)
     confirm: bool = False
-    discovery_kind: Literal["single", "list", "sitemap", "robots-sitemap", "crawl"] = "single"
+    discovery_kind: Literal["single", "list", "sitemap", "robots-sitemap", "crawl"] = Field(default="single", description="URL source; crawl follows all discovered same-origin pages within the configured bounds.")
     discovery_urls: list[str] = Field(default_factory=list)
     discovery_sitemap_xml: str | None = None
     discovery_sitemap_urls: list[str] = Field(default_factory=list)
@@ -950,6 +991,23 @@ def healthz() -> dict[str, bool]:
     return {"ok": True}
 
 
+@app.get("/dashboard/state")
+def dashboard_state_get_endpoint() -> dict[str, object]:
+    """Return the bounded local dashboard-tool state from the serve cache."""
+    state = _read_dashboard_state()
+    logger.info("[FIX:dashboard-state] state loaded fields=%d", len(state))
+    return {"state": state}
+
+
+@app.put("/dashboard/state")
+def dashboard_state_put_endpoint(payload: dict[str, object]) -> dict[str, object]:
+    """Persist only allow-listed dashboard-tool controls in the local cache."""
+    state = _sanitize_dashboard_state(payload)
+    _write_dashboard_state(state)
+    logger.info("[FIX:dashboard-state] state persisted fields=%d", len(state))
+    return {"state": state}
+
+
 @app.get("/checks")
 def checks_endpoint(language: Literal["en", "ru"] = "en") -> list[dict[str, object]]:
     """List the checks available to every Agent Readiness scan preset."""
@@ -1045,6 +1103,11 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None, p
         if coverage is not None:
             store.put_coverage(run_id, coverage.to_dict())
         _V2_RUNS.put(run_id, store)
+        robots_text = getattr(result, "robots_text", None)
+        if isinstance(robots_text, str) and robots_text:
+            _V2_ROBOTS[run_id] = robots_text
+            if len(_V2_ROBOTS) > 32:
+                _V2_ROBOTS.pop(next(iter(_V2_ROBOTS)))
     payload = result.to_dict()
     if effective_parent is not None:
         payload["rescan"] = {"parent_run_id": effective_parent, "selection_hash": selection_hash, "selected_count": len(selected_urls), "selected_urls": list(selected_urls), "selected_finding_ids": list(selection_meta), "remediation": _rescan_remediation(effective_parent, selection_meta)}
@@ -1120,9 +1183,13 @@ def _render_v2_dashboard(payload: dict) -> str:
     }
     findings = payload.get("findings", [])
     coverage = payload.get("coverage", {})
+    summary_labels = {
+        "broken": "Битая страница" if language == "ru" else "Broken page",
+        "warning": "Предупреждение" if language == "ru" else "Warning",
+    }
     rows = "".join(
         "<tr><td>"
-        + html.escape(str(item.get("id", "")))
+        + html.escape(check_title(str(item.get("id", "")), str(item.get("title", item.get("id", ""))), language))
         + " <span class='check-help' tabindex='0' title='"
         + html.escape(check_hint(str(item.get("id", "")), str(item.get("title", "")), str(item.get("category", "")), language))
         + "'>?</span>"
@@ -1132,12 +1199,16 @@ def _render_v2_dashboard(payload: dict) -> str:
         + html.escape(
             crawl_classification_label(item.get("summary"), language)
             if str(item.get("summary", "")) in {"complete_within_scope", "partial_limit", "partial_error"}
-            else str(item.get("summary", item.get("title", "")))
+            else summary_labels.get(
+                str(item.get("summary", "")),
+                detail_text(str(item.get("id", "")), str(item.get("summary", item.get("title", ""))), language),
+            )
         )
         + "</td></tr>"
         for item in findings
         if isinstance(item, dict)
     )
+    logger.info("[FIX:v2-report-i18n] localized print-summary findings=%d language=%s", len(findings), language)
     report_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
     status_counts = {status: sum(1 for item in findings if isinstance(item, dict) and item.get("status") == status) for status in ("fail", "warn", "pass", "skip", "error")}
     summary_label = "Сводка для печати" if language == "ru" else "Print summary"
@@ -1262,6 +1333,14 @@ def robots_simulate_endpoint(run_id: str, request: RobotsSimulationRequest) -> d
         return _robots_diff_payload(run_id, request)
     except (ValueError, KeyError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/runs/{run_id}/robots/source")
+def robots_source_endpoint(run_id: str) -> dict[str, object]:
+    """Return the bounded robots.txt document captured during this v2 run."""
+    if run_id not in _V2_ROBOTS:
+        raise HTTPException(status_code=404, detail="robots.txt was not found for this run")
+    return {"run_id": run_id, "found": True, "robots": _V2_ROBOTS[run_id]}
 
 
 @app.post("/v2/runs/{run_id}/sitemap/reconcile")

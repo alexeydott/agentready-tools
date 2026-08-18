@@ -93,6 +93,13 @@ Click **Load graph** to display a bounded projection of stored link
 occurrences. **Dead ends** and **Disconnected** filter only the displayed
 projection; they do not start a crawl.
 
+## Duplicate clusters
+
+Open **Duplicate clusters** to compare exact and near-duplicate content
+signatures in the stored run. Choose **All**, **Exact**, or **Near**, then
+click **Load clusters**. The tool reads the saved inventory and does not start
+a new crawl.
+
 ## Links below the settings
 
 - **Refresh check catalog** reloads the checks available for the selected

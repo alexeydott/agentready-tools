@@ -120,7 +120,7 @@ def test_dashboard_added_workspaces_have_localized_descriptions_and_help():
             "projects-panel",
         ):
             assert f'id="{panel_id}"' in tools_group
-        for panel_id in ("robots-simulation-panel", "sitemap-reconciliation-panel", "link-graph-panel"):
+        for panel_id in ("robots-simulation-panel", "sitemap-reconciliation-panel", "link-graph-panel", "duplicate-clusters-panel"):
             panel = html.split(f'id="{panel_id}"', 1)[1].split('</section>', 1)[0]
             assert '<details class="section-help">' not in panel
         assert ("Custom rules debugger" in html) if language == "en" else ("Отладчик пользовательских правил" in html)
@@ -142,9 +142,11 @@ def test_dashboard_workspace_guidance_is_documented_in_localized_faqs():
     assert "## Virtual Robots simulation" in english
     assert "## Sitemap reconciliation" in english
     assert "## Link Graph" in english
+    assert "## Duplicate clusters" in english
     assert "## Симуляция Virtual Robots" in russian
     assert "## Сверка sitemap" in russian
     assert "## Граф ссылок" in russian
+    assert "## Кластеры дубликатов" in russian
     assert "Preview matches" in english and "Предпросмотр совпадений" in russian
     assert "Baseline" in english and "Базовый запуск" in russian
 
@@ -170,6 +172,58 @@ def test_dashboard_tools_localize_visible_controls_and_statuses():
         assert value not in tools_group
     assert "t.graph_loaded.replace" in russian
     assert "translations[language.value].history_failed" in russian
+
+
+def test_dashboard_settings_expose_hints_for_scope_and_inventory_controls():
+    html = render_dashboard("en")
+    for control_id in (
+        "v2-discovery",
+        "v2-inventory-kind",
+        "v2-inventory-limit",
+        "v2-inventory-sort",
+        "v2-inventory-desc",
+        "v2-inventory-columns",
+        "v2-saved-view",
+        "robots-live",
+        "robots-proposed",
+        "robots-user-agents",
+        "sitemap-reconciliation-origin",
+        "sitemap-reconciliation-xml",
+        "custom-rules-document",
+        "link-graph-dead-end",
+        "link-graph-disconnected",
+        "duplicate-clusters-kind",
+        "project-id",
+        "project-name",
+    ):
+        start = html.index(f'id="{control_id}"')
+        context = html[max(0, start - 450): start + 260]
+        assert "class='hint'" in context, f"missing hint for {control_id}"
+    assert '"ai-provider-name": "ai_provider_name_hint"' in html
+    assert '"ai-key": "ai_key_hint"' in html
+    assert "addSettingsHints();" in html
+
+
+def test_tools_child_controls_are_persisted_to_local_and_cache_state():
+    html = render_dashboard("en")
+    for control_id in (
+        "robots-live", "robots-proposed", "robots-user-agents",
+        "sitemap-reconciliation-origin", "sitemap-reconciliation-xml",
+        "custom-rules-document", "link-graph-dead-end", "link-graph-disconnected",
+        "duplicate-clusters-kind", "project-id", "project-name",
+    ):
+        assert f'"{control_id}"' in html
+    assert 'const dashboardStateCacheKey = "/dashboard/state"' in html
+    assert 'fetch(dashboardStateCacheKey' in html
+    assert "dashboardStateCacheKey" in html
+    assert "scheduleSaveDashboardState" in html
+    assert "restoreDashboardStateFromCache" in html
+
+
+def test_dashboard_exposes_full_discovered_page_crawl_mode():
+    html = render_dashboard("en")
+    assert "All discovered pages" in html
+    assert "v2_discovery_hint" in html
 
 
 def test_dashboard_resets_inventory_cursor_when_query_shape_changes():
@@ -397,3 +451,25 @@ def test_combined_report_acceptance_contract_rewrites_internal_references():
     assert 'link.setAttribute("href", "#" + ids.get(target))' in html
     assert "data-report-instance='seo'" in html
     assert 'body.querySelectorAll("script").forEach(script => script.remove())' in html
+
+
+def test_virtual_robots_session_source_is_prefilled_readonly_only_when_found():
+    html = render_dashboard("en")
+
+    assert html.count('class="robots-document-field"') == 2
+    assert 'class="robots-document-field"><label for="robots-live">' in html
+    assert 'class="robots-document-field"><label for="robots-proposed">' in html
+    assert 'async function loadSessionRobots' in html
+    assert '/v2/runs/" + encodeURIComponent(runId) + "/robots/source' in html
+    assert 'live.readOnly = found' in html
+    assert 'live.dataset.userEdited' in html
+    assert "Current robots.txt loaded from this audit session." in html
+
+
+def test_link_graph_filters_use_compact_checkboxes_and_have_hints():
+    html = render_dashboard("en")
+    assert "#link-graph-panel input[type=checkbox]" in html
+    assert "#link-graph-panel input[type=checkbox] { width:auto;" in html
+    panel = html.split('id="link-graph-panel"', 1)[1].split('</section>', 1)[0]
+    assert 'id="link-graph-dead-end"' in panel and "Show nodes with no outgoing links" in panel
+    assert 'id="link-graph-disconnected"' in panel and "Show nodes outside the connected component" in panel

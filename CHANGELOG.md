@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.13.5
+
+### Dashboard tool persistence and Virtual Robots parity
+
+- Persisted child controls in the collapsed Tools area to localStorage and the
+  bounded `.cache/dashboard-state.json` cache with an allow-listed API.
+- Prefilled the current Virtual Robots policy from the active v2 audit session,
+  using conditional readonly behavior when robots.txt was discovered.
+- Aligned Virtual Robots access across dashboard, CLI, and MCP surfaces.
+- Fixed Link Graph filter checkbox sizing and retained localized filter hints.
+- Moved Duplicate clusters guidance into the centralized English/Russian FAQ
+  and dashboard Help panel.
+- Added regression coverage for state round trips, dashboard localization, and
+  v2 tool contracts.
+
 ## 0.13.4
 
 ### Grouped dashboard tools and graph reliability

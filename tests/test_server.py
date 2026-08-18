@@ -15,7 +15,7 @@ from agentready.audit_core.store import (
     RunUrlRecord,
     RunUrlState,
 )
-from agentready.server import _V2_RUNS, _render_v2_dashboard, _run_and_save_v2_job, _resolve_rescan_selection, app
+from agentready.server import _V2_ROBOTS, _V2_RUNS, _render_v2_dashboard, _run_and_save_v2_job, _resolve_rescan_selection, app
 
 
 def test_v2_dashboard_localizes_coverage_and_status_values():
@@ -58,6 +58,29 @@ def test_v2_dashboard_print_projection_is_summary_oriented():
     assert "Сводка для печати" in html
     assert "Ошибки: 1" in html
     assert "@media print" in html
+
+
+def test_v2_api_describes_all_discovered_page_mode():
+    schema = server_module.V2AuditRequest.model_json_schema()
+    assert "all discovered same-origin pages" in schema["properties"]["max_pages"]["description"]
+    assert "all discovered same-origin pages" in schema["properties"]["discovery_kind"]["description"]
+
+
+def test_v2_dashboard_print_table_localizes_finding_title_and_description():
+    html = _render_v2_dashboard({
+        "request": {"language": "ru"},
+        "target": "https://example.test/",
+        "coverage": {"classification": "complete_within_scope", "urls_fetched": 1},
+        "findings": [{
+            "id": "robots-txt",
+            "title": "Robots policy",
+            "status": "fail",
+            "summary": "robots.txt must be HTTP 200 plain text and contain a User-agent directive",
+        }],
+    })
+    visible = html.split("<script", 1)[0]
+    assert "robots.txt должен возвращаться с HTTP 200" in visible
+    assert "Robots policy" not in visible
 
 
 def test_background_v2_job_persists_json_and_html_artifacts(monkeypatch):
@@ -703,12 +726,53 @@ def test_dashboard_inline_script_does_not_close_html_script_early():
     assert 'reportText.indexOf("</script>", start)' not in response.text
 
 
+def test_v2_robots_source_endpoint_returns_session_document_without_leaking_unknown_runs():
+    _V2_ROBOTS["robots-test"] = "User-agent: *\nDisallow: /private\n"
+    client = TestClient(app)
+    response = client.get("/v2/runs/robots-test/robots/source")
+    assert response.status_code == 200
+    assert response.json() == {
+        "run_id": "robots-test",
+        "found": True,
+        "robots": "User-agent: *\nDisallow: /private\n",
+    }
+    missing = client.get("/v2/runs/missing-robots/robots/source")
+    assert missing.status_code == 404
+    _V2_ROBOTS.pop("robots-test", None)
+
+
 def test_dashboard_project_history_checks_project_list_response():
     response = TestClient(app).get("/dashboard", params={"language": "en"})
     assert response.status_code == 200
     assert 'const projectsResponse = await fetch("/v2/projects")' in response.text
     assert "if (!projectsResponse.ok)" in response.text
     assert "if (!Array.isArray(projectsPayload))" in response.text
+
+
+def test_dashboard_state_round_trips_bounded_tool_controls():
+    client = TestClient(app)
+    payload = {
+        "robots-live": "User-agent: *\nAllow: /",
+        "robots-proposed": "User-agent: *\nDisallow: /private",
+        "robots-user-agents": "Googlebot, *",
+        "sitemap-reconciliation-origin": "https://example.test",
+        "sitemap-reconciliation-xml": "<urlset></urlset>",
+        "custom-rules-document": "version: 1\nrules: []",
+        "link-graph-dead-end": True,
+        "link-graph-disconnected": False,
+        "duplicate-clusters-kind": "near",
+        "project-id": "demo",
+        "project-name": "Demo",
+        "credential": "must-not-persist",
+    }
+    saved = client.put("/dashboard/state", json=payload)
+    assert saved.status_code == 200
+    assert saved.json()["state"]["link-graph-dead-end"] is True
+    assert "credential" not in saved.json()["state"]
+    restored = client.get("/dashboard/state")
+    assert restored.status_code == 200
+    assert restored.json()["state"]["duplicate-clusters-kind"] == "near"
+    assert "credential" not in restored.json()["state"]
 
 
 def test_dashboard_project_history_uses_explanatory_localized_headers():

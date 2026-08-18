@@ -23,6 +23,17 @@ def test_cli_help_includes_examples_for_top_level_modes():
         assert example in help_text
 
 
+def test_cli_help_explains_full_discovered_page_crawl():
+    command = next(action for action in build_parser()._actions if action.dest == "command")
+    audit = command.choices["audit"]
+    help_text = audit.format_help()
+    assert "all discovered pages" in help_text.lower()
+    assert "use 0 with --discovery crawl" in help_text.lower()
+    args = build_parser().parse_args(["audit", "https://example.test", "--discovery", "crawl", "--max-pages", "0"])
+    assert args.discovery_kind == "crawl"
+    assert args.max_pages == 0
+
+
 def test_cli_rejects_removed_v1_commands():
     parser = build_parser()
     with pytest.raises(SystemExit):
@@ -52,6 +63,24 @@ def test_cli_exposes_virtual_robots_simulation():
     assert args.proposed == "robots-new.txt"
     assert args.user_agents == ["Googlebot"]
     assert args.interpretation == "google"
+
+
+def test_cli_robots_simulation_defaults_to_session_source(monkeypatch, tmp_path):
+    proposed = tmp_path / "proposed.txt"
+    proposed.write_text("User-agent: *\nDisallow: /private\n", encoding="utf-8")
+    calls = []
+
+    def fake_http(base_url, path, *, method="GET", payload=None):
+        calls.append((path, method, payload))
+        if method == "GET":
+            return {"found": True, "robots": "User-agent: *\nAllow: /\n"}
+        return {"schema": "agentready.robots-simulation.v2"}
+
+    monkeypatch.setattr(cli, "_http_json", fake_http)
+    args = build_parser().parse_args(["robots", "simulate", "run-1", "--proposed", str(proposed)])
+    assert cli._cmd_robots(args) == 0
+    assert calls[0][0].endswith("/v2/runs/run-1/robots/source")
+    assert calls[1][2]["live_robots"] == "User-agent: *\nAllow: /\n"
 
 
 def test_nested_cli_modes_include_usage_examples():
@@ -334,6 +363,8 @@ def test_mcp_v2_maps_execution_fields_to_shared_request(monkeypatch):
         render=True,
         provider="pagespeed",
         language="ru",
+        discovery_kind="crawl",
+        discovery_limit=5000,
         selected_urls=["https://example.test/page"],
     )
 
@@ -346,6 +377,8 @@ def test_mcp_v2_maps_execution_fields_to_shared_request(monkeypatch):
     assert request.render is True
     assert request.provider == "pagespeed"
     assert request.language == "ru"
+    assert request.discovery_kind == "crawl"
+    assert request.discovery_limit == 5000
 
 
 def test_mcp_v2_propagates_all_supported_profiles(monkeypatch):

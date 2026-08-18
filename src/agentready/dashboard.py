@@ -206,10 +206,12 @@ _TEXT = {
         "ai_enable_hint": "Enables the assistant and its loopback-only HTTP transport for the dashboard, CLI, and MCP.",
         "ai_provider": "Provider",
         "ai_provider_name": "Provider name",
+        "ai_provider_name_hint": "A local name used to identify this AI provider configuration.",
         "ai_provider_url": "Base URL",
         "ai_new": "New provider",
         "ai_enable": "Enable AI assistant and local transport",
         "ai_key": "API key",
+        "ai_key_hint": "Optional API key stored in the operating system credential vault; it is never shown in reports.",
         "ai_save": "Save provider",
         "ai_activate": "Use selected provider",
         "ai_clear": "Remove provider",
@@ -239,17 +241,26 @@ _TEXT = {
         "robots_simulate": "Simulate policy",
         "robots_empty": "Run an audit before simulating robots policy.",
         "robots_result": "Robots simulation result",
+        "robots_live_hint": "robots.txt discovered during this audit is used as the comparison baseline; if none was found, you can enter a policy manually.", "robots_live_loaded": "Current robots.txt loaded from this audit session.", "robots_live_discovered_hint": "Read-only policy discovered during the current audit session.", "robots_proposed_hint": "Candidate robots.txt content to compare offline against the stored policy.", "robots_user_agents_hint": "Comma-separated user-agent names to evaluate in the simulation.",
         "robots_change": "Change", "robots_url": "URL", "robots_no_changes": "No URL changes", "robots_newly_blocked": "Newly blocked", "robots_newly_allowed": "Newly allowed",
         "v2_discovery": "Discovery source",
+        "v2_discovery_hint": "Choose how the bounded v2 audit discovers URLs. All discovered pages follows same-origin links up to the page/depth safety caps; set Page limit to 0 to use the server hard cap.",
         "v2_discovery_single": "Single URL",
         "v2_discovery_list": "URL list",
         "v2_discovery_sitemap": "Sitemap XML",
         "v2_discovery_robots": "Robots sitemap",
-        "v2_discovery_crawl": "Bounded crawl",
+        "v2_discovery_crawl": "All discovered pages (bounded)",
         "v2_inventory_hint": "Browse bounded server-side inventory for the latest crawl.",
+        "v2_inventory_kind_hint": "Select the inventory projection to inspect for the latest completed run.",
+        "v2_rows_hint": "Maximum rows shown in one inventory page.",
+        "v2_inventory_sort_hint": "Sort the current inventory projection by a stable field.",
+        "v2_inventory_desc_hint": "Reverse the selected inventory sort order.",
+        "v2_columns_hint": "Choose which inventory columns are visible in the table.",
+        "v2_saved_view_hint": "Select a previously saved bounded inventory view.",
         "sitemap_reconciliation": "Sitemap reconciliation",
         "sitemap_reconciliation_hint": "Compare bounded sitemap XML with the stored run inventory. No sitemap is fetched or submitted by this control.",
         "sitemap_origin": "Origin",
+        "sitemap_origin_hint": "Origin used to resolve and classify sitemap URLs against the stored run.", "sitemap_documents_hint": "Bounded sitemap XML documents to compare; separate multiple documents with a blank line.",
         "sitemap_documents": "Sitemap XML (one or more documents separated by a blank line)",
         "sitemap_reconcile": "Reconcile sitemap",
         "run_audit_first": "Run an audit first", "sitemap_reconcile_complete": "Reconciliation complete", "sitemap_reconcile_failed": "Reconciliation failed",
@@ -257,17 +268,19 @@ _TEXT = {
         "custom_rules_hint": "Validate a declarative rules document, then preview matches against the saved audit representation. These actions do not start a crawl.",
         "custom_rules_help": "Use version 1 YAML with a stable rule id and an assertion. Validate catches schema errors; Preview matches evaluates the rule against saved evidence.",
         "custom_rules_document": "Rules YAML",
+        "custom_rules_document_hint": "YAML rules document validated and previewed against the saved audit representation.",
         "custom_rules_validate": "Validate rules",
         "custom_rules_preview": "Preview matches",
         "custom_rules_valid": "Rules are valid", "custom_rules_validation_failed": "Validation failed", "custom_rules_preview_complete": "Preview complete; no crawl started", "custom_rules_preview_failed": "Preview failed",
         "link_graph": "Link Graph",
         "link_graph_hint": "Load a bounded graph projection from stored link occurrences. Filters affect only the displayed page and do not start a crawl.",
-        "graph_dead_ends": "Dead ends", "graph_disconnected": "Disconnected", "graph_load": "Load graph", "graph_algorithm": "Authority algorithm", "graph_url": "URL", "graph_in": "In", "graph_out": "Out", "graph_authority": "Authority", "graph_loaded": "Loaded {loaded} of {total} nodes", "graph_failed": "Graph failed", "graph_node_inbound": "inbound", "graph_node_outbound": "outbound",
+        "graph_dead_ends": "Dead ends", "graph_dead_ends_hint": "Show nodes with no outgoing links in the bounded graph projection.", "graph_disconnected": "Disconnected", "graph_disconnected_hint": "Show nodes outside the connected component of the selected graph projection.", "graph_load": "Load graph", "graph_algorithm": "Authority algorithm", "graph_url": "URL", "graph_in": "In", "graph_out": "Out", "graph_authority": "Authority", "graph_loaded": "Loaded {loaded} of {total} nodes", "graph_failed": "Graph failed", "graph_node_inbound": "inbound", "graph_node_outbound": "outbound",
         "duplicate_clusters": "Duplicate clusters",
         "duplicate_clusters_hint": "Compare exact and near-duplicate content signatures from the stored run. Loading results does not start a new crawl.",
-        "duplicate_all": "All", "duplicate_exact": "Exact", "duplicate_near": "Near", "duplicate_load": "Load clusters", "duplicates_loaded": "Loaded {loaded} of {total} clusters", "duplicate_failed": "Duplicate query failed",
+        "duplicate_all": "All", "duplicate_exact": "Exact", "duplicate_near": "Near", "duplicate_kind_hint": "Filter clusters by exact or near-duplicate similarity.", "duplicate_load": "Load clusters", "duplicates_loaded": "Loaded {loaded} of {total} clusters", "duplicate_failed": "Duplicate query failed",
         "projects": "Projects and run history",
         "projects_hint": "Create or update a local project and review its stored audit runs. No remote project service is contacted.",
+        "project_id_hint": "Stable local identifier used to find this project and its audit history.", "project_name_hint": "Display name shown with the local project and its run history.",
         "project_id": "Project ID",
         "project_name": "Project name",
         "project_save": "Create/update project",
@@ -512,10 +525,12 @@ _TEXT = {
         "ai_enable_hint": "Включает помощника и loopback-only HTTP-транспорт для dashboard, CLI и MCP.",
         "ai_provider": "Провайдер",
         "ai_provider_name": "Имя провайдера",
+        "ai_provider_name_hint": "Локальное имя для идентификации этой конфигурации AI-провайдера.",
         "ai_provider_url": "Base URL",
         "ai_new": "Новый провайдер",
         "ai_enable": "Включить AI-помощника и локальный транспорт",
         "ai_key": "API key",
+        "ai_key_hint": "Необязательный API key хранится в системном хранилище учётных данных и не показывается в отчётах.",
         "ai_save": "Сохранить провайдера",
         "ai_activate": "Использовать выбранного провайдера",
         "ai_clear": "Удалить провайдера",
@@ -545,17 +560,26 @@ _TEXT = {
         "robots_simulate": "Симулировать политику",
         "robots_empty": "Сначала выполните аудит, затем симулируйте robots-политику.",
         "robots_result": "Результат симуляции robots",
+        "robots_live_hint": "robots.txt, найденный в текущем аудите, используется как основа сравнения; если файл не найден, политику можно ввести вручную.", "robots_live_loaded": "Текущий robots.txt загружен из этой сессии аудита.", "robots_live_discovered_hint": "Политика найдена в текущей сессии аудита и доступна только для чтения.", "robots_proposed_hint": "Предлагаемое содержимое robots.txt для офлайн-сравнения с сохранённой политикой.", "robots_user_agents_hint": "Имена user-agent через запятую для проверки в симуляции.",
         "robots_change": "Изменение", "robots_url": "URL", "robots_no_changes": "Изменений URL нет", "robots_newly_blocked": "Новые блокировки", "robots_newly_allowed": "Новые разрешения",
         "v2_discovery": "Источник обнаружения",
+        "v2_discovery_hint": "Выберите способ обнаружения URL для ограниченного v2-аудита. «Все обнаруженные страницы» следует по ссылкам в пределах сайта до безопасных лимитов страниц и глубины; установите лимит страниц 0 для жёсткого серверного лимита.",
         "v2_discovery_single": "Один URL",
         "v2_discovery_list": "Список URL",
         "v2_discovery_sitemap": "XML sitemap",
         "v2_discovery_robots": "Sitemap из robots",
-        "v2_discovery_crawl": "Ограниченный обход",
+        "v2_discovery_crawl": "Все обнаруженные страницы (с ограничениями)",
         "v2_inventory_hint": "Просмотр ограниченного серверного инвентаря последнего обхода.",
+        "v2_inventory_kind_hint": "Выберите проекцию инвентаря для просмотра в последнем завершённом запуске.",
+        "v2_rows_hint": "Максимальное число строк на одной странице инвентаря.",
+        "v2_inventory_sort_hint": "Сортирует текущую проекцию инвентаря по стабильному полю.",
+        "v2_inventory_desc_hint": "Разворачивает порядок выбранной сортировки инвентаря.",
+        "v2_columns_hint": "Выберите видимые столбцы таблицы инвентаря.",
+        "v2_saved_view_hint": "Выберите ранее сохранённое ограниченное представление инвентаря.",
         "sitemap_reconciliation": "Сверка sitemap",
         "sitemap_reconciliation_hint": "Сравнивает ограниченные XML-документы sitemap с сохранённым инвентарём запуска. Этот элемент ничего не загружает и не публикует.",
         "sitemap_origin": "Источник",
+        "sitemap_origin_hint": "Источник для разрешения и классификации URL sitemap относительно сохранённого запуска.", "sitemap_documents_hint": "Ограниченные XML-документы sitemap для сравнения; несколько документов разделяйте пустой строкой.",
         "sitemap_documents": "XML sitemap (несколько документов разделяйте пустой строкой)",
         "sitemap_reconcile": "Сверить sitemap",
         "run_audit_first": "Сначала выполните аудит", "sitemap_reconcile_complete": "Сверка завершена", "sitemap_reconcile_failed": "Ошибка сверки",
@@ -563,17 +587,19 @@ _TEXT = {
         "custom_rules_hint": "Проверяет декларативный документ правил и показывает совпадения с сохранённым представлением аудита. Эти действия не запускают обход.",
         "custom_rules_help": "Используйте YAML версии 1 со стабильным идентификатором правила и утверждением. Проверка находит ошибки схемы, а предпросмотр оценивает правило по сохранённым доказательствам.",
         "custom_rules_document": "YAML правил",
+        "custom_rules_document_hint": "Документ правил YAML для проверки и предпросмотра по сохранённому представлению аудита.",
         "custom_rules_validate": "Проверить правила",
         "custom_rules_preview": "Предпросмотр совпадений",
         "custom_rules_valid": "Правила корректны", "custom_rules_validation_failed": "Ошибка проверки", "custom_rules_preview_complete": "Предпросмотр завершён; обход не запускался", "custom_rules_preview_failed": "Ошибка предпросмотра",
         "link_graph": "Граф ссылок",
         "link_graph_hint": "Загружает ограниченную проекцию графа по сохранённым вхождениям ссылок. Фильтры влияют только на экран и не запускают обход.",
-        "graph_dead_ends": "Тупиковые страницы", "graph_disconnected": "Изолированные страницы", "graph_load": "Загрузить граф", "graph_algorithm": "Алгоритм авторитетности", "graph_url": "URL", "graph_in": "Входящие", "graph_out": "Исходящие", "graph_authority": "Авторитетность", "graph_loaded": "Загружено узлов: {loaded} из {total}", "graph_failed": "Ошибка графа", "graph_node_inbound": "входящих", "graph_node_outbound": "исходящих",
+        "graph_dead_ends": "Тупиковые страницы", "graph_dead_ends_hint": "Показывает узлы без исходящих ссылок в ограниченной проекции графа.", "graph_disconnected": "Изолированные страницы", "graph_disconnected_hint": "Показывает узлы вне связной компоненты выбранной проекции графа.", "graph_load": "Загрузить граф", "graph_algorithm": "Алгоритм авторитетности", "graph_url": "URL", "graph_in": "Входящие", "graph_out": "Исходящие", "graph_authority": "Авторитетность", "graph_loaded": "Загружено узлов: {loaded} из {total}", "graph_failed": "Ошибка графа", "graph_node_inbound": "входящих", "graph_node_outbound": "исходящих",
         "duplicate_clusters": "Кластеры дубликатов",
         "duplicate_clusters_hint": "Сравнивает точные и близкие сигнатуры дубликатов сохранённого запуска. Загрузка результатов не запускает новый обход.",
-        "duplicate_all": "Все", "duplicate_exact": "Точные", "duplicate_near": "Близкие", "duplicate_load": "Загрузить кластеры", "duplicates_loaded": "Загружено кластеров: {loaded} из {total}", "duplicate_failed": "Ошибка запроса дубликатов",
+        "duplicate_all": "Все", "duplicate_exact": "Точные", "duplicate_near": "Близкие", "duplicate_kind_hint": "Фильтрует кластеры по точному или близкому сходству дубликатов.", "duplicate_load": "Загрузить кластеры", "duplicates_loaded": "Загружено кластеров: {loaded} из {total}", "duplicate_failed": "Ошибка запроса дубликатов",
         "projects": "Проекты и история запусков",
         "projects_hint": "Создаёт или обновляет локальный проект и показывает сохранённые запуски аудита. Внешний сервис проектов не используется.",
+        "project_id_hint": "Стабильный локальный идентификатор проекта и его истории аудитов.", "project_name_hint": "Отображаемое имя локального проекта и его истории запусков.",
         "project_id": "Идентификатор проекта",
         "project_name": "Название проекта",
         "project_save": "Создать/обновить проект",
@@ -672,12 +698,18 @@ with the saved inventory. This control does not fetch or submit a sitemap.</p>
 <p>Click <strong>Load graph</strong> to display a bounded projection of stored
 link occurrences. The dead-end and disconnected filters change only the
 displayed projection; they do not start a crawl.</p>
-<h3>9. Use the AI assistant</h3>
+<h3>9. Duplicate clusters</h3>
+<p>Open <strong>Duplicate clusters</strong> to compare exact and near-duplicate
+content signatures in the stored run. Choose <strong>All</strong>,
+<strong>Exact</strong>, or <strong>Near</strong>, then click
+<strong>Load clusters</strong>. This reads the saved inventory and does not
+start a new crawl.</p>
+<h3>10. Use the AI assistant</h3>
 <p>After an audit, choose SEO, GEO, or SEO/GEO mode, then select a provider and
 model. Enter a request or use the prompt library. Skills, MCP context, file
 attachments, chat history, saved chats, and OpenAI/DeepSeek JSON export are
 available in the AI panel.</p>
-<h3>10. Language and troubleshooting</h3>
+<h3>11. Language and troubleshooting</h3>
 <p>The interface follows the selected language. Without an explicit URL
 parameter, Russian is used for a Russian browser locale and English otherwise.
 For errors, check the URL, click <strong>Check service health</strong>, enable
@@ -729,12 +761,18 @@ YAML-документ до использования в рабочем проц
 <p>Нажмите <strong>Загрузить граф</strong>, чтобы показать ограниченную
 проекцию сохранённых вхождений ссылок. Фильтры тупиков и disconnected меняют
 только отображение и не запускают обход.</p>
-<h3>9. AI-помощник</h3>
+<h3>9. Кластеры дубликатов</h3>
+<p>Откройте <strong>Кластеры дубликатов</strong>, чтобы сравнить точные и
+близкие сигнатуры содержимого сохранённого запуска. Выберите
+<strong>Все</strong>, <strong>Точные</strong> или <strong>Близкие</strong>,
+затем нажмите <strong>Загрузить кластеры</strong>. Используется сохранённый
+инвентарь; новый обход не запускается.</p>
+<h3>10. AI-помощник</h3>
 <p>После аудита выберите режим SEO, GEO или SEO/GEO, затем провайдера и
 модель. Напишите запрос или выберите prompt из библиотеки. В AI-панели также
 доступны skills, контекст MCP, вложения, история и сохранение чатов, а также
 экспорт OpenAI/DeepSeek JSON.</p>
-<h3>10. Язык и диагностика</h3>
+<h3>11. Язык и диагностика</h3>
 <p>Интерфейс использует выбранный язык. Если язык не указан в URL, для русской
 локали браузера выбирается русский, для остальных — английский. При ошибке
 проверьте URL, нажмите <strong>Проверить состояние сервиса</strong>, включите
@@ -772,7 +810,7 @@ button.secondary {{ background:#fff; color:#9e2f0b; border:1px solid #ed4308; }}
 .panel {{ background:#fff; border:1px solid #efcdb8; border-radius:16px; padding:22px; margin-bottom:20px; box-shadow:0 4px 14px #8e3b1612; }}
 .form-grid {{ display:grid; grid-template-columns:minmax(0,2fr) minmax(150px,1fr) minmax(210px,auto); gap:14px; align-items:end; }}
 .model-control {{ display:flex; gap:6px; align-items:center; }} .model-control select {{ min-width:0; flex:1 1 auto; }} .model-control button {{ width:auto; flex:0 0 46px; min-width:46px; padding-left:8px; padding-right:8px; }}
-.form-grid.three {{ grid-template-columns:repeat(3,minmax(0,1fr)); }} .form-grid.four {{ grid-template-columns:repeat(4,minmax(0,1fr)); }}
+.form-grid.three {{ grid-template-columns:repeat(3,minmax(0,1fr)); }} .form-grid.four {{ grid-template-columns:repeat(4,minmax(0,1fr)); }} .robots-document-field {{ display:flex; flex-direction:column; min-width:0; }} .robots-document-field textarea {{ width:100%; box-sizing:border-box; }}
 details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} details summary h2,details summary h3 {{ display:inline; font:inherit; margin:0; }} .actions {{ display:flex; gap:10px; margin-top:16px; }}
 .advanced-links {{ display:flex; flex-wrap:wrap; gap:18px; margin-top:18px; padding-top:14px; border-top:1px solid #efcdb8; }} .advanced-link-row {{ display:flex; align-items:center; gap:6px; position:relative; }}
 .inventory-toolbar {{ display:grid; grid-template-columns:minmax(150px,1.2fr) repeat(4,minmax(110px,1fr)) minmax(180px,1.5fr) minmax(150px,1fr); gap:10px; align-items:end; }} .inventory-toolbar > label {{ min-width:0; }} .inventory-toolbar > select,.inventory-toolbar > input {{ min-width:0; box-sizing:border-box; }} .inventory-toolbar > button {{ width:auto; min-width:120px; }} .inventory-toolbar input[type=checkbox] {{ width:auto; min-height:20px; padding:0; }}
@@ -780,6 +818,7 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 #checks {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:14px; }}
 .check {{ border:1px solid #efcdb8; border-radius:10px; padding:12px; display:grid; grid-template-columns:auto 1fr; gap:10px; }}
 .check input {{ width:auto; margin-top:4px; }} .check strong {{ display:inline; }} .check small {{ display:block; line-height:1.4; margin-top:4px; color:#6c554b; }}
+#link-graph-panel input[type=checkbox] {{ width:auto; min-width:20px; min-height:20px; padding:0; margin:0 6px 0 0; vertical-align:middle; }} #link-graph-panel label {{ display:inline-flex; align-items:center; gap:4px; margin:0 14px 10px 0; }}
 .hint {{ position:relative; display:inline-flex; align-items:center; justify-content:center; width:21px; height:21px; min-width:21px; min-height:21px; margin-left:6px; border:1px solid #ed4308; border-radius:50%; background:#fff8f2; color:#9e2f0b; font-size:.82rem; font-weight:700; line-height:1; cursor:help; vertical-align:middle; }}
 .hint:hover::after,.hint:focus::after {{ content:attr(data-tooltip); position:absolute; z-index:20; left:0; top:26px; width:min(340px,80vw); padding:10px 12px; border-radius:10px; background:#24130d; color:#ffe8d8; font-size:.85rem; font-weight:400; line-height:1.45; white-space:pre-line; text-align:left; box-shadow:0 6px 18px #0005; }}
 #result {{ min-height:80px; background:#fff8f2; color:#441d0c; border:1px solid #efcdb8; border-radius:12px; padding:18px; }}
@@ -931,7 +970,7 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <label><input id="verify" type="checkbox" style="width:auto;margin-right:8">{escape(text["verify"])} {_hint(text, "verify_hint")}</label>
 </div><div class="form-grid three" style="margin-top:14px">
 <div><label for="v2-profile">{escape(text["v2_profile"])} {_hint(text, "v2_profile_hint")}</label><select id="v2-profile"><option value="quick">{escape(text["v2_profile_quick"])}</option><option value="standard">{escape(text["v2_profile_standard"])}</option><option value="deep">{escape(text["v2_profile_deep"])}</option></select></div>
-<div><label for="v2-discovery">{escape(text["v2_discovery"])}</label><select id="v2-discovery"><option value="single">{escape(text["v2_discovery_single"])}</option><option value="list">{escape(text["v2_discovery_list"])}</option><option value="sitemap">{escape(text["v2_discovery_sitemap"])}</option><option value="robots-sitemap">{escape(text["v2_discovery_robots"])}</option><option value="crawl">{escape(text["v2_discovery_crawl"])}</option></select></div>
+<div><label for="v2-discovery">{escape(text["v2_discovery"])} {_hint(text, "v2_discovery_hint")}</label><select id="v2-discovery"><option value="single">{escape(text["v2_discovery_single"])}</option><option value="list">{escape(text["v2_discovery_list"])}</option><option value="sitemap">{escape(text["v2_discovery_sitemap"])}</option><option value="robots-sitemap">{escape(text["v2_discovery_robots"])}</option><option value="crawl">{escape(text["v2_discovery_crawl"])}</option></select></div>
 <div><label for="v2-max-pages">{escape(text["v2_max_pages"])} {_hint(text, "v2_max_pages_hint")}</label><input id="v2-max-pages" type="number" min="0" max="25000" value="3"></div>
 <div><label for="v2-max-depth">{escape(text["v2_max_depth"])} {_hint(text, "v2_max_depth_hint")}</label><input id="v2-max-depth" type="number" min="0" max="32" placeholder="профиль"></div>
 <label><input id="v2-render" type="checkbox" style="width:auto;margin-right:8">{escape(text["v2_render"])} {_hint(text, "v2_render_hint")}</label>
@@ -947,18 +986,18 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <h2 id="v2-inventory-title">{escape(text["v2_inventory"])} {_hint(text, "v2_inventory_hint")}</h2>
 <div class="inventory-toolbar">
 <button type="button" class="secondary" onclick="loadV2Inventory()">{escape(text["v2_inventory_load"])}</button>
-<label for="v2-inventory-kind">{escape(text["v2_inventory_kind"])}</label>
+<label for="v2-inventory-kind">{escape(text["v2_inventory_kind"])} {_hint(text, "v2_inventory_kind_hint")}</label>
 <select id="v2-inventory-kind" onchange="loadV2Inventory(this.value)"><option value="pages">{escape(text["v2_kind_pages"])}</option><option value="links">{escape(text["v2_kind_links"])}</option><option value="resources">{escape(text["v2_kind_resources"])}</option><option value="redirects">{escape(text["v2_kind_redirects"])}</option><option value="findings">{escape(text["v2_kind_findings"])}</option><option value="metrics">{escape(text["v2_kind_metrics"])}</option></select>
-<label for="v2-inventory-limit">{escape(text["v2_rows"])}</label>
+<label for="v2-inventory-limit">{escape(text["v2_rows"])} {_hint(text, "v2_rows_hint")}</label>
 <select id="v2-inventory-limit" onchange="loadV2Inventory()"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option></select>
-<label for="v2-inventory-sort">{escape(text["v2_inventory_sort"])}</label><select id="v2-inventory-sort" onchange="loadV2Inventory()"><option value="url">URL</option><option value="status">{escape(text["v2_sort_status"])}</option><option value="depth">{escape(text["v2_sort_depth"])}</option><option value="title">{escape(text["v2_sort_title"])}</option><option value="anchor">{escape(text["v2_sort_anchor"])}</option></select>
-<label><input id="v2-inventory-desc" type="checkbox" style="width:auto;margin-right:6px" onchange="loadV2Inventory()">{escape(text["v2_inventory_desc"])}</label>
+<label for="v2-inventory-sort">{escape(text["v2_inventory_sort"])} {_hint(text, "v2_inventory_sort_hint")}</label><select id="v2-inventory-sort" onchange="loadV2Inventory()"><option value="url">URL</option><option value="status">{escape(text["v2_sort_status"])}</option><option value="depth">{escape(text["v2_sort_depth"])}</option><option value="title">{escape(text["v2_sort_title"])}</option><option value="anchor">{escape(text["v2_sort_anchor"])}</option></select>
+<label><input id="v2-inventory-desc" type="checkbox" style="width:auto;margin-right:6px" onchange="loadV2Inventory()">{escape(text["v2_inventory_desc"])} {_hint(text, "v2_inventory_desc_hint")}</label>
 <label for="v2-inventory-filter">{escape(text["v2_filter"])} {_hint(text, "v2_filter_hint")}</label>
 <input id="v2-inventory-filter" type="search" placeholder="{escape(text["v2_filter_hint"])}" oninput="filterV2Inventory()">
-<label for="v2-inventory-columns">{escape(text["v2_columns"])}</label><select id="v2-inventory-columns" multiple size="3" aria-label="{escape(text["v2_columns"])}"><option value="url" selected>URL</option><option value="status" selected>Status</option><option value="title" selected>Title</option><option value="depth">{escape(text["v2_sort_depth"])}</option><option value="anchor">{escape(text["v2_sort_anchor"])}</option></select>
+<label for="v2-inventory-columns">{escape(text["v2_columns"])} {_hint(text, "v2_columns_hint")}</label><select id="v2-inventory-columns" multiple size="3" aria-label="{escape(text["v2_columns"])}"><option value="url" selected>URL</option><option value="status" selected>Status</option><option value="title" selected>Title</option><option value="depth">{escape(text["v2_sort_depth"])}</option><option value="anchor">{escape(text["v2_sort_anchor"])}</option></select>
 <button id="v2-inventory-next" type="button" class="secondary" onclick="loadNextV2Inventory()" hidden>{escape(text["v2_next_page"])}</button>
 <button type="button" class="secondary" onclick="saveV2InventoryView()">{escape(text["v2_save_view"])}</button>
-<label for="v2-saved-view">{escape(text["v2_saved_view"])}</label><select id="v2-saved-view" onchange="loadSavedV2View(this.value)"><option value="">—</option></select>
+<label for="v2-saved-view">{escape(text["v2_saved_view"])} {_hint(text, "v2_saved_view_hint")}</label><select id="v2-saved-view" onchange="loadSavedV2View(this.value)"><option value="">—</option></select>
 <button type="button" class="secondary" onclick="deleteSavedV2View()">{escape(text["v2_delete_view"])}</button>
 <button type="button" class="secondary" onclick="exportSavedV2View()">{escape(text["v2_export_view"])}</button>
 <button type="button" class="secondary" onclick="compareV2Inventory()">{escape(text["v2_inventory_compare"])}</button>
@@ -974,21 +1013,21 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div class="tools-content">
 <section id="robots-simulation-panel" class="panel" hidden aria-labelledby="robots-simulation-title">
 <h2 id="robots-simulation-title">{escape(text["robots_simulation"])} {_hint(text, "robots_simulation_hint")}</h2>
-<div class="form-grid three"><label for="robots-live">{escape(text["robots_live"])}<textarea id="robots-live" rows="5"></textarea></label><label for="robots-proposed">{escape(text["robots_proposed"])}<textarea id="robots-proposed" rows="5"></textarea></label><div><label for="robots-user-agents">{escape(text["robots_user_agents"])}</label><input id="robots-user-agents" value="*"><button type="button" class="secondary" onclick="simulateRobots()">{escape(text["robots_simulate"])}</button></div></div>
+<div class="form-grid three"><div class="robots-document-field"><label for="robots-live">{escape(text["robots_live"])} {_hint(text, "robots_live_hint")}</label><textarea id="robots-live" rows="5"></textarea></div><div class="robots-document-field"><label for="robots-proposed">{escape(text["robots_proposed"])} {_hint(text, "robots_proposed_hint")}</label><textarea id="robots-proposed" rows="5"></textarea></div><div><label for="robots-user-agents">{escape(text["robots_user_agents"])} {_hint(text, "robots_user_agents_hint")}</label><input id="robots-user-agents" value="*"><button type="button" class="secondary" onclick="simulateRobots()">{escape(text["robots_simulate"])}</button></div></div>
 <div id="robots-simulation-status" role="status" aria-live="polite">{escape(text["robots_empty"])}</div><div id="robots-simulation-result" role="region" aria-live="polite"></div>
 </section>
 <section id="sitemap-reconciliation-panel" class="panel" hidden aria-labelledby="sitemap-reconciliation-title">
 <h2 id="sitemap-reconciliation-title">{escape(text["sitemap_reconciliation"])} {_hint(text, "sitemap_reconciliation_hint")}</h2>
 <p class="section-hint">{escape(text["sitemap_reconciliation_hint"])}</p>
-<label for="sitemap-reconciliation-origin">{escape(text["sitemap_origin"])}</label><input id="sitemap-reconciliation-origin" type="url" placeholder="https://example.test">
-<label for="sitemap-reconciliation-xml">{escape(text["sitemap_documents"])}</label><textarea id="sitemap-reconciliation-xml" rows="6"></textarea>
+<label for="sitemap-reconciliation-origin">{escape(text["sitemap_origin"])} {_hint(text, "sitemap_origin_hint")}</label><input id="sitemap-reconciliation-origin" type="url" placeholder="https://example.test">
+<label for="sitemap-reconciliation-xml">{escape(text["sitemap_documents"])} {_hint(text, "sitemap_documents_hint")}</label><textarea id="sitemap-reconciliation-xml" rows="6"></textarea>
 <button type="button" class="secondary" onclick="reconcileSitemap()">{escape(text["sitemap_reconcile"])}</button>
 <div id="sitemap-reconciliation-status" role="status" aria-live="polite"></div><div id="sitemap-reconciliation-result" role="region" aria-live="polite"></div>
 </section>
 <section id="custom-rules-panel" class="panel" aria-labelledby="custom-rules-title">
 <h2 id="custom-rules-title">{escape(text["custom_rules"])} {_hint(text, "custom_rules_hint")}</h2>
 <p class="section-hint">{escape(text["custom_rules_hint"])}</p>
-<label for="custom-rules-document">{escape(text["custom_rules_document"])}</label><textarea id="custom-rules-document" rows="8">version: 1
+<label for="custom-rules-document">{escape(text["custom_rules_document"])} {_hint(text, "custom_rules_document_hint")}</label><textarea id="custom-rules-document" rows="8">version: 1
 rules:
   - id: example
     title: {text["custom_rules_example_title"]}
@@ -1001,20 +1040,19 @@ rules:
 <section id="link-graph-panel" class="panel" hidden aria-labelledby="link-graph-title">
 <h2 id="link-graph-title">{escape(text["link_graph"])} {_hint(text, "link_graph_hint")}</h2>
 <p class="section-hint">{escape(text["link_graph_hint"])}</p>
-<div><label><input id="link-graph-dead-end" type="checkbox"> {escape(text["graph_dead_ends"])}</label><label><input id="link-graph-disconnected" type="checkbox"> {escape(text["graph_disconnected"])}</label><button type="button" class="secondary" onclick="loadLinkGraph()">{escape(text["graph_load"])}</button></div>
+<div><label><input id="link-graph-dead-end" type="checkbox"> {escape(text["graph_dead_ends"])} {_hint(text, "graph_dead_ends_hint")}</label><label><input id="link-graph-disconnected" type="checkbox"> {escape(text["graph_disconnected"])} {_hint(text, "graph_disconnected_hint")}</label><button type="button" class="secondary" onclick="loadLinkGraph()">{escape(text["graph_load"])}</button></div>
 <div id="link-graph-status" role="status" aria-live="polite"></div><div id="link-graph-result" role="region" aria-live="polite"></div>
 </section>
 <section id="duplicate-clusters-panel" class="panel" hidden aria-labelledby="duplicate-clusters-title">
 <h2 id="duplicate-clusters-title">{escape(text["duplicate_clusters"])} {_hint(text, "duplicate_clusters_hint")}</h2>
 <p class="section-hint">{escape(text["duplicate_clusters_hint"])}</p>
-<details class="section-help"><summary>{escape(text["help"])}</summary><p>{escape(text["duplicate_clusters_hint"])}</p></details>
-<div><select id="duplicate-clusters-kind"><option value="all">{escape(text["duplicate_all"])}</option><option value="exact">{escape(text["duplicate_exact"])}</option><option value="near">{escape(text["duplicate_near"])}</option></select><button type="button" class="secondary" onclick="loadDuplicateClusters()">{escape(text["duplicate_load"])}</button></div>
+<div><label class="sr-only" for="duplicate-clusters-kind">{escape(text["duplicate_clusters"])} {_hint(text, "duplicate_kind_hint")}</label><select id="duplicate-clusters-kind"><option value="all">{escape(text["duplicate_all"])}</option><option value="exact">{escape(text["duplicate_exact"])}</option><option value="near">{escape(text["duplicate_near"])}</option></select><button type="button" class="secondary" onclick="loadDuplicateClusters()">{escape(text["duplicate_load"])}</button></div>
 <div id="duplicate-clusters-status" role="status" aria-live="polite"></div><div id="duplicate-clusters-result" role="region" aria-live="polite"></div>
 </section>
 <section id="projects-panel" class="panel" aria-labelledby="projects-title">
 <h2 id="projects-title">{escape(text["projects"])} {_hint(text, "projects_hint")}</h2>
 <p class="section-hint">{escape(text["projects_hint"])}</p>
-<div><label for="project-id">{escape(text["project_id"])}</label><input id="project-id" value="default-project"><label for="project-name">{escape(text["project_name"])}</label><input id="project-name" value="{escape(text["project_default_name"])}"><button type="button" class="secondary" onclick="createDashboardProject()">{escape(text["project_save"])}</button><button type="button" class="secondary" onclick="loadDashboardProjects()">{escape(text["project_load_history"])}</button></div>
+<div><label for="project-id">{escape(text["project_id"])} {_hint(text, "project_id_hint")}</label><input id="project-id" value="default-project"><label for="project-name">{escape(text["project_name"])} {_hint(text, "project_name_hint")}</label><input id="project-name" value="{escape(text["project_default_name"])}"><button type="button" class="secondary" onclick="createDashboardProject()">{escape(text["project_save"])}</button><button type="button" class="secondary" onclick="loadDashboardProjects()">{escape(text["project_load_history"])}</button></div>
 <div id="projects-status" role="status" aria-live="polite"></div><div id="projects-result" role="region" aria-live="polite"></div>
 </section>
 </div>
@@ -1032,6 +1070,30 @@ rules:
 <noscript><section class="noscript-notice" aria-labelledby="noscript-title"><h2 id="noscript-title">{escape(text["noscript_title"])}</h2><p>{escape(text["noscript_text"])}</p></section></noscript>
 <script>
 const translations = {translations};
+function addSettingsHints() {{
+  const hints = {{
+    "ai-provider-name": "ai_provider_name_hint",
+    "ai-key": "ai_key_hint",
+  }};
+  let added = 0;
+  Object.entries(hints).forEach(([id, key]) => {{
+    const control = document.getElementById(id);
+    const label = control && document.querySelector(`label[for="${{id}}"]`);
+    if (!label || label.querySelector(".hint")) return;
+    const value = translations[language.value][key];
+    if (!value) return;
+    const hint = document.createElement("span");
+    hint.className = "hint";
+    hint.tabIndex = 0;
+    hint.setAttribute("role", "img");
+    hint.setAttribute("aria-label", value);
+    hint.dataset.tooltip = value;
+    hint.textContent = "?";
+    label.appendChild(hint);
+    added += 1;
+  }});
+  console.info("[FIX:dashboard-hints] Settings hints attached", {{added}});
+}}
 const language = document.getElementById("language");
 language.value = "{lang}";
 const languageExplicit = new URLSearchParams(location.search).has("language");
@@ -1048,8 +1110,10 @@ helpToggle.onclick = () => {{
   console.info("Dashboard help toggled", {{visible, language:language.value}});
 }};
 const dashboardStateKey = "agentready.dashboard.state.v2";
+const dashboardStateCacheKey = "/dashboard/state";
 const dashboardReportKey = "agentready.dashboard.report.v2";
-const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-discovery","v2-max-pages","v2-max-depth","v2-render","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only"];
+const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-discovery","v2-max-pages","v2-max-depth","v2-render","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only","robots-live","robots-proposed","robots-user-agents","sitemap-reconciliation-origin","sitemap-reconciliation-xml","custom-rules-document","link-graph-dead-end","link-graph-disconnected","duplicate-clusters-kind","project-id","project-name"];
+let dashboardStateSaveTimer = null;
 function readDashboardState() {{
   try {{
     const raw = localStorage.getItem(dashboardStateKey);
@@ -1059,6 +1123,14 @@ function readDashboardState() {{
     return {{}};
   }}
 }}
+function scheduleSaveDashboardState(state) {{
+  clearTimeout(dashboardStateSaveTimer);
+  dashboardStateSaveTimer = setTimeout(() => {{
+    fetch(dashboardStateCacheKey, {{method:"PUT", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify(state)}})
+      .then(response => {{ if (!response.ok) throw new Error("HTTP " + response.status); console.info("[FIX:dashboard-state] State mirrored to cache", {{fields:Object.keys(state).length}}); }})
+      .catch(error => console.warn("[FIX:dashboard-state] Unable to mirror state to cache", {{error:String(error)}}));
+  }}, 250);
+}}
 function saveDashboardState() {{
   try {{
     const state = readDashboardState();
@@ -1067,8 +1139,11 @@ function saveDashboardState() {{
       if (!element) return;
       state[id] = element.type === "checkbox" ? element.checked : element.value;
     }});
+    const toolsPanel = document.getElementById("tools-panel");
+    if (toolsPanel) state["tools-open"] = toolsPanel.open;
     state.language = language.value;
     localStorage.setItem(dashboardStateKey, JSON.stringify(state));
+    scheduleSaveDashboardState(state);
   }} catch (error) {{
     console.warn("Unable to save dashboard state", {{error:String(error)}});
   }}
@@ -1081,10 +1156,33 @@ function restoreDashboardState() {{
     if (!element || state[id] === undefined) return;
     if (element.type === "checkbox") element.checked = Boolean(state[id]);
     else element.value = element.dataset.decimal !== undefined ? normalizeDecimalString(state[id]) : state[id];
+    if (id === "robots-live" && typeof state[id] === "string" && state[id].trim()) element.dataset.userEdited = "true";
   }});
+  const toolsPanel = document.getElementById("tools-panel");
+  if (toolsPanel && typeof state["tools-open"] === "boolean") toolsPanel.open = state["tools-open"];
   return state;
 }}
+async function restoreDashboardStateFromCache() {{
+  try {{
+    const response = await fetch(dashboardStateCacheKey);
+    if (!response.ok) return;
+    const payload = await response.json();
+    const cached = payload && payload.state && typeof payload.state === "object" ? payload.state : {{}};
+    const local = readDashboardState();
+    const merged = {{...cached, ...local}};
+    dashboardStateIds.forEach(id => {{
+      const element = document.getElementById(id);
+      if (!element || merged[id] === undefined || local[id] !== undefined) return;
+      if (element.type === "checkbox") element.checked = Boolean(merged[id]);
+      else element.value = merged[id];
+    }});
+    const toolsPanel = document.getElementById("tools-panel");
+    if (toolsPanel && local["tools-open"] === undefined && typeof cached["tools-open"] === "boolean") toolsPanel.open = cached["tools-open"];
+    console.info("[FIX:dashboard-state] State restored from cache", {{fields:Object.keys(cached).length}});
+  }} catch (error) {{ console.warn("[FIX:dashboard-state] Unable to restore state from cache", {{error:String(error)}}); }}
+}}
 const restoredDashboardState = restoreDashboardState();
+restoreDashboardStateFromCache();
 language.onchange = () => {{ saveDashboardState(); location.search = "?language=" + language.value; }};
 dashboardStateIds.forEach(id => {{
   const element = document.getElementById(id);
@@ -1345,6 +1443,7 @@ function restoreReportState() {{
       return false;
     }}
     window.agentreadyV2Report = state.v2Report || null;
+    if (window.agentreadyV2Report && window.agentreadyV2Report.run) loadSessionRobots(window.agentreadyV2Report.run.id);
     renderReport(state.html, false);
     const contextReady = state.preset !== "v2" || Boolean(window.agentreadyV2Report);
     setAiAvailability(Boolean(state.url && document.getElementById("url").value.trim() && contextReady));
@@ -1382,6 +1481,7 @@ function captureV2Report(reportText, required=false) {{
       const duplicatePanel = document.getElementById("duplicate-clusters-panel");
       if (duplicatePanel) duplicatePanel.hidden = false;
       console.info("[FIX:ai-audit-context] Embedded audit report captured", {{bytes:reportText.length, findings:(window.agentreadyV2Report.findings || []).length}});
+      loadSessionRobots(window.agentreadyV2Report.run && window.agentreadyV2Report.run.id);
       return window.agentreadyV2Report;
     }}
   }} catch (error) {{
@@ -1393,6 +1493,36 @@ function captureV2Report(reportText, required=false) {{
     return null;
   }}
   return window.agentreadyV2Report;
+}}
+async function loadSessionRobots(runId) {{
+  const live = document.getElementById("robots-live");
+  if (!live || !runId || live.dataset.userEdited === "true") return;
+  try {{
+    const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/robots/source");
+    const payload = await response.json();
+    const found = response.ok && payload.found === true && typeof payload.robots === "string" && payload.robots.length > 0;
+    if (live.dataset.userEdited === "true") return;
+    live.value = found ? payload.robots : "";
+    live.readOnly = found;
+    live.setAttribute("aria-readonly", String(found));
+    live.title = found ? translations[language.value].robots_live_discovered_hint : "";
+    const status = document.getElementById("robots-simulation-status");
+    if (found && status) status.textContent = translations[language.value].robots_live_loaded;
+    console.info("[FIX:robots-session] Current robots policy loaded", {{run_id:runId, found, bytes:found ? payload.robots.length : 0}});
+  }} catch (error) {{
+    live.readOnly = false;
+    live.removeAttribute("aria-readonly");
+    console.warn("[FIX:robots-session] Unable to load current robots policy", {{run_id:runId, error:String(error)}});
+  }}
+}}
+function resetSessionRobots() {{
+  const live = document.getElementById("robots-live");
+  if (!live) return;
+  live.value = "";
+  live.readOnly = false;
+  live.removeAttribute("aria-readonly");
+  live.title = "";
+  live.dataset.userEdited = "false";
 }}
 async function runV2BackgroundPollOnly() {{
   while (activeV2JobId) {{ const jobId = activeV2JobId; await new Promise(resolve => setTimeout(resolve, 700)); if (!jobId) break; const status = await (await fetch("/v2/jobs/" + encodeURIComponent(jobId))).json(); setCrawlProgress(status.progress); if (status.status === "completed") {{ captureV2Report(status.html); renderReport(status.html); activeV2JobId = null; localStorage.removeItem("agentready.dashboard.job.v2"); }} else if (["failed","cancelled"].includes(status.status)) {{ activeV2JobId = null; localStorage.removeItem("agentready.dashboard.job.v2"); }} }}
@@ -1427,6 +1557,7 @@ async function runScan() {{
   }}
   if (!aiConversationHistory.length) {{ logDashboardAction("ai.context.reset", {{reason:"new-audit"}}); }}
   window.agentreadyV2Report = null;
+  resetSessionRobots();
   const preset = document.getElementById("preset").value;
   if (preset === "all") {{ await runAll(); return; }}
   if (preset === "seo") {{ await runSeo(); return; }}
@@ -1535,7 +1666,10 @@ async function loadLinkGraph() {{
   const output = document.getElementById("link-graph-result");
   const runId = dashboardRunId();
   if (!runId) {{ status.textContent = translations[language.value].run_audit_first; return; }}
-  const query = new URLSearchParams({{limit:"100", dead_end:String(document.getElementById("link-graph-dead-end").checked), disconnected:String(document.getElementById("link-graph-disconnected").checked)}});
+  const deadEnd = document.getElementById("link-graph-dead-end").checked;
+  const disconnected = document.getElementById("link-graph-disconnected").checked;
+  const query = new URLSearchParams({{limit:"100", dead_end:String(deadEnd), disconnected:String(disconnected)}});
+  console.info("[FIX:link-graph-filters] Loading graph projection", {{run_id:runId, dead_end:deadEnd, disconnected}});
   try {{
     const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/graph?" + query.toString());
     const payload = await response.json();
@@ -2755,6 +2889,8 @@ document.getElementById("ai-message").addEventListener("keydown", event => {{
     runAi("/ai/chat");
   }}
 }});
+const toolsPanel = document.getElementById("tools-panel");
+if (toolsPanel) toolsPanel.addEventListener("toggle", saveDashboardState);
 document.getElementById("ai-chat-button").addEventListener("click", () => runAi("/ai/chat"));
 document.getElementById("ai-message").addEventListener("paste", event => {{
   const files = event.clipboardData && event.clipboardData.files;
@@ -2778,6 +2914,12 @@ document.getElementById("ai-chat-search").addEventListener("input", event => {{
 document.getElementById("preset").onchange = () => {{ setAiAvailability(false); updatePresetHint(); loadChecks(); }};
 document.getElementById("v2-profile").addEventListener("change", syncV2ProfileBudget);
 updatePresetHint(); updateAiModeHint(); setAiAvailability(false); loadChecks(false);
+const robotsLiveField = document.getElementById("robots-live");
+if (robotsLiveField) robotsLiveField.addEventListener("input", () => {{
+  robotsLiveField.dataset.userEdited = "true";
+  robotsLiveField.readOnly = false;
+  robotsLiveField.removeAttribute("aria-readonly");
+}});
 restoreReportState();
 restoreActiveV2Job();
 loadSavedV2Views();
@@ -2785,6 +2927,7 @@ refreshAiProviders().catch(error => console.warn("Unable to initialize AI provid
 loadAiTools();
 updateAiContextChips();
 setupPromptComposer();
+addSettingsHints();
 loadPromptLibrary();
 loadSavedChats();
 restoreAiChatState();

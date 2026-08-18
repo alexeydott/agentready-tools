@@ -160,6 +160,7 @@ class AuditResult:
     fact_views: tuple[FactView, ...] = ()
     mobile_report: Any | None = None
     discovery_plan_hash: str | None = None
+    robots_text: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         projection = self.mobile_report or self.seo_report or self.report
@@ -364,6 +365,7 @@ class AuditService:
             follow_links=follow_links,
         )
         check_report = None
+        robots_text = None
         rule_client = None
         crawler_transport = request.transport
         # The v2 service is the sole public readiness boundary.  The existing
@@ -412,6 +414,14 @@ class AuditService:
                     fact_views=fact_views,
                 )
                 check_report = report_from_checks(target, self._apply_check_limit(list(rule_engine_report.checks), request.limits))
+                cached_robots = rule_client.cached(f"{origin}/robots.txt")
+                if cached_robots is not None and cached_robots.status_code == 200:
+                    robots_text = cached_robots.text
+                    logger.info(
+                        "[FIX:robots-session] captured discovered robots policy run_id=%s bytes=%d",
+                        context.run_id,
+                        len(robots_text),
+                    )
         finally:
             if rule_client is not None:
                 rule_client.close()
@@ -436,7 +446,7 @@ class AuditService:
             crawl.coverage.fetched,
             crawl.coverage.classification.value,
         )
-        return AuditResult(request, run, crawl, report, lineage_id, fact_views=fact_views, discovery_plan_hash=discovery_hash)
+        return AuditResult(request, run, crawl, report, lineage_id, fact_views=fact_views, discovery_plan_hash=discovery_hash, robots_text=robots_text)
 
     def _run_mobile(self, request: AuditRequest) -> AuditResult:
         """Collect one page once, then project static and rendered mobile facts."""

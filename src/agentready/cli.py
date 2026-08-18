@@ -78,7 +78,7 @@ def _audit_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--format", choices=["console", "json", "markdown", "html"], default="json")
     p.add_argument("--preset", choices=["all", "content", "api", "ai-search"], default="all")
     p.add_argument("--profile", choices=["quick", "standard", "deep", "custom"], default="standard")
-    p.add_argument("--max-pages", type=int, default=25)
+    p.add_argument("--max-pages", type=int, default=25, help="Maximum pages to fetch; use 0 with --discovery crawl to audit all discovered pages up to the server hard cap")
     p.add_argument("--timeout", type=float, default=5.0)
     p.add_argument("--max-depth", type=int)
     p.add_argument("--max-duration", type=float)
@@ -87,7 +87,7 @@ def _audit_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--include", action="append", default=[])
     p.add_argument("--exclude", action="append", default=[])
     p.add_argument("--select-url", action="append", default=[], help="Restrict a child rescan to explicit same-origin URLs")
-    p.add_argument("--discovery", dest="discovery_kind", choices=["single", "list", "sitemap", "robots-sitemap", "crawl"], default="single")
+    p.add_argument("--discovery", dest="discovery_kind", choices=["single", "list", "sitemap", "robots-sitemap", "crawl"], default="single", help="URL source; crawl follows all discovered same-origin pages within the configured bounds")
     p.add_argument("--discovery-url", action="append", default=[], help="Bounded discovery URL for list or explicit sitemap roots")
     p.add_argument("--discovery-sitemap-xml", help="Read a local sitemap XML document for bounded discovery")
     p.add_argument("--discovery-limit", type=int, default=1000)
@@ -160,7 +160,7 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     simulate = _add_command_parser(robots_commands, "simulate", help="Compare live and proposed robots rules without refetching")
     simulate.add_argument("run_id")
     simulate.add_argument("--proposed", required=True, help="Proposed robots.txt file")
-    simulate.add_argument("--live", help="Live robots.txt file; defaults to an empty policy")
+    simulate.add_argument("--live", help="Live robots.txt file; when omitted, use robots.txt captured by the selected v2 run")
     simulate.add_argument("--user-agent", action="append", dest="user_agents", default=[])
     simulate.add_argument("--observed-page", action="append", default=[])
     simulate.add_argument("--interpretation", choices=["rfc9309", "google"], default="rfc9309")
@@ -1023,7 +1023,14 @@ def _cmd_compare(args: argparse.Namespace) -> int:
 
 
 def _cmd_robots(args: argparse.Namespace) -> int:
-    live = Path(args.live).read_text(encoding="utf-8") if args.live else ""
+    if args.live:
+        live = Path(args.live).read_text(encoding="utf-8")
+    else:
+        source = _http_json(
+            args.base_url,
+            f"/v2/runs/{urllib.parse.quote(args.run_id, safe='')}/robots/source",
+        )
+        live = source.get("robots", "") if source.get("found") else ""
     proposed = Path(args.proposed).read_text(encoding="utf-8")
     payload = {
         "live_robots": live,

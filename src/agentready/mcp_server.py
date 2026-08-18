@@ -16,6 +16,7 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 import logging
+import hashlib
 
 from .agentfindings import build_findings, build_remediation_plan
 from .audit_service import AuditRequest, AuditService
@@ -25,6 +26,7 @@ from .provider_service import ProviderService
 from .mobile_scanner import audit_mobile
 from .query_service import QueryService
 from .report_storage import save_report
+from .robots import RobotsInterpretation, parse_robots, simulate_robots
 from .seo_scanner import audit_seo
 from .workflows import InventoryRequest
 
@@ -53,10 +55,19 @@ def audit_v2(
     render: bool = False,
     provider: str | None = None,
     language: str = "en",
+    discovery_kind: str = "single",
+    discovery_urls: list[str] | None = None,
+    discovery_sitemap_xml: str | None = None,
+    discovery_sitemap_urls: list[str] | None = None,
+    discovery_limit: int = 1000,
     rescan_of: str | None = None,
     selected_urls: list[str] | None = None,
 ) -> dict:
-    """Run the shared bounded v2 audit application service."""
+    """Run the shared bounded v2 audit application service.
+
+    Set ``discovery_kind="crawl"`` to follow all discovered same-origin pages
+    within the configured bounds. Use ``max_pages=0`` for the server hard cap.
+    """
     effective_limits = limits or {}
     effective_max_pages = (
         int(effective_limits["max_pages"])
@@ -76,6 +87,11 @@ def audit_v2(
             render=render,
             provider=provider,
             language=language,
+            discovery_kind=discovery_kind,
+            discovery_urls=tuple(discovery_urls or ()),
+            discovery_sitemap_xml=discovery_sitemap_xml,
+            discovery_sitemap_urls=tuple(discovery_sitemap_urls or ()),
+            discovery_limit=discovery_limit,
             parent_run_id=rescan_of,
             selected_urls=tuple(selected_urls or ()),
             allow_private=False,
@@ -85,6 +101,56 @@ def audit_v2(
     saved_path = save_report(payload, target=url, surface="mcp-v2", fmt="json")
     logger.info("MCP report saved path=%s", saved_path)
     return payload
+
+
+@mcp.tool()
+def robots_simulate_v2(
+    live_robots: str,
+    proposed_robots: str,
+    observed_pages: list[str] | None = None,
+    user_agents: list[str] | None = None,
+    origin: str = "https://example.com",
+    interpretation: str = "rfc9309",
+) -> dict:
+    """Compare current and proposed robots.txt policies without publishing changes.
+
+    This is the MCP equivalent of the dashboard and CLI Virtual Robots tool;
+    callers provide the bounded audit inventory URLs in ``observed_pages``.
+    """
+    try:
+        mode = RobotsInterpretation(interpretation)
+    except ValueError as exc:
+        raise ValueError("interpretation must be rfc9309 or google") from exc
+    live = parse_robots(live_robots, origin)
+    proposed = parse_robots(proposed_robots, origin)
+    urls = list(dict.fromkeys(observed_pages or []))
+    per_bot = {
+        user_agent: (lambda diff: {
+            "newly_allowed": list(diff.newly_allowed_urls),
+            "newly_blocked": list(diff.newly_blocked_urls),
+            "sitemap_conflicts": list(diff.sitemap_urls_affected),
+            "important_page_conflicts": list(diff.observed_search_pages_affected),
+            "label": diff.label,
+            "user_agent": diff.user_agent,
+        })(simulate_robots(
+            live,
+            proposed,
+            urls,
+            user_agent=user_agent,
+            observed_search_pages=urls,
+            interpretation=mode,
+        ))
+        for user_agent in (user_agents or ["*"])
+    }
+    logger.info("MCP robots simulation bots=%d urls=%d interpretation=%s", len(per_bot), len(urls), mode.value)
+    return {
+        "schema": "agentready.robots-simulation.v2",
+        "interpretation": mode.value,
+        "live_policy_hash": hashlib.sha256(live_robots.encode("utf-8")).hexdigest(),
+        "proposed_policy_hash": hashlib.sha256(proposed_robots.encode("utf-8")).hexdigest(),
+        "per_bot_diff": per_bot,
+        "label": "SIMULATION - site not changed",
+    }
 
 
 @mcp.tool()

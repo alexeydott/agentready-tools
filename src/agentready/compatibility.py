@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-RELEASE_VERSION = "0.13.4"
+RELEASE_VERSION = "0.13.5"
 RELEASE_CHANNEL = "stable"
 V2_SCHEMAS = (
     "agentready.audit.v2",
@@ -39,6 +39,7 @@ V2_SURFACES = (
     "/v2/runs/{run_id}/pagespeed",
     "/v2/runs/{run_id}/provider-jobs",
     "/v2/runs/{run_id}/robots/simulate",
+    "/v2/runs/{run_id}/robots/source",
     "/v2/runs/{run_id}/sitemap/reconcile",
     "/v2/runs/{run_id}/graph",
     "/v2/runs/{run_id}/graph/node",
@@ -89,6 +90,7 @@ V2_SURFACES = (
     "/ai/providers/{provider_id}",
     "/ai/credentials",
     "mcp.audit_v2",
+    "mcp.robots_simulate_v2",
     "mcp.seo_audit_v2",
     "mcp.provider_enrichment_v2",
     "mcp.mobile_audit_v2",
