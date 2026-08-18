@@ -159,6 +159,9 @@ storage or password fields. It also treats unavailable optional AI chat
 providers as explicit skips rather than product failures. The direct module
 entrypoint is available for CLI smoke checks:
 
+The complete IT-01..IT-12 mapping, including the manual-only trusted-auth case,
+is maintained in [interactive-acceptance-matrix.md](interactive-acceptance-matrix.md).
+
 ```powershell
 python -m agentready.cli --help
 python -m agentready.cli audit https://example.com --profile quick --max-pages 1

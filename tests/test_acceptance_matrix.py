@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import re
 from threading import Lock
+from pathlib import Path
 
 from agentready.cli import build_parser
 from agentready.dashboard import render_dashboard
@@ -18,6 +19,13 @@ from agentready.metrics import (
     ga4_adapter,
 )
 from agentready.server import V2AuditRequest
+
+
+def test_interactive_matrix_lists_all_cases_and_safe_manual_boundary():
+    matrix = (Path(__file__).parents[1] / "docs" / "interactive-acceptance-matrix.md").read_text(encoding="utf-8")
+    assert all(f"IT-{number:02d}" in matrix for number in range(1, 13))
+    assert "Manual credentialed; never default CI" in matrix
+    assert "authorization headers" in matrix
 
 
 def test_l0_unit_contracts_are_available():
