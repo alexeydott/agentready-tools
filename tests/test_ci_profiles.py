@@ -7,8 +7,8 @@ def test_ci_profiles_install_explicit_dependency_sets_and_isolate_mcp_collection
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     release = (ROOT / ".github" / "workflows" / "release-validation.yml").read_text(encoding="utf-8")
 
-    assert 'python -m pip install -e ".[dev]"' in ci
-    assert 'python -m pip install -e ".[dev,mcp]"' in ci
+    assert 'python -m pip install -e ".[dev,server]"' in ci
+    assert 'python -m pip install -e ".[dev,mcp,server]"' in ci
     assert 'python -m pip install -e ".[dev,portable]"' in ci
     assert "--ignore=tests/test_acceptance_mcp.py" in ci
     assert 'python -m pip install -e ".[dev,mcp,portable]"' in release
@@ -21,10 +21,15 @@ def test_ci_profiles_install_explicit_dependency_sets_and_isolate_mcp_collection
     assert '"${environment}/bin/agentready" mcp --help' in release
     assert 'import agentready.mcp_server' in release
     assert 'test -f "${source_root}/MANIFEST.in"' in release
-    assert "Unexpected skipped tests in full-release run" in release
+    assert 'name: Run full suite and report intentional skips' in release
+    assert 'python -m pytest -q -ra -m "not scale"' in release
+    assert "Unexpected skipped tests in full-release run" not in release
 
     source_package = (ROOT / "scripts" / "package-source.ps1").read_text(encoding="utf-8")
     assert '"MANIFEST.in"' in source_package
+    assert 'pyproject.toml' in source_package
+    assert 'Select-String' in source_package
+    assert "!tests/fixtures/site_lab/manifest.json" in (ROOT / ".gitignore").read_text(encoding="utf-8")
 
 
 def test_mcp_acceptance_module_does_not_import_optional_package_at_collection():

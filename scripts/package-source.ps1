@@ -5,10 +5,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$version = & python -c "from agentready import __version__; print(__version__)"
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($version)) {
-    throw "Unable to read package version. Activate the project virtual environment first."
+$pyprojectPath = Join-Path $projectRoot "pyproject.toml"
+$versionMatch = Select-String -LiteralPath $pyprojectPath -Pattern '^\s*version\s*=\s*"([^"]+)"' | Select-Object -First 1
+if (-not $versionMatch -or $versionMatch.Matches.Count -eq 0) {
+    throw "Unable to read package version from pyproject.toml."
 }
+$version = $versionMatch.Matches[0].Groups[1].Value
 
 if ([string]::IsNullOrWhiteSpace($Output)) {
     $Output = Join-Path $projectRoot "dist\source\agentready-tools-$($version.Trim())-source.zip"

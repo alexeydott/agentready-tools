@@ -1,0 +1,22 @@
+{
+  "name": "agentready-site-lab",
+  "version": 1,
+  "scenarios": {
+    "success": ["/"],
+    "redirects": ["/redirect", "/redirect-chain-1", "/redirect-loop-a"],
+    "statuses": ["/missing", "/gone", "/error"],
+    "timing": ["/slow?seconds=0.1"],
+    "url_identity": ["/foo", "/foo/"],
+    "metadata": ["/noindex", "/canonical", "/hreflang"],
+    "duplicates": ["/duplicate-a", "/duplicate-b", "/near-duplicate"],
+    "discovery": ["/robots.txt", "/sitemap-index.xml", "/sitemap-child.xml", "/orphan"],
+    "links": ["/js-links", "/repeated-links"],
+    "resources": ["/resource.css", "/mixed-content"],
+    "security": ["/auth"]
+  },
+  "credentials": {
+    "username": "fixture",
+    "password": "secret",
+    "scope": "local-test-only"
+  }
+}

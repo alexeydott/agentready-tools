@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 
@@ -33,6 +34,9 @@ def test_portable_packaging_includes_mcp_facade():
 
 
 def test_built_portable_help_includes_examples_for_main_and_nested_modes():
+    if os.name != "nt":
+        pytest.skip("portable Win64 executable can only run on Windows")
+
     artifact = ROOT / "dist" / "portable" / "agentready.exe"
     if not artifact.is_file():
         pytest.skip("portable executable has not been built")

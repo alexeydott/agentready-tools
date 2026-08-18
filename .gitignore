@@ -84,3 +84,4 @@ temp/
 /.cache/*
 !schemas/
 !schemas/*.json
+!tests/fixtures/site_lab/manifest.json
