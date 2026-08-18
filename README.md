@@ -157,6 +157,7 @@ agentready audit https://example.com --mode readiness \
 | [Safety](docs/safety.md) | Network, crawler, commerce safety boundaries |
 | [Architecture](docs/architecture.md) | Runtime layers and the canonical v2 contract |
 | [Development](docs/development.md) | Project layout and validation |
+| [Operations](docs/operations.md) | v2 collection, inventory, providers, limits, migrations, backup/restore, troubleshooting |
 | [Dashboard FAQ (RU)](docs/dashbord_faq_ru.md) | Beginner dashboard guide in Russian |
 | [Dashboard FAQ (EN)](docs/dashbor_faq_en.md) | Beginner dashboard guide in English |
 
