@@ -229,6 +229,12 @@ _TEXT = {
         "result": "Operation result",
         "ready": "Configure an audit and choose an operation.",
         "v2_inventory": "Run inventory",
+        "v2_discovery": "Discovery source",
+        "v2_discovery_single": "Single URL",
+        "v2_discovery_list": "URL list",
+        "v2_discovery_sitemap": "Sitemap XML",
+        "v2_discovery_robots": "Robots sitemap",
+        "v2_discovery_crawl": "Bounded crawl",
         "v2_inventory_hint": "Browse bounded server-side inventory for the latest crawl.",
         "v2_inventory_load": "Load inventory",
         "v2_inventory_empty": "Run the bounded audit to load inventory.",
@@ -484,6 +490,12 @@ _TEXT = {
         "result": "Результат операции",
         "ready": "Настройте аудит и выберите операцию.",
         "v2_inventory": "Инвентарь запуска",
+        "v2_discovery": "Источник обнаружения",
+        "v2_discovery_single": "Один URL",
+        "v2_discovery_list": "Список URL",
+        "v2_discovery_sitemap": "XML sitemap",
+        "v2_discovery_robots": "Sitemap из robots",
+        "v2_discovery_crawl": "Ограниченный обход",
         "v2_inventory_hint": "Просмотр ограниченного серверного инвентаря последнего обхода.",
         "v2_inventory_load": "Загрузить инвентарь",
         "v2_inventory_empty": "Запустите ограниченный аудит, чтобы загрузить инвентарь.",
@@ -772,6 +784,7 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <label><input id="verify" type="checkbox" style="width:auto;margin-right:8">{escape(text["verify"])} {_hint(text, "verify_hint")}</label>
 </div><div class="form-grid three" style="margin-top:14px">
 <div><label for="v2-profile">{escape(text["v2_profile"])} {_hint(text, "v2_profile_hint")}</label><select id="v2-profile"><option value="quick">{escape(text["v2_profile_quick"])}</option><option value="standard">{escape(text["v2_profile_standard"])}</option><option value="deep">{escape(text["v2_profile_deep"])}</option></select></div>
+<div><label for="v2-discovery">{escape(text["v2_discovery"])}</label><select id="v2-discovery"><option value="single">{escape(text["v2_discovery_single"])}</option><option value="list">{escape(text["v2_discovery_list"])}</option><option value="sitemap">{escape(text["v2_discovery_sitemap"])}</option><option value="robots-sitemap">{escape(text["v2_discovery_robots"])}</option><option value="crawl">{escape(text["v2_discovery_crawl"])}</option></select></div>
 <div><label for="v2-max-pages">{escape(text["v2_max_pages"])} {_hint(text, "v2_max_pages_hint")}</label><input id="v2-max-pages" type="number" min="0" max="25000" value="3"></div>
 <div><label for="v2-max-depth">{escape(text["v2_max_depth"])} {_hint(text, "v2_max_depth_hint")}</label><input id="v2-max-depth" type="number" min="0" max="32" placeholder="профиль"></div>
 <label><input id="v2-render" type="checkbox" style="width:auto;margin-right:8">{escape(text["v2_render"])} {_hint(text, "v2_render_hint")}</label>
@@ -839,7 +852,7 @@ helpToggle.onclick = () => {{
 }};
 const dashboardStateKey = "agentready.dashboard.state.v2";
 const dashboardReportKey = "agentready.dashboard.report.v2";
-const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-max-pages","v2-max-depth","v2-render","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only"];
+const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-discovery","v2-max-pages","v2-max-depth","v2-render","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only"];
 function readDashboardState() {{
   try {{
     const raw = localStorage.getItem(dashboardStateKey);
@@ -992,7 +1005,7 @@ function scanPayload() {{
   const preset = document.getElementById("preset").value;
   const applicable = catalog.filter(item => item.presets.includes(preset)).map(item => item.id);
   const selected = selectedChecks();
-  const payload = {{url:document.getElementById("url").value, preset, profile:document.getElementById("v2-profile").value,
+  const payload = {{url:document.getElementById("url").value, preset, profile:document.getElementById("v2-profile").value, discovery_kind:document.getElementById("v2-discovery").value,
     max_pages:selectedV2MaxPages(), language:language.value,
     content_url:document.getElementById("content-url").value || null, commerce_url:document.getElementById("commerce-url").value || null,
     include:selected.filter(id => !applicable.includes(id)), exclude:applicable.filter(id => !selected.includes(id)),

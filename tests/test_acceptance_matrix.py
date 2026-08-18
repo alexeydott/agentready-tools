@@ -27,6 +27,8 @@ def test_l0_unit_contracts_are_available():
 
 def test_l1_deterministic_dashboard_fixture_is_localized():
     html = render_dashboard("en")
+    assert 'id="v2-discovery"' in html
+    assert "discovery_kind" in html
     assert 'id="v2-inventory-panel"' in html
     assert 'id="v2-inventory-next"' in html
     assert "saveV2InventoryView" in html

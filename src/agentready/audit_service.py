@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -12,8 +13,15 @@ from . import __version__
 from .audit_core import AuditRunContext, CollectedPage, FactView, RunSnapshot, RunState
 from .crawl_profiles import HARD_CAPS, resolve_profile
 from .crawler import AsyncCrawler, CrawlResult, CrawlScope
+from .discovery import (
+    RobotsSitemapSource,
+    SingleUrlSource,
+    SitemapSource,
+    UrlListSource,
+    discovery_plan_hash,
+)
 from .egress import EgressPolicy
-from .fetcher import FetchTransport
+from .fetcher import Fetcher, FetchTransport
 from .http import CachedHttpTransport, HttpClient
 from .report_v2 import (
     AuditReport,
@@ -46,6 +54,11 @@ class AuditRequest:
     include: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
     selected_urls: tuple[str, ...] = ()
+    discovery_kind: str = "single"
+    discovery_urls: tuple[str, ...] = ()
+    discovery_sitemap_xml: str | None = None
+    discovery_sitemap_urls: tuple[str, ...] = ()
+    discovery_limit: int = 1000
     render: bool = False
     provider: str | None = None
     ga_property: str | None = None
@@ -81,6 +94,12 @@ class AuditRequest:
             raise ValueError("max_redirects must not be negative")
         if self.max_bytes <= 0:
             raise ValueError("max_bytes must be positive")
+        if self.discovery_kind not in {"single", "list", "sitemap", "robots-sitemap", "crawl"}:
+            raise ValueError("discovery_kind must be single, list, sitemap, robots-sitemap, or crawl")
+        if self.discovery_limit <= 0 or self.discovery_limit > 100_000:
+            raise ValueError("discovery_limit must be between 1 and 100000")
+        if self.discovery_kind == "sitemap" and not self.discovery_sitemap_xml:
+            raise ValueError("discovery_sitemap_xml is required for sitemap discovery")
 
     def configuration(self) -> dict[str, Any]:
         """Return the non-secret configuration used for run identity."""
@@ -95,6 +114,11 @@ class AuditRequest:
             "include": list(self.include),
             "exclude": list(self.exclude),
             "selected_urls": list(self.selected_urls),
+            "discovery_kind": self.discovery_kind,
+            "discovery_urls": list(self.discovery_urls),
+            "discovery_sitemap_hash": hashlib.sha256(self.discovery_sitemap_xml.encode("utf-8")).hexdigest() if self.discovery_sitemap_xml else None,
+            "discovery_sitemap_urls": list(self.discovery_sitemap_urls),
+            "discovery_limit": self.discovery_limit,
             "render": self.render,
             "provider": self.provider,
             "ga_property": self.ga_property,
@@ -120,6 +144,7 @@ class AuditResult:
     seo_report: Any | None = None
     fact_views: tuple[FactView, ...] = ()
     mobile_report: Any | None = None
+    discovery_plan_hash: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         projection = self.mobile_report or self.seo_report or self.report
@@ -149,6 +174,11 @@ class AuditResult:
             payload["request"]["mode"] = self.request.mode
         if self.request.crawl:
             payload["request"]["crawl"] = True
+        if self.request.discovery_kind != "single" or self.request.discovery_limit != 1000:
+            payload["request"]["discovery_kind"] = self.request.discovery_kind
+            payload["request"]["discovery_limit"] = self.request.discovery_limit
+        if self.discovery_plan_hash is not None and (self.request.discovery_kind != "single" or self.request.discovery_limit != 1000):
+            payload["request"]["discovery_plan_hash"] = self.discovery_plan_hash
         if self.request.recommendation_limit != 10:
             payload["request"]["recommendation_limit"] = self.request.recommendation_limit
         return payload
@@ -208,6 +238,23 @@ class AuditService:
         logger.debug("collection fact views built pages=%d", len(views))
         return views
 
+    @staticmethod
+    def _discovery_seeds(target: str, request: AuditRequest) -> tuple[tuple[str, ...], str]:
+        if request.discovery_kind == "single":
+            source = SingleUrlSource(target)
+            return (), discovery_plan_hash(source, limit=request.discovery_limit)
+        elif request.discovery_kind == "list":
+            source = UrlListSource(tuple(request.discovery_urls) or (target,))
+        elif request.discovery_kind == "sitemap":
+            source = SitemapSource(request.discovery_sitemap_xml or "", target)
+        elif request.discovery_kind == "robots-sitemap":
+            source = RobotsSitemapSource(target, tuple(request.discovery_sitemap_urls))
+            return (), discovery_plan_hash(source, limit=request.discovery_limit)
+        else:
+            source = SingleUrlSource(target)
+        urls = tuple(dict.fromkeys(source.discover(limit=request.discovery_limit)))
+        return urls, discovery_plan_hash(source, limit=request.discovery_limit)
+
     def run(self, request: AuditRequest) -> AuditResult:
         if request.mode == "mobile":
             return self._run_mobile(request)
@@ -255,7 +302,24 @@ class AuditService:
             max_response_bytes=request.max_bytes,
             allowed_origins=frozenset({origin}),
         )
-        seeds = tuple(dict.fromkeys(self._validate_selected_urls(target, request.selected_urls)))
+        discovered_seeds, discovery_hash = self._discovery_seeds(target, request)
+        seeds = tuple(dict.fromkeys(self._validate_selected_urls(target, request.selected_urls or discovered_seeds)))
+        if request.discovery_kind == "robots-sitemap":
+            source = RobotsSitemapSource(target, tuple(request.discovery_sitemap_urls))
+
+            async def discover_robots() -> tuple[str, ...]:
+                async with Fetcher(policy=policy, timeout=request.timeout, transport=request.transport) as fetcher:
+                    return await source.discover_from_fetcher(fetcher, limit=request.discovery_limit)
+
+            seeds = tuple(dict.fromkeys(self._validate_selected_urls(target, asyncio.run(discover_robots()))))
+        logger.info(
+            "discovery plan run_id=%s kind=%s plan_hash=%s count=%d limit=%d",
+            context.run_id,
+            request.discovery_kind,
+            discovery_hash[:12],
+            len(seeds),
+            request.discovery_limit,
+        )
         check_include, scope_include = self._partition_filters(request.include, BY_ID)
         check_exclude, scope_exclude = self._partition_filters(request.exclude, BY_ID)
         logger.info(
@@ -266,12 +330,13 @@ class AuditService:
             scope_include,
             scope_exclude,
         )
+        follow_links = request.discovery_kind in {"single", "crawl"} and not bool(request.selected_urls)
         scope = CrawlScope(
             seeds or (target,),
             allowed_origins=(origin,),
             include_rules=scope_include,
             exclude_rules=scope_exclude,
-            follow_links=not bool(seeds),
+            follow_links=follow_links,
         )
         check_report = None
         rule_client = None
@@ -343,7 +408,7 @@ class AuditService:
             crawl.coverage.fetched,
             crawl.coverage.classification.value,
         )
-        return AuditResult(request, run, crawl, report, lineage_id, fact_views=fact_views)
+        return AuditResult(request, run, crawl, report, lineage_id, fact_views=fact_views, discovery_plan_hash=discovery_hash)
 
     def _run_mobile(self, request: AuditRequest) -> AuditResult:
         """Collect one page once, then project static and rendered mobile facts."""

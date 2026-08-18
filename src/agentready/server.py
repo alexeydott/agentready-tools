@@ -433,6 +433,11 @@ class V2AuditRequest(BaseModel):
     provider: str | None = None
     rescan_of: str | None = None
     selected_urls: list[str] = Field(default_factory=list)
+    discovery_kind: Literal["single", "list", "sitemap", "robots-sitemap", "crawl"] = "single"
+    discovery_urls: list[str] = Field(default_factory=list)
+    discovery_sitemap_xml: str | None = None
+    discovery_sitemap_urls: list[str] = Field(default_factory=list)
+    discovery_limit: int = Field(default=1000, ge=1, le=100_000)
 
 
 class SeoRequest(BaseModel):
@@ -873,6 +878,11 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None, p
             language=request.language,
             parent_run_id=parent_run_id if parent_run_id is not None else request.rescan_of,
             selected_urls=tuple(request.selected_urls),
+            discovery_kind=request.discovery_kind,
+            discovery_urls=tuple(request.discovery_urls),
+            discovery_sitemap_xml=request.discovery_sitemap_xml,
+            discovery_sitemap_urls=tuple(request.discovery_sitemap_urls),
+            discovery_limit=request.discovery_limit,
             store=store,
             progress_callback=progress_callback,
         )

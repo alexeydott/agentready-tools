@@ -63,6 +63,16 @@ semantics, and shared limit bound. CLI/API/MCP/dashboard transports validate
 edge input only and delegate filtering, sorting, and pagination to the same
 `AuditService`/`QueryService` workflow.
 
+Discovery sources are selected with the canonical audit request. The CLI uses
+`--discovery single|list|sitemap|robots-sitemap|crawl`, repeated
+`--discovery-url` values, `--discovery-sitemap-xml <local-file>`, and a bounded
+`--discovery-limit`. API and dashboard requests use the corresponding
+`discovery_kind`, `discovery_urls`, `discovery_sitemap_xml`,
+`discovery_sitemap_urls`, and `discovery_limit` fields. URL lists and sitemaps
+are deduplicated deterministically and constrained to the target origin;
+robots sitemap retrieval stays behind the bounded Fetcher/EgressPolicy
+boundary. Reports include a non-secret discovery plan hash for provenance.
+
 The `/dashboard` v2 preset uses `POST /v2/audit/dashboard` and renders the
 canonical `AuditService` result in an escaped HTML projection. The dashboard's
 advanced panel exposes the vNext crawl profile (`quick`, `standard`, `deep`),

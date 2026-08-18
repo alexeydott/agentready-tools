@@ -33,6 +33,16 @@ def test_cli_rejects_removed_v1_commands():
         parser.parse_args(["mobile", "audit", "https://example.com"])
 
 
+def test_cli_exposes_bounded_discovery_sources():
+    args = build_parser().parse_args([
+        "audit", "https://example.com", "--discovery", "list",
+        "--discovery-url", "https://example.com/docs", "--discovery-limit", "10",
+    ])
+    assert args.discovery_kind == "list"
+    assert args.discovery_url == ["https://example.com/docs"]
+    assert args.discovery_limit == 10
+
+
 def test_nested_cli_modes_include_usage_examples():
     command = next(action for action in build_parser()._actions if action.dest == "command")
     choices = command.choices

@@ -86,6 +86,10 @@ def _audit_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--include", action="append", default=[])
     p.add_argument("--exclude", action="append", default=[])
     p.add_argument("--select-url", action="append", default=[], help="Restrict a child rescan to explicit same-origin URLs")
+    p.add_argument("--discovery", dest="discovery_kind", choices=["single", "list", "sitemap", "robots-sitemap", "crawl"], default="single")
+    p.add_argument("--discovery-url", action="append", default=[], help="Bounded discovery URL for list or explicit sitemap roots")
+    p.add_argument("--discovery-sitemap-xml", help="Read a local sitemap XML document for bounded discovery")
+    p.add_argument("--discovery-limit", type=int, default=1000)
     p.add_argument("--render", action="store_true")
     p.add_argument("--provider")
     p.add_argument("--checks", action="append", default=[])
@@ -933,6 +937,11 @@ def _cmd_audit(args: argparse.Namespace) -> int:
             include=tuple(args.include),
             exclude=tuple(args.exclude),
             selected_urls=tuple(args.select_url),
+            discovery_kind=args.discovery_kind,
+            discovery_urls=tuple(args.discovery_url),
+            discovery_sitemap_xml=Path(args.discovery_sitemap_xml).read_text(encoding="utf-8") if args.discovery_sitemap_xml else None,
+            discovery_sitemap_urls=tuple(args.discovery_url) if args.discovery_kind == "robots-sitemap" else (),
+            discovery_limit=args.discovery_limit,
             render=args.render,
             provider=args.provider,
             language=args.language,

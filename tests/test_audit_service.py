@@ -10,6 +10,31 @@ from agentready.audit_service import AuditRequest, AuditService
 from agentready.crawler import CrawlCoverage, CrawlResult
 
 
+def test_audit_request_exposes_bounded_discovery_sources_and_provenance():
+    request = AuditRequest(
+        target="https://example.test/",
+        discovery_kind="list",
+        discovery_urls=("https://example.test/b", "https://example.test/a", "https://example.test/b"),
+        discovery_limit=2,
+    )
+    seeds, plan_hash = AuditService._discovery_seeds(request.target, request)
+    assert seeds == ("https://example.test/b", "https://example.test/a")
+    assert len(plan_hash) == 64
+    assert request.configuration()["discovery_kind"] == "list"
+
+
+def test_audit_request_sitemap_rejects_external_urls_and_missing_xml():
+    with pytest.raises(ValueError, match="discovery_sitemap_xml"):
+        AuditRequest(target="https://example.test/", discovery_kind="sitemap")
+    request = AuditRequest(
+        target="https://example.test/sitemap.xml",
+        discovery_kind="sitemap",
+        discovery_sitemap_xml="<urlset><url><loc>/a</loc></url><url><loc>https://other.test/b</loc></url></urlset>",
+    )
+    seeds, _ = AuditService._discovery_seeds("https://example.test/", request)
+    assert seeds == ("https://example.test/a",)
+
+
 def test_audit_check_limit_is_bounded_and_zero_means_unlimited():
     checks = [object(), object(), object()]
     assert len(AuditService._apply_check_limit(checks, {"check_limit": 2})) == 2
