@@ -8,6 +8,24 @@ import pytest
 
 from agentready.audit_service import AuditRequest, AuditService
 from agentready.crawler import CrawlCoverage, CrawlResult
+from tests.fixtures.site_lab import SiteLabServer
+
+
+def test_seo_normalizes_content_type_parameters_from_fixture():
+    with SiteLabServer() as site:
+        result = AuditService().run(
+            AuditRequest(
+                target=site.base_url,
+                mode="seo",
+                crawl=True,
+                max_pages=4,
+                allow_private=True,
+            )
+        )
+
+    page_available = [check for check in result.seo_report.checks if check.id == "page-available"]
+    assert page_available
+    assert page_available[0].status == "pass"
 
 
 def test_audit_request_exposes_bounded_discovery_sources_and_provenance():

@@ -609,7 +609,9 @@ class AuditService:
             if view.facts is None:
                 continue
             representation = view.representation
-            content_type = representation.content_type if representation is not None else ""
+            content_type = representation.content_type.split(";", 1)[0].strip().lower() if representation is not None else ""
+            if representation is not None and representation.content_type != content_type:
+                logger.info("[FIX:seo-content-type] normalized content type url=%s raw=%s normalized=%s", view.url, representation.content_type, content_type)
             evidence = evidence_from_parsed_page(
                 view,
                 url=view.url,

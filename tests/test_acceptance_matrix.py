@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from threading import Lock
 
 from agentready.cli import build_parser
@@ -32,6 +33,7 @@ def test_l1_deterministic_dashboard_fixture_is_localized():
     assert 'id="v2-inventory-panel"' in html
     assert 'id="v2-inventory-next"' in html
     assert "saveV2InventoryView" in html
+    assert not re.search(r"<summary\\b[^>]*>.*?class=['\"]hint", html, re.DOTALL)
 
 
 def test_l2_cli_api_surface_contracts_preserve_shared_fields():
