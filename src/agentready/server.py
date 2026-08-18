@@ -268,6 +268,11 @@ def _run_provider_enrichment(run_id: str, request: ProviderEnrichmentRequest) ->
     if not urls:
         page = service.run_urls(RunUrlQuery(run_id, limit=100))
         urls = [item.url_key for item in page.items]
+    metric_inputs = tuple(
+        item
+        for item in request.cached_metrics
+        if item.url_key is None or item.url_key in urls
+    )
     metrics = tuple(
         ExternalMetric(
             request.provider,
@@ -278,8 +283,7 @@ def _run_provider_enrichment(run_id: str, request: ProviderEnrichmentRequest) ->
             item.version,
             item.observed_at,
         )
-        for item in request.cached_metrics
-        if item.url_key is None or item.url_key in urls
+        for item in metric_inputs
     )
     if not metrics:
         result = {
@@ -297,6 +301,8 @@ def _run_provider_enrichment(run_id: str, request: ProviderEnrichmentRequest) ->
             config=ProviderConfig(),
             cached=metrics,
             sample_urls=tuple(urls),
+            scope=request.scope or request.property_ref or request.site,
+            metric_url_keys=tuple(item.url_key for item in metric_inputs),
         )
         result = service_result.to_dict()
         result["sample_count"] = len(urls)
@@ -581,6 +587,9 @@ class ProviderMetricInput(BaseModel):
 
 class ProviderEnrichmentRequest(BaseModel):
     provider: Literal["pagespeed", "ga4", "gsc", "url-inspection"]
+    scope: str | None = Field(default=None, max_length=2048)
+    property_ref: str | None = Field(default=None, max_length=128)
+    site: str | None = Field(default=None, max_length=2048)
     sample_urls: list[str] = Field(default_factory=list, max_length=100)
     cached_metrics: list[ProviderMetricInput] = Field(default_factory=list, max_length=500)
 

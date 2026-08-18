@@ -28,7 +28,12 @@ def test_provider_service_requires_explicit_operation_and_never_persists_secret_
     store = MemorySiteStore()
     store.begin_run(RunRecord("run-1", "config", "tool", "rules"))
     service = ProviderService(store)
-    result = service.enrich("run-1", "gsc", config=ProviderConfig(credential_ref="vault:gsc"))
+    result = service.enrich("run-1", "gsc", config=ProviderConfig(credential_ref="vault:gsc"), scope="https://example.test")
     assert result.result.status.value == "not_requested"
     assert result.to_dict()["credential_ref"] == "vault:gsc"
     assert "secret_value" not in str(result.to_dict())
+
+
+def test_provider_scope_validation_normalizes_ga_and_search_console_references():
+    assert ProviderService.validate_scope("ga4", "123") == "properties/123"
+    assert ProviderService.validate_scope("gsc", "HTTPS://Example.test/") == "https://example.test"

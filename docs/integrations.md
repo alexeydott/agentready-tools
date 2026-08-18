@@ -225,6 +225,13 @@ unavailable, quota, timeout, and stale-cache states remain explicit. Transport
 handlers do not instantiate provider adapters directly, and raw credentials or
 authenticated responses are not persisted.
 
+GA4 scopes accept numeric property IDs (normalized to `properties/<id>`).
+Search Console and URL Inspection scopes accept credential-free HTTP(S) site
+URLs and are normalized to their origin/path. Cached fixture metrics retain
+their page URL when supplied; repeated writes are idempotent and every metric
+keeps provider, adapter version, source, observation time, and cache freshness
+provenance.
+
 Generic inventory parity:
 
 ```bash

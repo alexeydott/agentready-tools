@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlsplit
 
 from .audit_core.store import SiteStore
 from .metrics import (
@@ -94,6 +95,22 @@ class ProviderService:
         except KeyError as exc:
             raise ValueError("unsupported provider") from exc
 
+    @classmethod
+    def validate_scope(cls, provider: str, scope: str | None) -> str | None:
+        """Validate a GA property or Search Console site scope without secrets."""
+        if provider == "ga4":
+            if scope is None or not (scope.isdigit() or (scope.startswith("properties/") and scope[10:].isdigit())):
+                raise ValueError("GA4 scope must be a numeric property ID")
+            return scope if scope.startswith("properties/") else f"properties/{scope}"
+        if provider in {"gsc", "url-inspection"}:
+            if scope is None:
+                raise ValueError("Search Console scope is required")
+            parsed = urlsplit(scope)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+                raise ValueError("Search Console scope must be an HTTP(S) site URL without credentials")
+            return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}" or f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+        return scope
+
     def enrich(
         self,
         run_id: str,
@@ -103,9 +120,12 @@ class ProviderService:
         operation: Operation | None = None,
         cached: tuple[ExternalMetric, ...] | None = None,
         sample_urls: tuple[str, ...] = (),
+        scope: str | None = None,
+        metric_url_keys: tuple[str | None, ...] = (),
     ) -> ProviderServiceResult:
+        normalized_scope = self.validate_scope(provider, scope) if provider in {"ga4", "gsc", "url-inspection"} else scope
         adapter = self.adapter(provider, config)
-        scope_hash = hashlib.sha256(json.dumps({"provider": provider, "urls": sorted(set(sample_urls))}, sort_keys=True).encode()).hexdigest()[:24]
+        scope_hash = hashlib.sha256(json.dumps({"provider": provider, "scope": normalized_scope, "urls": sorted(set(sample_urls))}, sort_keys=True).encode()).hexdigest()[:24]
         now = datetime.now(UTC)
         persisted = self._load_cache(run_id, provider, scope_hash, now)
         if persisted is not None and cached is None and operation is None:
@@ -119,7 +139,7 @@ class ProviderService:
         collected = now.isoformat(timespec="seconds")
         expires = (now + timedelta(seconds=self.cache_ttl_seconds)).isoformat(timespec="seconds")
         service_result = ProviderServiceResult(result, collected, expires, credential_ref=config.credential_ref)
-        self._persist(run_id, provider, scope_hash, service_result)
+        self._persist(run_id, provider, scope_hash, service_result, metric_url_keys)
         logger.info("provider service completed provider=%s run_id=%s status=%s metrics=%d cache_ttl=%d", provider, run_id, result.status.value, len(result.metrics), self.cache_ttl_seconds)
         return service_result
 
@@ -140,12 +160,11 @@ class ProviderService:
         result = ProviderResult(provider, ProviderStatus(str(payload.get("status", ProviderStatus.AVAILABLE.value))), metrics, payload.get("detail"), payload.get("quota_remaining"), from_cache=True)
         return ProviderServiceResult(result, str(payload.get("collected_at")), str(payload.get("expires_at")), credential_ref=payload.get("credential_ref"))
 
-    def _persist(self, run_id: str, provider: str, scope_hash: str, value: ProviderServiceResult) -> None:
-        for metric in value.result.metrics:
-            self.store.put_metric(metric.to_record(run_id))
+    def _persist(self, run_id: str, provider: str, scope_hash: str, value: ProviderServiceResult, metric_url_keys: tuple[str | None, ...] = ()) -> None:
+        for index, metric in enumerate(value.result.metrics):
+            self.store.put_metric(metric.to_record(run_id, url_key=metric_url_keys[index] if index < len(metric_url_keys) else None))
         payload = value.result.to_dict()
         payload.update({"collected_at": value.collected_at, "expires_at": value.expires_at, "metrics": [item.to_dict() for item in value.result.metrics]})
         if value.credential_ref:
             payload["credential_ref"] = value.credential_ref
         self.store.put_evidence(run_id, f"provider-cache:{provider}:{scope_hash}", payload)
-

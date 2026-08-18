@@ -21,6 +21,7 @@ from .agentfindings import build_findings, build_remediation_plan
 from .audit_service import AuditRequest, AuditService
 from .exports import export_query
 from .metrics import ExternalMetric, ProviderStatus, cached_result
+from .provider_service import ProviderService
 from .mobile_scanner import audit_mobile
 from .query_service import QueryService
 from .report_storage import save_report
@@ -127,6 +128,7 @@ def seo_audit_v2(
 def provider_enrichment_v2(
     provider: str,
     cached_metrics: list[dict] | None = None,
+    scope: str | None = None,
 ) -> dict:
     """Normalize a bounded cached provider fixture without accepting credentials.
 
@@ -137,6 +139,7 @@ def provider_enrichment_v2(
     supported = {"pagespeed", "ga4", "gsc", "url-inspection"}
     if provider not in supported:
         raise ValueError("unsupported provider")
+    normalized_scope = ProviderService.validate_scope(provider, scope) if provider in {"ga4", "gsc", "url-inspection"} else scope
     metrics = tuple(
         ExternalMetric(
             provider,
@@ -159,6 +162,8 @@ def provider_enrichment_v2(
             "from_cache": False,
         }
     result = cached_result(provider, metrics).to_dict()
+    if normalized_scope:
+        result["scope"] = normalized_scope
     logger.info("MCP provider fixture normalized provider=%s metrics=%d", provider, len(metrics))
     return result
 
