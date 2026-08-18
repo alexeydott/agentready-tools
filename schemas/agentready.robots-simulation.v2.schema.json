@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentready.dev/schemas/agentready.robots-simulation.v2.schema.json",
+  "title": "AgentReady Virtual Robots simulation v2 contract",
+  "type": "object",
+  "required": [
+    "schema",
+    "run_id",
+    "origin",
+    "interpretation",
+    "live_policy_hash",
+    "proposed_policy_hash",
+    "newly_allowed",
+    "newly_blocked",
+    "sitemap_conflicts",
+    "important_page_conflicts",
+    "per_bot_diff"
+  ],
+  "properties": {
+    "schema": {"const": "agentready.robots-simulation.v2"},
+    "run_id": {"type": "string", "minLength": 1},
+    "origin": {"type": "string", "format": "uri"},
+    "interpretation": {"enum": ["rfc9309", "google"]},
+    "live_policy_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "proposed_policy_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "newly_allowed": {"type": "array", "items": {"type": "string", "format": "uri"}},
+    "newly_blocked": {"type": "array", "items": {"type": "string", "format": "uri"}},
+    "sitemap_conflicts": {"type": "array", "items": {"type": "string", "format": "uri"}},
+    "important_page_conflicts": {"type": "array", "items": {"type": "string", "format": "uri"}},
+    "per_bot_diff": {"type": "object", "additionalProperties": {"type": "object"}},
+    "label": {"type": "string"}
+  },
+  "additionalProperties": true
+}

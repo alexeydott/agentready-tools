@@ -43,6 +43,17 @@ def test_cli_exposes_bounded_discovery_sources():
     assert args.discovery_limit == 10
 
 
+def test_cli_exposes_virtual_robots_simulation():
+    args = build_parser().parse_args([
+        "robots", "simulate", "run-1", "--proposed", "robots-new.txt",
+        "--user-agent", "Googlebot", "--interpretation", "google",
+    ])
+    assert args.robots_command == "simulate"
+    assert args.proposed == "robots-new.txt"
+    assert args.user_agents == ["Googlebot"]
+    assert args.interpretation == "google"
+
+
 def test_nested_cli_modes_include_usage_examples():
     command = next(action for action in build_parser()._actions if action.dest == "command")
     choices = command.choices

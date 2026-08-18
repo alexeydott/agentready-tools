@@ -135,6 +135,19 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     compare.add_argument("--base-url", default="http://127.0.0.1:8765")
     compare.add_argument("--max-pages", type=int, default=25)
 
+    robots = _add_command_parser(sub, "robots", help="Simulate bounded virtual robots policies over a stored v2 run")
+    robots_commands = robots.add_subparsers(dest="robots_command", required=True)
+    simulate = _add_command_parser(robots_commands, "simulate", help="Compare live and proposed robots rules without refetching")
+    simulate.add_argument("run_id")
+    simulate.add_argument("--proposed", required=True, help="Proposed robots.txt file")
+    simulate.add_argument("--live", help="Live robots.txt file; defaults to an empty policy")
+    simulate.add_argument("--user-agent", action="append", dest="user_agents", default=[])
+    simulate.add_argument("--observed-page", action="append", default=[])
+    simulate.add_argument("--interpretation", choices=["rfc9309", "google"], default="rfc9309")
+    simulate.add_argument("--origin")
+    simulate.add_argument("--base-url", default="http://127.0.0.1:8765")
+    simulate.add_argument("--output", "-o")
+
 
 def build_parser() -> argparse.ArgumentParser:
     logger.debug("Building CLI parser: frozen=%s", bool(getattr(sys, "frozen", False)))
@@ -802,6 +815,29 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_robots(args: argparse.Namespace) -> int:
+    live = Path(args.live).read_text(encoding="utf-8") if args.live else ""
+    proposed = Path(args.proposed).read_text(encoding="utf-8")
+    payload = {
+        "live_robots": live,
+        "proposed_robots": proposed,
+        "user_agents": args.user_agents or ["*"],
+        "observed_search_pages": args.observed_page,
+        "interpretation": args.interpretation,
+        "origin": args.origin,
+    }
+    result = _http_json(
+        args.base_url,
+        f"/v2/runs/{urllib.parse.quote(args.run_id, safe='')}/robots/simulate",
+        method="POST",
+        payload=payload,
+    )
+    content = json.dumps(result, ensure_ascii=False, indent=2)
+    _write_cli_output(content, args.output)
+    logger.info("CLI robots simulation run_id=%s bots=%d", args.run_id, len(args.user_agents or ["*"]))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     try:
         for stream in (sys.stdout, sys.stderr):
@@ -830,6 +866,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_rescan(args)
         if args.command == "compare":
             return _cmd_compare(args)
+        if args.command == "robots":
+            return _cmd_robots(args)
         if args.command == "ai":
             return _cmd_ai(args)
         if args.command == "checks":

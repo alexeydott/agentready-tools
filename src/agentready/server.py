@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import logging
@@ -12,6 +13,7 @@ from dataclasses import asdict, is_dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 try:
     from fastapi import FastAPI, HTTPException, Query, Request
@@ -63,6 +65,7 @@ from .registry import CHECKS
 from .remediation import remediation_for
 from .report_storage import save_report
 from .report_v2 import diff_reports, export_inventory, report_from_dict
+from .robots import RobotsInterpretation, RobotsSimulationService, parse_robots
 from .saved_views import SavedView, SavedViewRegistry
 from .seo_checks import SEO_CHECK_METADATA, SEO_CHECKS_BY_ID
 from .seo_crawler import CRAWL_CHECK_METADATA
@@ -438,6 +441,15 @@ class V2AuditRequest(BaseModel):
     discovery_sitemap_xml: str | None = None
     discovery_sitemap_urls: list[str] = Field(default_factory=list)
     discovery_limit: int = Field(default=1000, ge=1, le=100_000)
+
+
+class RobotsSimulationRequest(BaseModel):
+    live_robots: str = Field(default="", max_length=500 * 1024)
+    proposed_robots: str = Field(min_length=1, max_length=500 * 1024)
+    user_agents: list[str] = Field(default_factory=lambda: ["*"] , min_length=1, max_length=8)
+    observed_search_pages: list[str] = Field(default_factory=list, max_length=1000)
+    interpretation: Literal["rfc9309", "google"] = "rfc9309"
+    origin: str | None = Field(default=None, max_length=2048)
 
 
 class SeoRequest(BaseModel):
@@ -991,6 +1003,73 @@ def _run_and_save_v2_job(request: V2AuditRequest, progress_callback: object) -> 
     html_path = save_report(_render_v2_dashboard(payload), target=request.url, surface="job-v2", fmt="html")
     logger.info("background v2 report saved json=%s html=%s", json_path, html_path)
     return payload
+
+
+def _robots_diff_payload(run_id: str, request: RobotsSimulationRequest) -> dict:
+    try:
+        store = _V2_RUNS.get(run_id)
+    except KeyError as exc:
+        raise ValueError("run not found") from exc
+    query = QueryService(store)
+    first_page = query.run_urls(RunUrlQuery(run_id, limit=1))
+    if not first_page.items and not request.origin:
+        raise ValueError("origin is required when the run has no stored URLs")
+    origin = request.origin or f"{urlsplit(first_page.items[0].url_key).scheme}://{urlsplit(first_page.items[0].url_key).netloc}"
+    live = parse_robots(request.live_robots, origin)
+    simulated = parse_robots(request.proposed_robots, origin)
+    interpretation = RobotsInterpretation(request.interpretation)
+    service = RobotsSimulationService(query)
+    per_bot: dict[str, dict] = {}
+    for user_agent in dict.fromkeys(request.user_agents):
+        diff = service.simulate(
+            run_id,
+            live,
+            simulated,
+            user_agent=user_agent,
+            observed_search_pages=request.observed_search_pages,
+            interpretation=interpretation,
+        )
+        per_bot[user_agent] = {
+            "newly_allowed": list(diff.newly_allowed_urls),
+            "newly_blocked": list(diff.newly_blocked_urls),
+            "sitemap_conflicts": list(diff.sitemap_urls_affected),
+            "important_page_conflicts": list(diff.observed_search_pages_affected),
+        }
+    primary = per_bot[request.user_agents[0]]
+    live_hash = hashlib.sha256(request.live_robots.encode("utf-8")).hexdigest()
+    proposed_hash = hashlib.sha256(request.proposed_robots.encode("utf-8")).hexdigest()
+    logger.info(
+        "[FIX:robots-simulation] run_id=%s interpretation=%s bots=%d live_hash=%s proposed_hash=%s affected=%d",
+        run_id,
+        request.interpretation,
+        len(per_bot),
+        live_hash[:12],
+        proposed_hash[:12],
+        sum(len(item["newly_allowed"]) + len(item["newly_blocked"]) for item in per_bot.values()),
+    )
+    return {
+        "schema": "agentready.robots-simulation.v2",
+        "run_id": run_id,
+        "origin": origin,
+        "interpretation": request.interpretation,
+        "live_policy_hash": live_hash,
+        "proposed_policy_hash": proposed_hash,
+        "newly_allowed": primary["newly_allowed"],
+        "newly_blocked": primary["newly_blocked"],
+        "sitemap_conflicts": primary["sitemap_conflicts"],
+        "important_page_conflicts": primary["important_page_conflicts"],
+        "per_bot_diff": per_bot,
+        "label": "SIMULATION - site not changed",
+    }
+
+
+@app.post("/v2/runs/{run_id}/robots/simulate")
+def robots_simulate_endpoint(run_id: str, request: RobotsSimulationRequest) -> dict:
+    """Compare supplied robots policies against stored inventory without refetching."""
+    try:
+        return _robots_diff_payload(run_id, request)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/v2/audit")

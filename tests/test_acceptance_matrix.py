@@ -33,6 +33,8 @@ def test_l1_deterministic_dashboard_fixture_is_localized():
     assert 'id="v2-inventory-panel"' in html
     assert 'id="v2-inventory-next"' in html
     assert "saveV2InventoryView" in html
+    assert 'id="robots-simulation-panel"' in html
+    assert "simulateRobots" in html
     assert not re.search(r"<summary\\b[^>]*>.*?class=['\"]hint", html, re.DOTALL)
 
 

@@ -88,6 +88,7 @@ class RobotsSimulationService:
         *,
         user_agent: str = "*",
         observed_search_pages: list[str] | tuple[str, ...] = (),
+        interpretation: RobotsInterpretation = RobotsInterpretation.RFC9309,
     ) -> RobotsPolicyDiff:
         cursor: str | None = None
         urls: list[str] = []
@@ -103,6 +104,7 @@ class RobotsSimulationService:
             urls,
             user_agent=user_agent,
             observed_search_pages=observed_search_pages,
+            interpretation=interpretation,
         )
 
 

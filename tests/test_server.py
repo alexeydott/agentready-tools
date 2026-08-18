@@ -85,6 +85,30 @@ def test_server_rejects_removed_v1_audit_routes():
         assert client.post(path, json={"url": "https://example.com"}).status_code == 404
 
 
+def test_virtual_robots_endpoint_uses_stored_inventory_without_fetching():
+    run_id = "run-robots-http"
+    store = MemorySiteStore()
+    store.begin_run(RunRecord(run_id, "config", "tool", "rules"))
+    for url in ("https://example.com/public/a", "https://example.com/private/a"):
+        store.put_run_url(RunUrlRecord(run_id, url, RunUrlState.PARSED))
+    server_module._V2_RUNS.put(run_id, store)
+
+    response = TestClient(app).post(
+        f"/v2/runs/{run_id}/robots/simulate",
+        json={
+            "live_robots": "User-agent: *\nAllow: /\n",
+            "proposed_robots": "User-agent: *\nDisallow: /private\n",
+            "user_agents": ["Googlebot", "GPTBot"],
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["schema"] == "agentready.robots-simulation.v2"
+    assert payload["newly_blocked"] == ["https://example.com/private/a"]
+    assert set(payload["per_bot_diff"]) == {"Googlebot", "GPTBot"}
+    assert payload["label"].startswith("SIMULATION")
+
+
 def test_provider_enrichment_is_cached_opt_in_and_persists_typed_metrics():
     run_id = "run-provider-http"
     store = MemorySiteStore()

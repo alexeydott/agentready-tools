@@ -73,6 +73,16 @@ are deduplicated deterministically and constrained to the target origin;
 robots sitemap retrieval stays behind the bounded Fetcher/EgressPolicy
 boundary. Reports include a non-secret discovery plan hash for provenance.
 
+Virtual Robots simulation compares supplied live and proposed robots policies
+against a completed run's stored URL inventory without refetching pages or
+publishing robots.txt. Use `agentready robots simulate RUN_ID --proposed
+robots-new.txt --live robots-live.txt`; the API equivalent is
+`POST /v2/runs/{run_id}/robots/simulate` with `live_robots`, `proposed_robots`,
+`user_agents`, and optional `interpretation` (`rfc9309` or `google`). The
+response includes policy hashes, newly allowed/blocked URLs, sitemap and
+important-page conflicts, and per-bot diffs. The dashboard exposes the same
+bounded diff after a v2 run is loaded.
+
 The `/dashboard` v2 preset uses `POST /v2/audit/dashboard` and renders the
 canonical `AuditService` result in an escaped HTML projection. The dashboard's
 advanced panel exposes the vNext crawl profile (`quick`, `standard`, `deep`),

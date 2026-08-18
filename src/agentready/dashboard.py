@@ -229,6 +229,13 @@ _TEXT = {
         "result": "Operation result",
         "ready": "Configure an audit and choose an operation.",
         "v2_inventory": "Run inventory",
+        "robots_simulation": "Virtual Robots simulation",
+        "robots_live": "Current robots.txt",
+        "robots_proposed": "Proposed robots.txt",
+        "robots_user_agents": "User agents (comma-separated)",
+        "robots_simulate": "Simulate policy",
+        "robots_empty": "Run an audit before simulating robots policy.",
+        "robots_result": "Robots simulation result",
         "v2_discovery": "Discovery source",
         "v2_discovery_single": "Single URL",
         "v2_discovery_list": "URL list",
@@ -490,6 +497,13 @@ _TEXT = {
         "result": "Результат операции",
         "ready": "Настройте аудит и выберите операцию.",
         "v2_inventory": "Инвентарь запуска",
+        "robots_simulation": "Симуляция Virtual Robots",
+        "robots_live": "Текущий robots.txt",
+        "robots_proposed": "Предлагаемый robots.txt",
+        "robots_user_agents": "User-agent (через запятую)",
+        "robots_simulate": "Симулировать политику",
+        "robots_empty": "Сначала выполните аудит, затем симулируйте robots-политику.",
+        "robots_result": "Результат симуляции robots",
         "v2_discovery": "Источник обнаружения",
         "v2_discovery_single": "Один URL",
         "v2_discovery_list": "Список URL",
@@ -821,6 +835,11 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 </div>
 <div id="v2-inventory-status" role="status" aria-live="polite"></div>
 <div id="v2-inventory" role="region" aria-live="polite">{escape(text["v2_inventory_empty"])}</div>
+</section>
+<section id="robots-simulation-panel" class="panel" hidden aria-labelledby="robots-simulation-title">
+<h2 id="robots-simulation-title">{escape(text["robots_simulation"])}</h2>
+<div class="form-grid three"><label for="robots-live">{escape(text["robots_live"])}<textarea id="robots-live" rows="5"></textarea></label><label for="robots-proposed">{escape(text["robots_proposed"])}<textarea id="robots-proposed" rows="5"></textarea></label><div><label for="robots-user-agents">{escape(text["robots_user_agents"])}</label><input id="robots-user-agents" value="*"><button type="button" class="secondary" onclick="simulateRobots()">{escape(text["robots_simulate"])}</button></div></div>
+<div id="robots-simulation-status" role="status" aria-live="polite">{escape(text["robots_empty"])}</div><div id="robots-simulation-result" role="region" aria-live="polite"></div>
 </section>
 <section id="ai-assistant-panel" class="panel ai-workspace" hidden aria-labelledby="ai-workspace-title">
 <div class="ai-workspace-header"><div class="ai-header-title"><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><div class="ai-header-meta"><small>{escape(text["ai_hint"])}</small><span id="ai-model-chip" class="ai-model-chip" title="{escape(text["ai_model_chip"])}">{escape(text["ai_model_chip"])}: —</span></div></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" title="{escape(text["ai_saved_chats"])}" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><div class="ai-mode-segmented" role="group" aria-label="{escape(text["ai_mode"])}"><button type="button" data-ai-mode="both" title="{escape(text["ai_mode_both_hint"])}" onclick="setAiMode('both')">{escape(text["ai_mode_both"])}</button><button type="button" data-ai-mode="seo" title="{escape(text["ai_mode_seo_hint"])}" onclick="setAiMode('seo')">{escape(text["ai_mode_seo"])}</button><button type="button" data-ai-mode="geo" title="{escape(text["ai_mode_geo_hint"])}" onclick="setAiMode('geo')">{escape(text["ai_mode_geo"])}</button></div><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
@@ -1176,6 +1195,8 @@ function captureV2Report(reportText, required=false) {{
     const end = reportText.indexOf("<" + "/script>", start);
     if (start >= 0 && end > start) {{
       window.agentreadyV2Report = JSON.parse(reportText.slice(start + v2Marker.length, end));
+      const robotsPanel = document.getElementById("robots-simulation-panel");
+      if (robotsPanel) robotsPanel.hidden = false;
       console.info("[FIX:ai-audit-context] Embedded audit report captured", {{bytes:reportText.length, findings:(window.agentreadyV2Report.findings || []).length}});
       return window.agentreadyV2Report;
     }}
@@ -1261,6 +1282,23 @@ let v2InventoryCursor = null;
 let v2InventoryItems = [];
 let v2InventoryCounts = {{}};
 let v2InventoryOverviewRunId = null;
+async function simulateRobots() {{
+  const report = window.agentreadyV2Report;
+  const status = document.getElementById("robots-simulation-status");
+  const output = document.getElementById("robots-simulation-result");
+  const runId = report && report.run ? report.run.id : null;
+  if (!runId) {{ status.textContent = translations[language.value].robots_empty; return; }}
+  const userAgents = document.getElementById("robots-user-agents").value.split(",").map(value => value.trim()).filter(Boolean);
+  try {{
+    status.textContent = translations[language.value].progress_fetch;
+    const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/robots/simulate", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{live_robots:document.getElementById("robots-live").value,proposed_robots:document.getElementById("robots-proposed").value,user_agents:userAgents.length ? userAgents : ["*"]}})}});
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const data = await response.json();
+    const rows = data.newly_blocked.map(url => "<tr><td>newly blocked</td><td>" + escapeHtml(url) + "</td></tr>").join("") + data.newly_allowed.map(url => "<tr><td>newly allowed</td><td>" + escapeHtml(url) + "</td></tr>").join("");
+    output.innerHTML = "<p>" + escapeHtml(data.label) + "</p><table><thead><tr><th>Change</th><th>URL</th></tr></thead><tbody>" + (rows || "<tr><td colspan='2'>No URL changes</td></tr>") + "</tbody></table>";
+    status.textContent = translations[language.value].robots_result;
+  }} catch (error) {{ status.textContent = translations[language.value].robots_result + ": " + error.message; }}
+}}
 async function loadV2Inventory(kind=null, cursor=null) {{
   const report = window.agentreadyV2Report;
   const runId = report && report.run ? report.run.id : null;
