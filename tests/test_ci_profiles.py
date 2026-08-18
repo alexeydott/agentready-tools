@@ -7,6 +7,12 @@ def test_ci_profiles_install_explicit_dependency_sets_and_isolate_mcp_collection
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     release = (ROOT / ".github" / "workflows" / "release-validation.yml").read_text(encoding="utf-8")
 
+    for workflow in (ci, release):
+        assert "actions/checkout@v6" in workflow
+        assert "actions/setup-python@v6" in workflow
+        assert "actions/checkout@v4" not in workflow
+        assert "actions/setup-python@v5" not in workflow
+
     assert 'python -m pip install -e ".[dev,server]"' in ci
     assert 'python -m pip install -e ".[dev,mcp,server]"' in ci
     assert 'tests/test_acceptance_mcp.py' in ci
