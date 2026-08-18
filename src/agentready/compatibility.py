@@ -35,6 +35,7 @@ V2_SURFACES = (
     "/v2/jobs/{job_id}",
     "/v2/jobs/{job_id}/cancel",
     "/v2/runs/{run_id}/provider-enrichment",
+    "/v2/runs/{run_id}/url-inspection",
     "/v2/runs/{run_id}/provider-jobs",
     "/v2/runs/{run_id}/robots/simulate",
     "/v2/runs/{run_id}/sitemap/reconcile",

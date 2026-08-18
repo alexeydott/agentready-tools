@@ -89,6 +89,58 @@ class ProviderService:
     def capabilities(cls) -> tuple[ProviderCapability, ...]:
         return tuple(ProviderCapability(provider, "adapter-v1", capabilities) for provider, capabilities in sorted(cls._CAPABILITIES.items()))
 
+    @classmethod
+    def select_urls(cls, scope: str, urls: tuple[str, ...] | list[str], *, limit: int = 100) -> tuple[str, ...]:
+        """Select a deterministic same-origin URL sample for URL Inspection."""
+        if limit <= 0 or limit > 1000:
+            raise ValueError("URL Inspection sample limit must be between 1 and 1000")
+        normalized_scope = cls.validate_scope("url-inspection", scope)
+        scope_parts = urlsplit(normalized_scope or "")
+        selected = {
+            url.strip()
+            for url in urls
+            if isinstance(url, str) and url.strip()
+            and urlsplit(url).scheme.lower() == scope_parts.scheme
+            and urlsplit(url).netloc.lower() == scope_parts.netloc
+        }
+        return tuple(sorted(selected)[:limit])
+
+    def inspect_url_fixtures(
+        self,
+        run_id: str,
+        *,
+        scope: str,
+        urls: tuple[str, ...] | list[str],
+        observations: Mapping[str, Mapping[str, Any]],
+        max_urls: int = 100,
+        version: str = "search-console-v1",
+        observed_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Normalize bounded URL Inspection fixtures and persist URL-linked evidence."""
+        selected = self.select_urls(scope, urls, limit=max_urls)
+        timestamp = observed_at or datetime.now(UTC).isoformat(timespec="seconds")
+        expires_at = (datetime.fromisoformat(timestamp.replace("Z", "+00:00")) + timedelta(seconds=self.cache_ttl_seconds)).isoformat(timespec="seconds")
+        allowed_states = {"indexed", "not_indexed", "unknown", "blocked", "error", "insufficient_data"}
+        items: list[dict[str, Any]] = []
+        for url in selected:
+            raw = observations.get(url, {})
+            state = str(raw.get("state", "unknown")).lower()
+            if state not in allowed_states:
+                state = "unknown"
+            coverage = str(raw.get("coverage", "complete" if url in observations else "unavailable")).lower()
+            if coverage not in {"complete", "partial", "unavailable"}:
+                coverage = "partial"
+            item = {"url": url, "state": state, "coverage": coverage, "canonical": raw.get("canonical"), "version": str(raw.get("version", version)), "observed_at": timestamp, "expires_at": expires_at}
+            items.append(item)
+            metric = ExternalMetric("url-inspection", "index_state", state, None, "url-inspection", item["version"], timestamp)
+            self.store.put_metric(metric.to_record(run_id, url_key=url))
+            self.store.put_evidence(run_id, f"url-inspection:{url}", item)
+        coverage_state = "complete" if items and all(item["coverage"] == "complete" for item in items) else "partial" if items else "unavailable"
+        result = {"schema": "agentready.provider.url-inspection.v2", "provider": "url-inspection", "scope": self.validate_scope("url-inspection", scope), "version": version, "sampled_count": len(items), "budget": max_urls, "coverage": coverage_state, "freshness": {"observed_at": timestamp, "expires_at": expires_at, "fresh": True}, "items": items}
+        self.store.put_evidence(run_id, "provider:url-inspection:summary", result)
+        logger.info("url inspection complete run_id=%s sampled=%d coverage=%s version=%s", run_id, len(items), coverage_state, version)
+        return result
+
     def adapter(self, provider: str, config: ProviderConfig) -> ProviderAdapter:
         try:
             return self._FACTORIES[provider](config)

@@ -232,6 +232,14 @@ their page URL when supplied; repeated writes are idempotent and every metric
 keeps provider, adapter version, source, observation time, and cache freshness
 provenance.
 
+URL Inspection fixtures can be normalized through
+`POST /v2/runs/{run_id}/url-inspection` with a credential-free site scope and a
+bounded URL list. Selection is deterministic and same-origin; states are
+normalized to `indexed`, `not_indexed`, `unknown`, `blocked`, `error`, or
+`insufficient_data`, with explicit complete/partial/unavailable coverage and
+freshness. Evidence is stored under each run URL and is queryable through the
+existing bounded metrics/inventory dashboard projection.
+
 Generic inventory parity:
 
 ```bash

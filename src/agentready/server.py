@@ -594,6 +594,15 @@ class ProviderEnrichmentRequest(BaseModel):
     cached_metrics: list[ProviderMetricInput] = Field(default_factory=list, max_length=500)
 
 
+class UrlInspectionRequest(BaseModel):
+    scope: str = Field(min_length=1, max_length=2048)
+    urls: list[str] = Field(min_length=1, max_length=1000)
+    observations: dict[str, dict[str, object]] = Field(default_factory=dict)
+    max_urls: int = Field(default=100, ge=1, le=1000)
+    version: str = Field(default="search-console-v1", min_length=1, max_length=80)
+    observed_at: str | None = Field(default=None, max_length=80)
+
+
 class AIRequest(BaseModel):
     mode: Literal["seo", "geo", "both"] = "both"
     operation: Literal["recommend", "chat"] = "recommend"
@@ -1465,6 +1474,26 @@ def provider_enrichment_endpoint(run_id: str, request: ProviderEnrichmentRequest
         return _run_provider_enrichment(run_id, request)
     except ValueError as exc:
         raise HTTPException(status_code=404 if "run not found" in str(exc) else 400, detail=str(exc)) from exc
+
+
+@app.post("/v2/runs/{run_id}/url-inspection")
+def url_inspection_endpoint(run_id: str, request: UrlInspectionRequest) -> dict:
+    """Normalize bounded URL Inspection fixtures into run-linked evidence."""
+    try:
+        store = _V2_RUNS.get(run_id)
+        return ProviderService(store).inspect_url_fixtures(
+            run_id,
+            scope=request.scope,
+            urls=tuple(request.urls),
+            observations=request.observations,
+            max_urls=request.max_urls,
+            version=request.version,
+            observed_at=request.observed_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/v2/runs/{run_id}/provider-jobs")
