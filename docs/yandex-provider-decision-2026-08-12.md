@@ -1,4 +1,4 @@
-# Yandex provider decision — 2026-08-12
+# Yandex provider decision — 2026-08-18
 
 ## Decision
 
@@ -9,6 +9,29 @@ broker or infer ranking/indexing state from public search results.
 The v2 provider workflow accepts only bounded, explicitly supplied cached
 observations. Live credentials remain in the local OS-vault/CLI context and
 are never accepted by the default HTTP or MCP audit surfaces.
+
+## Task 28 verification — deferred
+
+The decision was rechecked against the current official documentation on
+2026-08-18. The required implementation contour is still incomplete:
+
+- Webmaster requires a registered OAuth application/client ID, an OAuth token,
+  a user ID, and acceptance of the service terms before authenticated site
+  data can be used.
+- Webmaster documents quota failures and recovery timestamps, but does not
+  expose a stable product quota contract suitable for silently scheduling
+  per-page checks.
+- Metrica requires OAuth with `metrika:read`; Reports API responses are
+  aggregated/sampled and may include limited-disclosure data. Current limits
+  include IP, parallel-user, daily, and Reports API windows rather than one
+  simple per-run budget.
+- The repository still has no approved Yandex OAuth client, host/counter
+  requirement, retention policy, or authenticated fixtures.
+
+Because credential authority, exact endpoint scope, retention, and fixtures
+remain product inputs rather than implementation facts, Task 28 is deferred.
+No Yandex adapter, provider capability, API route, or transport integration is
+added. Reconsider only after the criteria below are supplied and approved.
 
 ## Evidence from official documentation
 
