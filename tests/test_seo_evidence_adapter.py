@@ -1,4 +1,5 @@
 from agentready.page_parser import parse_page
+from agentready.audit_core.collection import CollectedPage, FactView
 from agentready.seo.evidence import evidence_from_parsed_page
 
 
@@ -18,3 +19,16 @@ def test_legacy_seo_evidence_can_project_shared_parsed_facts():
     assert evidence.description == "Desc"
     assert evidence.h1 == ("Heading",)
     assert evidence.canonicals == ("https://example.test/",)
+
+
+def test_seo_evidence_projects_collected_fact_view_without_legacy_title_attribute():
+    page = parse_page(b"<title>Collected</title><h1>Heading</h1>")
+    view = FactView(CollectedPage("https://example.test/", 0, 200, page.representation, page.facts))
+    evidence = evidence_from_parsed_page(
+        view,
+        url="https://example.test/",
+        final_url="https://example.test/",
+        status_code=200,
+        content_type="text/html",
+    )
+    assert evidence.title == "Collected"

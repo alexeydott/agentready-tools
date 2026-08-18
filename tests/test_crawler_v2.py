@@ -396,6 +396,37 @@ def test_crawler_depth_zero_keeps_start_page_resources_without_following_links()
     asyncio.run(run())
 
 
+def test_crawler_converts_per_page_projection_errors_to_partial_failures() -> None:
+    """A single bad page projection must not kill workers or hang the crawl."""
+    from agentready.fetcher import FetchError
+
+    class BrokenResourceStore(MemorySiteStore):
+        def put_resource(self, *args, **kwargs):
+            raise FetchError("synthetic resource projection failure")
+
+    async def run() -> None:
+        result = await asyncio.wait_for(
+            AsyncCrawler(
+                CrawlScope(("https://example.test/",), allowed_origins=("https://example.test",)),
+                config=CrawlConfig(max_pages=1, min_request_interval_ms=0),
+                policy=EgressPolicy(allowed_origins=frozenset({"https://example.test"})),
+                transport=httpx.MockTransport(
+                    lambda _request: httpx.Response(
+                        200,
+                        headers={"content-type": "text/html"},
+                        content=b"<img src='/asset.png'><p>ok</p>",
+                    )
+                ),
+                store=BrokenResourceStore(),
+            ).crawl(),
+            timeout=2,
+        )
+        assert result.coverage.failed == 1
+        assert result.coverage.fetched == 1
+
+    asyncio.run(run())
+
+
 def test_crawler_persists_redirect_inventory_from_fetch_result() -> None:
     from agentready.fetcher import FetchResult, RedirectHop
 

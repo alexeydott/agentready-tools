@@ -197,6 +197,24 @@ def test_fetcher_revalidates_redirects_and_preserves_chain():
     assert not result.redirect_records[0].cross_origin
 
 
+def test_fetcher_does_not_replay_set_cookie_between_passive_requests():
+    seen: list[str | None] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers.get("cookie"))
+        if request.url.path == "/first":
+            return httpx.Response(200, headers={"set-cookie": "session=secret; Path=/"}, request=request)
+        return httpx.Response(200, request=request)
+
+    async def run() -> None:
+        async with Fetcher(transport=httpx.MockTransport(handler)) as fetcher:
+            await fetcher.get(FetchRequest("https://example.com/first", purpose="crawl"))
+            await fetcher.get(FetchRequest("https://example.com/second", purpose="crawl"))
+
+    asyncio.run(run())
+    assert seen == [None, None]
+
+
 def test_fetcher_enforces_response_limit():
     async def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=b"012345", request=request)

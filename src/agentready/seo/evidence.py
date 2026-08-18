@@ -64,7 +64,10 @@ def evidence_from_parsed_page(
         final_url=final_url,
         status_code=status_code,
         content_type=content_type,
-        title=titles[0] if titles else parsed.title,
+        # ``FactView`` projects a ``CollectedPage`` and deliberately exposes
+        # facts, not legacy parser attributes such as ``title``.  Keep the
+        # canonical projection safe for both shared page representations.
+        title=titles[0] if titles else "",
         titles=titles,
         description=descriptions[0] if descriptions else "",
         descriptions=descriptions,

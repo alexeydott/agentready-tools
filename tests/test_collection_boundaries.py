@@ -110,6 +110,7 @@ def test_collected_http_client_replays_analyzer_page_without_second_fetch() -> N
 
     assert fetched.text == "<html><title>Collected</title></html>"
     assert fetched.status_code == 200
+    assert client.timeout == 5.0
 
 
 def test_multiple_mobile_analyzers_reuse_one_collected_representation() -> None:

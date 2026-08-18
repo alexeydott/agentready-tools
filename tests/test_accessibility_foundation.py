@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 from agentready.dashboard import render_dashboard
 from agentready.models import CategoryScore, CheckResult, ScanReport
@@ -86,6 +87,38 @@ def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
         assert 'loadNextV2Inventory' in html
         assert 'filterV2Inventory' in html
         assert 'saveV2InventoryView' in html
+
+
+def test_dashboard_added_workspaces_have_localized_descriptions_and_help():
+    for language, custom_hint, robots_hint in (
+        ("en", "Validate a declarative rules document", "Compare the stored robots policy"),
+        ("ru", "Проверяет декларативный документ правил", "Сравнивает сохранённую и предлагаемую политику robots"),
+    ):
+        html = render_dashboard(language)
+        assert custom_hint in html
+        assert robots_hint in html
+        assert "sitemap_reconciliation_hint" in html
+        assert "link_graph_hint" in html
+        assert "duplicate_clusters_hint" in html
+        assert "projects_hint" in html
+        custom_panel = html.split('id="custom-rules-panel"', 1)[1].split('</section>', 1)[0]
+        projects_panel = html.split('id="projects-panel"', 1)[1].split('</section>', 1)[0]
+        assert '<details class="section-help">' not in custom_panel
+        assert '<details class="section-help">' not in projects_panel
+        assert ("Custom rules debugger" in html) if language == "en" else ("Отладчик пользовательских правил" in html)
+        assert ("Projects and run history" in html) if language == "en" else ("Проекты и история запусков" in html)
+
+
+def test_dashboard_workspace_guidance_is_documented_in_localized_faqs():
+    root = Path(__file__).parents[1]
+    english = (root / "docs" / "dashbor_faq_en.md").read_text(encoding="utf-8")
+    russian = (root / "docs" / "dashbord_faq_ru.md").read_text(encoding="utf-8")
+    assert "## Custom rules debugger" in english
+    assert "## Projects and run history" in english
+    assert "## Отладчик пользовательских правил" in russian
+    assert "## Проекты и история запусков" in russian
+    assert "Preview matches" in english and "Предпросмотр совпадений" in russian
+    assert "Baseline" in english and "Базовый запуск" in russian
 
 
 def test_dashboard_resets_inventory_cursor_when_query_shape_changes():

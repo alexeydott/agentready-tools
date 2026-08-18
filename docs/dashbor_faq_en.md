@@ -50,6 +50,30 @@ Open **Advanced parameters** when you need more control:
 - **Verify Agent Skills digests** — validates skill content instead of checking
   only its links.
 
+## Custom rules debugger
+
+Open **Custom rules** to validate a YAML rules document before using it in an
+audit workflow. Use `version: 1`, a stable `id` for every rule, a title, and an
+assertion. **Validate rules** checks the document structure and reports the
+location of invalid fields. **Preview matches** evaluates the rules against
+the available saved audit representation; it does not start a crawl or send a
+new request to the audited website.
+
+## Projects and run history
+
+In **Projects and run history**, enter a stable project ID and display name,
+then click **Create or update project**. **Load run history** lists the
+project's recent audit runs. The table uses these columns:
+
+- **Audit run** — the identifier of the saved run.
+- **Started by** — what initiated the run, such as the dashboard or an API
+  request.
+- **Baseline** — whether the run is marked as the comparison baseline
+  (`Yes`/`No`).
+
+An empty history is a valid result: it means that no run has been saved for the
+selected project yet.
+
 ## Links below the settings
 
 - **Refresh check catalog** reloads the checks available for the selected

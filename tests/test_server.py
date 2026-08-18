@@ -703,6 +703,24 @@ def test_dashboard_inline_script_does_not_close_html_script_early():
     assert 'reportText.indexOf("</script>", start)' not in response.text
 
 
+def test_dashboard_project_history_checks_project_list_response():
+    response = TestClient(app).get("/dashboard", params={"language": "en"})
+    assert response.status_code == 200
+    assert 'const projectsResponse = await fetch("/v2/projects")' in response.text
+    assert "if (!projectsResponse.ok)" in response.text
+    assert "if (!Array.isArray(projectsPayload))" in response.text
+
+
+def test_dashboard_project_history_uses_explanatory_localized_headers():
+    english = TestClient(app).get("/dashboard", params={"language": "en"}).text
+    russian = TestClient(app).get("/dashboard", params={"language": "ru"}).text
+    assert 'history_run' in english and 'history_trigger' in english and 'history_baseline' in english
+    assert "Audit run" in english and "Started by" in english
+    assert "Запуск аудита" in russian and "Источник запуска" in russian
+    assert "Started by shows what created each audit" in english
+    assert "«Источник запуска» показывает" in russian
+
+
 def test_dashboard_hints_use_hover_tooltips_like_reports():
     """All dashboard hints use the report-style hover tooltip, not click popovers."""
     for language in ("en", "ru"):

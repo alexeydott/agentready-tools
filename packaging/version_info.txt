@@ -17,11 +17,11 @@ VSVersionInfo(
           [
             StringStruct('CompanyName', 'alexey.t (alexey.dot.t@gmail.com'),
             StringStruct('FileDescription', 'developer toolkit to make your websites AI agent-ready.'),
-            StringStruct('FileVersion', '0.13.2'),
+            StringStruct('FileVersion', '0.13.3'),
             StringStruct('InternalName', 'agentready'),
             StringStruct('OriginalFilename', 'agentready.exe'),
             StringStruct('ProductName', 'AgentReady Tools'),
-            StringStruct('ProductVersion', '0.13.2')
+            StringStruct('ProductVersion', '0.13.3')
           ]
         )
       ]

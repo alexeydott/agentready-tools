@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.3
+
+### Shared dashboard workspace guidance
+
+- Moved Custom rules debugger guidance into the shared dashboard Help panel
+  and localized English/Russian FAQ pages.
+- Moved Projects and run history guidance into the shared Help panel and FAQ,
+  including the meaning of run, trigger, and baseline fields.
+- Removed redundant expandable help blocks from both workspace panels while
+  retaining concise descriptions and accessible tooltips.
+- Added regression coverage for the localized documentation and panel markup.
+
 ## 0.13.2
 
 ### Explicit test dependencies and release packaging

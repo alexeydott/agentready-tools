@@ -201,6 +201,10 @@ class CollectedHttpClient:
 
     def __init__(self, client: HttpClient | None, fact_views: tuple[FactView, ...]) -> None:
         self._client = client
+        # Keep the analyzer-client contract usable for supplemental checks
+        # (for example DNS-AID) even when all page requests are replayed from
+        # the collected v2 representation.
+        self.timeout = getattr(client, "timeout", 5.0)
         self._views: dict[str, FactView] = {}
         for view in fact_views:
             self._views[view.url] = view

@@ -230,6 +230,7 @@ _TEXT = {
         "ready": "Configure an audit and choose an operation.",
         "v2_inventory": "Run inventory",
         "robots_simulation": "Virtual Robots simulation",
+        "robots_simulation_hint": "Compare the stored robots policy with a proposed policy for selected user agents. This is an offline simulation and does not publish robots.txt.",
         "robots_live": "Current robots.txt",
         "robots_proposed": "Proposed robots.txt",
         "robots_user_agents": "User agents (comma-separated)",
@@ -243,6 +244,35 @@ _TEXT = {
         "v2_discovery_robots": "Robots sitemap",
         "v2_discovery_crawl": "Bounded crawl",
         "v2_inventory_hint": "Browse bounded server-side inventory for the latest crawl.",
+        "sitemap_reconciliation": "Sitemap reconciliation",
+        "sitemap_reconciliation_hint": "Compare bounded sitemap XML with the stored run inventory. No sitemap is fetched or submitted by this control.",
+        "sitemap_origin": "Origin",
+        "sitemap_documents": "Sitemap XML (one or more documents separated by a blank line)",
+        "sitemap_reconcile": "Reconcile sitemap",
+        "custom_rules": "Custom rules debugger",
+        "custom_rules_hint": "Validate a declarative rules document, then preview matches against the saved audit representation. These actions do not start a crawl.",
+        "custom_rules_help": "Use version 1 YAML with a stable rule id and an assertion. Validate catches schema errors; Preview matches evaluates the rule against saved evidence.",
+        "custom_rules_document": "Rules YAML",
+        "custom_rules_validate": "Validate rules",
+        "custom_rules_preview": "Preview matches",
+        "link_graph": "Link Graph",
+        "link_graph_hint": "Load a bounded graph projection from stored link occurrences. Filters affect only the displayed page and do not start a crawl.",
+        "duplicate_clusters": "Duplicate clusters",
+        "duplicate_clusters_hint": "Compare exact and near-duplicate content signatures from the stored run. Loading results does not start a new crawl.",
+        "projects": "Projects and run history",
+        "projects_hint": "Create or update a local project and review its stored audit runs. No remote project service is contacted.",
+        "project_id": "Project ID",
+        "project_name": "Project name",
+        "project_save": "Create/update project",
+        "project_load_history": "Load history",
+        "history_run": "Audit run",
+        "history_trigger": "Started by",
+        "history_baseline": "Baseline",
+        "history_baseline_yes": "Yes",
+        "history_baseline_no": "No",
+        "projects_count": "Projects: {count}",
+        "runs_count": "Audit runs: {count}",
+        "history_explanation": "Started by shows what created each audit; Baseline marks the run used for comparison.",
         "v2_inventory_load": "Load inventory",
         "v2_inventory_empty": "Run the bounded audit to load inventory.",
         "v2_kind_pages": "Pages", "v2_kind_links": "Links", "v2_kind_resources": "Resources", "v2_kind_redirects": "Redirects", "v2_kind_findings": "Findings", "v2_kind_metrics": "Metrics",
@@ -498,6 +528,7 @@ _TEXT = {
         "ready": "Настройте аудит и выберите операцию.",
         "v2_inventory": "Инвентарь запуска",
         "robots_simulation": "Симуляция Virtual Robots",
+        "robots_simulation_hint": "Сравнивает сохранённую и предлагаемую политику robots для выбранных user-agent. Это офлайн-симуляция, robots.txt не публикуется.",
         "robots_live": "Текущий robots.txt",
         "robots_proposed": "Предлагаемый robots.txt",
         "robots_user_agents": "User-agent (через запятую)",
@@ -511,6 +542,35 @@ _TEXT = {
         "v2_discovery_robots": "Sitemap из robots",
         "v2_discovery_crawl": "Ограниченный обход",
         "v2_inventory_hint": "Просмотр ограниченного серверного инвентаря последнего обхода.",
+        "sitemap_reconciliation": "Сверка sitemap",
+        "sitemap_reconciliation_hint": "Сравнивает ограниченные XML-документы sitemap с сохранённым инвентарём запуска. Этот элемент ничего не загружает и не публикует.",
+        "sitemap_origin": "Источник",
+        "sitemap_documents": "XML sitemap (несколько документов разделяйте пустой строкой)",
+        "sitemap_reconcile": "Сверить sitemap",
+        "custom_rules": "Отладчик пользовательских правил",
+        "custom_rules_hint": "Проверяет декларативный документ правил и показывает совпадения с сохранённым представлением аудита. Эти действия не запускают обход.",
+        "custom_rules_help": "Используйте YAML версии 1 со стабильным идентификатором правила и утверждением. Проверка находит ошибки схемы, а предпросмотр оценивает правило по сохранённым доказательствам.",
+        "custom_rules_document": "YAML правил",
+        "custom_rules_validate": "Проверить правила",
+        "custom_rules_preview": "Предпросмотр совпадений",
+        "link_graph": "Граф ссылок",
+        "link_graph_hint": "Загружает ограниченную проекцию графа по сохранённым вхождениям ссылок. Фильтры влияют только на экран и не запускают обход.",
+        "duplicate_clusters": "Кластеры дубликатов",
+        "duplicate_clusters_hint": "Сравнивает точные и близкие сигнатуры дубликатов сохранённого запуска. Загрузка результатов не запускает новый обход.",
+        "projects": "Проекты и история запусков",
+        "projects_hint": "Создаёт или обновляет локальный проект и показывает сохранённые запуски аудита. Внешний сервис проектов не используется.",
+        "project_id": "Идентификатор проекта",
+        "project_name": "Название проекта",
+        "project_save": "Создать/обновить проект",
+        "project_load_history": "Загрузить историю",
+        "history_run": "Запуск аудита",
+        "history_trigger": "Источник запуска",
+        "history_baseline": "Базовый запуск",
+        "history_baseline_yes": "Да",
+        "history_baseline_no": "Нет",
+        "projects_count": "Проектов: {count}",
+        "runs_count": "Запусков аудита: {count}",
+        "history_explanation": "«Источник запуска» показывает, что создало аудит; «Базовый запуск» отмечает запуск для сравнения.",
         "v2_inventory_load": "Загрузить инвентарь",
         "v2_inventory_empty": "Запустите ограниченный аудит, чтобы загрузить инвентарь.",
         "v2_kind_pages": "Страницы", "v2_kind_links": "Ссылки", "v2_kind_resources": "Ресурсы", "v2_kind_redirects": "Редиректы", "v2_kind_findings": "Проверки", "v2_kind_metrics": "Метрики",
@@ -565,16 +625,30 @@ timeout, workers, maturity threshold, recommendation limit, and Agent Skills
 digest verification. Use <strong>Refresh check catalog</strong> to reload
 available checks. Open <strong>Checks included in this run</strong> to select
 individual checks.</p>
-<h3>3. Read and save results</h3>
+<h3>3. Custom rules debugger</h3>
+<p>Open <strong>Custom rules</strong> to validate a YAML rules document before
+using it in an audit workflow. Use <code>version: 1</code>, a stable
+<code>id</code> for every rule, a title, and an assertion. Click
+<strong>Validate rules</strong> to check the structure. Click
+<strong>Preview matches</strong> to evaluate the rules against the available
+audit representation; preview does not start a crawl.</p>
+<h3>4. Projects and run history</h3>
+<p>In <strong>Projects and run history</strong>, enter a stable project ID and
+display name, then click <strong>Create or update project</strong>. Click
+<strong>Load run history</strong> to see recent runs. <strong>Audit run</strong>
+identifies the run, <strong>Started by</strong> describes what initiated it,
+and <strong>Baseline</strong> says whether it was used for comparison. An
+empty history is valid and means no run is saved for that project.</p>
+<h3>5. Read and save results</h3>
 <p>The result shows progress, score, maturity, checks, recommendations, URLs,
 pages, resources, and metrics. Use <strong>Download report</strong> or
 <strong>Print report</strong> beside the report.</p>
-<h3>4. Use the AI assistant</h3>
+<h3>6. Use the AI assistant</h3>
 <p>After an audit, choose SEO, GEO, or SEO/GEO mode, then select a provider and
 model. Enter a request or use the prompt library. Skills, MCP context, file
 attachments, chat history, saved chats, and OpenAI/DeepSeek JSON export are
 available in the AI panel.</p>
-<h3>5. Language and troubleshooting</h3>
+<h3>7. Language and troubleshooting</h3>
 <p>The interface follows the selected language. Without an explicit URL
 parameter, Russian is used for a Russian browser locale and English otherwise.
 For errors, check the URL, click <strong>Check service health</strong>, enable
@@ -593,16 +667,32 @@ For errors, check the URL, click <strong>Check service health</strong>, enable
 зрелости, лимит рекомендаций и проверку digest Agent Skills. Ссылка
 <strong>Обновить каталог проверок</strong> загружает список заново. В блоке
 <strong>Проверки, включённые в запуск</strong> выбираются отдельные проверки.</p>
-<h3>3. Результаты и сохранение</h3>
+<h3>3. Отладчик пользовательских правил</h3>
+<p>Откройте блок <strong>Пользовательские правила</strong>, чтобы проверить
+YAML-документ до использования в рабочем процессе аудита. Используйте
+<code>version: 1</code>, стабильный <code>id</code> каждого правила, заголовок
+и условие. Кнопка <strong>Проверить правила</strong> проверяет структуру.
+Кнопка <strong>Предпросмотр совпадений</strong> оценивает правила по доступному
+представлению аудита и не запускает обход сайта.</p>
+<h3>4. Проекты и история запусков</h3>
+<p>В блоке <strong>Проекты и история запусков</strong> укажите стабильный
+идентификатор и название проекта, затем нажмите
+<strong>Создать или обновить проект</strong>. Кнопка
+<strong>Загрузить историю запусков</strong> показывает последние аудиты.
+<strong>Запуск аудита</strong> идентифицирует запуск,
+<strong>Источник запуска</strong> объясняет, что его создало, а
+<strong>Базовый запуск</strong> показывает, использовался ли он для сравнения.
+Пустая история означает, что для проекта ещё нет сохранённых запусков.</p>
+<h3>5. Результаты и сохранение</h3>
 <p>В результате отображаются прогресс, балл, уровень зрелости, проверки,
 рекомендации, URL, страницы, ресурсы и метрики. Рядом с отчётом доступны
 <strong>Скачать отчёт</strong> и <strong>Распечатать отчёт</strong>.</p>
-<h3>4. AI-помощник</h3>
+<h3>6. AI-помощник</h3>
 <p>После аудита выберите режим SEO, GEO или SEO/GEO, затем провайдера и
 модель. Напишите запрос или выберите prompt из библиотеки. В AI-панели также
 доступны skills, контекст MCP, вложения, история и сохранение чатов, а также
 экспорт OpenAI/DeepSeek JSON.</p>
-<h3>5. Язык и диагностика</h3>
+<h3>7. Язык и диагностика</h3>
 <p>Интерфейс использует выбранный язык. Если язык не указан в URL, для русской
 локали браузера выбирается русский, для остальных — английский. При ошибке
 проверьте URL, нажмите <strong>Проверить состояние сервиса</strong>, включите
@@ -837,46 +927,51 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div id="v2-inventory" role="region" aria-live="polite">{escape(text["v2_inventory_empty"])}</div>
 </section>
 <section id="robots-simulation-panel" class="panel" hidden aria-labelledby="robots-simulation-title">
-<h2 id="robots-simulation-title">{escape(text["robots_simulation"])}</h2>
+<h2 id="robots-simulation-title">{escape(text["robots_simulation"])} {_hint(text, "robots_simulation_hint")}</h2>
+<details class="section-help"><summary>{escape(text["help"])}</summary><p>{escape(text["robots_simulation_hint"])}</p></details>
 <div class="form-grid three"><label for="robots-live">{escape(text["robots_live"])}<textarea id="robots-live" rows="5"></textarea></label><label for="robots-proposed">{escape(text["robots_proposed"])}<textarea id="robots-proposed" rows="5"></textarea></label><div><label for="robots-user-agents">{escape(text["robots_user_agents"])}</label><input id="robots-user-agents" value="*"><button type="button" class="secondary" onclick="simulateRobots()">{escape(text["robots_simulate"])}</button></div></div>
 <div id="robots-simulation-status" role="status" aria-live="polite">{escape(text["robots_empty"])}</div><div id="robots-simulation-result" role="region" aria-live="polite"></div>
 </section>
 <section id="sitemap-reconciliation-panel" class="panel" hidden aria-labelledby="sitemap-reconciliation-title">
-<h2 id="sitemap-reconciliation-title">Sitemap reconciliation</h2>
-<p>Paste bounded sitemap XML documents. They are compared with the stored run inventory; no sitemap is submitted.</p>
-<label for="sitemap-reconciliation-origin">Origin</label><input id="sitemap-reconciliation-origin" type="url" placeholder="https://example.test">
-<label for="sitemap-reconciliation-xml">Sitemap XML (one or more documents separated by a blank line)</label><textarea id="sitemap-reconciliation-xml" rows="6"></textarea>
-<button type="button" class="secondary" onclick="reconcileSitemap()">Reconcile sitemap</button>
+<h2 id="sitemap-reconciliation-title">{escape(text["sitemap_reconciliation"])} {_hint(text, "sitemap_reconciliation_hint")}</h2>
+<p class="section-hint">{escape(text["sitemap_reconciliation_hint"])}</p>
+<details class="section-help"><summary>{escape(text["help"])}</summary><p>{escape(text["sitemap_reconciliation_hint"])}</p></details>
+<label for="sitemap-reconciliation-origin">{escape(text["sitemap_origin"])}</label><input id="sitemap-reconciliation-origin" type="url" placeholder="https://example.test">
+<label for="sitemap-reconciliation-xml">{escape(text["sitemap_documents"])}</label><textarea id="sitemap-reconciliation-xml" rows="6"></textarea>
+<button type="button" class="secondary" onclick="reconcileSitemap()">{escape(text["sitemap_reconcile"])}</button>
 <div id="sitemap-reconciliation-status" role="status" aria-live="polite"></div><div id="sitemap-reconciliation-result" role="region" aria-live="polite"></div>
 </section>
 <section id="custom-rules-panel" class="panel" aria-labelledby="custom-rules-title">
-<h2 id="custom-rules-title">Custom rules debugger</h2>
-<p>Validate and preview bounded declarative rules against the current saved representation. Editing a rule never starts a crawl.</p>
-<label for="custom-rules-document">Rules YAML</label><textarea id="custom-rules-document" rows="8">version: 1
+<h2 id="custom-rules-title">{escape(text["custom_rules"])} {_hint(text, "custom_rules_hint")}</h2>
+<p class="section-hint">{escape(text["custom_rules_hint"])}</p>
+<label for="custom-rules-document">{escape(text["custom_rules_document"])}</label><textarea id="custom-rules-document" rows="8">version: 1
 rules:
   - id: example
     title: Example text
     assert:
       kind: text
       pattern: agent</textarea>
-<div><button type="button" class="secondary" onclick="validateCustomRules()">Validate rules</button><button type="button" class="secondary" onclick="debugCustomRules()">Preview matches</button></div>
+<div><button type="button" class="secondary" onclick="validateCustomRules()">{escape(text["custom_rules_validate"])}</button><button type="button" class="secondary" onclick="debugCustomRules()">{escape(text["custom_rules_preview"])}</button></div>
 <div id="custom-rules-status" role="status" aria-live="polite"></div><pre id="custom-rules-result" role="region" aria-live="polite"></pre>
 </section>
 <section id="link-graph-panel" class="panel" hidden aria-labelledby="link-graph-title">
-<h2 id="link-graph-title">Link Graph</h2>
-<p>Cached graph projection from stored link occurrences. Filters keep only the current bounded page in the DOM.</p>
+<h2 id="link-graph-title">{escape(text["link_graph"])} {_hint(text, "link_graph_hint")}</h2>
+<p class="section-hint">{escape(text["link_graph_hint"])}</p>
+<details class="section-help"><summary>{escape(text["help"])}</summary><p>{escape(text["link_graph_hint"])}</p></details>
 <div><label><input id="link-graph-dead-end" type="checkbox"> Dead ends</label><label><input id="link-graph-disconnected" type="checkbox"> Disconnected</label><button type="button" class="secondary" onclick="loadLinkGraph()">Load graph</button></div>
 <div id="link-graph-status" role="status" aria-live="polite"></div><div id="link-graph-result" role="region" aria-live="polite"></div>
 </section>
 <section id="duplicate-clusters-panel" class="panel" hidden aria-labelledby="duplicate-clusters-title">
-<h2 id="duplicate-clusters-title">Duplicate clusters</h2>
-<p>Compare exact and near-duplicate content signatures from the stored run. No new crawl is started.</p>
+<h2 id="duplicate-clusters-title">{escape(text["duplicate_clusters"])} {_hint(text, "duplicate_clusters_hint")}</h2>
+<p class="section-hint">{escape(text["duplicate_clusters_hint"])}</p>
+<details class="section-help"><summary>{escape(text["help"])}</summary><p>{escape(text["duplicate_clusters_hint"])}</p></details>
 <div><select id="duplicate-clusters-kind"><option value="all">All</option><option value="exact">Exact</option><option value="near">Near</option></select><button type="button" class="secondary" onclick="loadDuplicateClusters()">Load clusters</button></div>
 <div id="duplicate-clusters-status" role="status" aria-live="polite"></div><div id="duplicate-clusters-result" role="region" aria-live="polite"></div>
 </section>
 <section id="projects-panel" class="panel" aria-labelledby="projects-title">
-<h2 id="projects-title">Projects and run history</h2>
-<div><label for="project-id">Project ID</label><input id="project-id" value="default-project"><label for="project-name">Name</label><input id="project-name" value="Default project"><button type="button" class="secondary" onclick="createDashboardProject()">Create/update project</button><button type="button" class="secondary" onclick="loadDashboardProjects()">Load history</button></div>
+<h2 id="projects-title">{escape(text["projects"])} {_hint(text, "projects_hint")}</h2>
+<p class="section-hint">{escape(text["projects_hint"])}</p>
+<div><label for="project-id">{escape(text["project_id"])}</label><input id="project-id" value="default-project"><label for="project-name">{escape(text["project_name"])}</label><input id="project-name" value="Default project"><button type="button" class="secondary" onclick="createDashboardProject()">{escape(text["project_save"])}</button><button type="button" class="secondary" onclick="loadDashboardProjects()">{escape(text["project_load_history"])}</button></div>
 <div id="projects-status" role="status" aria-live="polite"></div><div id="projects-result" role="region" aria-live="polite"></div>
 </section>
 <section id="ai-assistant-panel" class="panel ai-workspace" hidden aria-labelledby="ai-workspace-title">
@@ -1432,13 +1527,17 @@ async function loadDashboardProjects() {{
   const status = document.getElementById("projects-status");
   const output = document.getElementById("projects-result");
   try {{
-    const projects = await (await fetch("/v2/projects")).json();
+    const projectsResponse = await fetch("/v2/projects");
+    const projectsPayload = await projectsResponse.json().catch(() => null);
+    if (!projectsResponse.ok) throw new Error((projectsPayload && projectsPayload.detail) || "projects request failed (HTTP " + projectsResponse.status + ")");
+    if (!Array.isArray(projectsPayload)) throw new Error("projects response is not a list");
+    const projects = projectsPayload;
     const project = projects.find(item => item.project_id === document.getElementById("project-id").value.trim());
-    if (!project) {{ output.textContent = JSON.stringify(projects, null, 2); status.textContent = `Projects: ${{projects.length}}`; return; }}
+    if (!project) {{ output.textContent = JSON.stringify(projects, null, 2); status.textContent = translations[language.value].projects_count.replace("{{count}}", String(projects.length)); return; }}
     const response = await fetch("/v2/projects/" + encodeURIComponent(project.project_id) + "/runs?limit=50");
     const history = await response.json(); if (!response.ok) throw new Error(history.detail || "history request failed");
-    output.innerHTML = `<p>${{escapeHtml(project.name)}} — ${{escapeHtml(project.target)}}</p><table><thead><tr><th>Run</th><th>Trigger</th><th>Baseline</th></tr></thead><tbody>${{(history.items || []).map(item => `<tr><td>${{escapeHtml(item.run_id)}}</td><td>${{escapeHtml(item.trigger)}}</td><td>${{item.baseline_run_id ? "yes" : "no"}}</td></tr>`).join("")}}</tbody></table>`;
-    status.textContent = `Runs: ${{history.total || 0}}`;
+    output.innerHTML = `<p>${{escapeHtml(project.name)}} — ${{escapeHtml(project.target)}}</p><p class="section-hint">${{escapeHtml(translations[language.value].history_explanation)}}</p><table><thead><tr><th>${{escapeHtml(translations[language.value].history_run)}}</th><th>${{escapeHtml(translations[language.value].history_trigger)}}</th><th>${{escapeHtml(translations[language.value].history_baseline)}}</th></tr></thead><tbody>${{(history.items || []).map(item => `<tr><td>${{escapeHtml(item.run_id)}}</td><td>${{escapeHtml(item.trigger || "—")}}</td><td>${{item.baseline_run_id ? escapeHtml(translations[language.value].history_baseline_yes) : escapeHtml(translations[language.value].history_baseline_no)}}</td></tr>`).join("")}}</tbody></table>`;
+    status.textContent = translations[language.value].runs_count.replace("{{count}}", String(history.total || 0));
   }} catch (error) {{ status.textContent = "History failed: " + error.message; }}
 }}
 async function loadSitemapCategory(category) {{

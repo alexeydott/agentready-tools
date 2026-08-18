@@ -171,6 +171,13 @@ class Fetcher:
         for hop in range(self.policy.max_redirects + 1):
             self.policy.validate_request(current, purpose=request.purpose)
             try:
+                # httpx persists Set-Cookie responses in its client jar.  A
+                # passive crawl must not turn one public response into a
+                # credential-bearing request for the next URL; explicit
+                # request headers remain governed by the egress policy.
+                if self._client.cookies:
+                    self._client.cookies.clear()
+                    logger.info("[FIX:fetcher-cookie] cleared passive response cookie jar")
                 async with self._client.stream(method, current, headers=headers) as response:
                     if response.status_code in _REDIRECTS and response.headers.get("location"):
                         target = urljoin(current, response.headers["location"])

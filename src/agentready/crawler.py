@@ -571,6 +571,20 @@ class AsyncCrawler:
                             len(facts.links) if facts is not None else 0,
                             len(facts.resources) if facts is not None else 0,
                         )
+                except Exception as exc:  # noqa: BLE001 - isolate one page from the bounded crawl
+                    # Fetch failures are handled at the transport boundary above, but
+                    # parsing/storage projections can fail after a response was fetched.
+                    # Never let one malformed page kill a worker and strand the frontier.
+                    failed += 1
+                    frontier.set_state(item.url, CrawlItemState.FAILED)
+                    record_url(item.url, RunUrlState.FAILED, item.depth, error_kind=type(exc).__name__)
+                    pages[item.url] = CrawledPage(item.url, item.depth, None, None, str(exc))
+                    logger.exception(
+                        "[FIX:crawler-worker] page isolated run_id=%s url=%s error_type=%s",
+                        run_id,
+                        _safe_log_url(item.url),
+                        type(exc).__name__,
+                    )
                 finally:
                     queue.task_done()
                     async with result_lock:
