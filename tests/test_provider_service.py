@@ -55,3 +55,26 @@ def test_url_inspection_sampling_and_normalized_states_are_bounded_and_linked():
     assert result["items"][1]["state"] == "unknown"
     assert store.get_evidence("run-1", "url-inspection:https://example.test/a")["state"] == "indexed"
     assert service.query("run-1", provider="url-inspection")["total"] == 2
+
+
+def test_pagespeed_page_and_origin_fixtures_preserve_provenance_and_no_core_score_impact():
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("run-1", "config", "tool", "rules"))
+    service = ProviderService(store, cache_ttl_seconds=60)
+    result = service.pagespeed_fixtures(
+        "run-1",
+        scope="https://example.test",
+        urls=("https://example.test/b", "https://example.test/a"),
+        observations={"https://example.test/a": {"metrics": {"lcp": 1200, "cls": 0.1}, "state": "available"}},
+        metric_scope="page",
+        strategy="desktop",
+        device="desktop",
+        data_source="lab",
+        max_urls=2,
+    )
+    assert result["items"][0]["url"] == "https://example.test/a"
+    assert result["items"][1]["state"] == "insufficient_data"
+    assert result["core_score_impact"] == "none"
+    assert store.get_evidence("run-1", "pagespeed:page:https://example.test/a")["data_source"] == "lab"
+    origin = service.pagespeed_fixtures("run-1", scope="https://example.test", urls=(), observations={"https://example.test": {"metrics": {"performance_score": 90}}}, metric_scope="origin")
+    assert origin["sampled_count"] == 1 and origin["items"][0]["scope"] == "origin"

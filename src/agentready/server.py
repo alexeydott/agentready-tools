@@ -603,6 +603,19 @@ class UrlInspectionRequest(BaseModel):
     observed_at: str | None = Field(default=None, max_length=80)
 
 
+class PageSpeedRequest(BaseModel):
+    scope: str = Field(min_length=1, max_length=2048)
+    urls: list[str] = Field(default_factory=list, max_length=1000)
+    observations: dict[str, dict[str, object]] = Field(default_factory=dict)
+    metric_scope: Literal["page", "origin"] = "page"
+    strategy: Literal["mobile", "desktop"] = "mobile"
+    device: str = Field(default="mobile", min_length=1, max_length=40)
+    data_source: Literal["field", "lab"] = "field"
+    max_urls: int = Field(default=100, ge=1, le=1000)
+    version: str = Field(default="psi-v5", min_length=1, max_length=80)
+    observed_at: str | None = Field(default=None, max_length=80)
+
+
 class AIRequest(BaseModel):
     mode: Literal["seo", "geo", "both"] = "both"
     operation: Literal["recommend", "chat"] = "recommend"
@@ -1508,6 +1521,30 @@ def provider_job_endpoint(run_id: str, request: ProviderEnrichmentRequest) -> di
         raise HTTPException(status_code=429, detail=str(exc)) from exc
     logger.info("provider enrichment job submitted run_id=%s job_id=%s provider=%s", run_id, job_id, request.provider)
     return {"job_id": job_id, "status": "running", "provider": request.provider}
+
+
+@app.post("/v2/runs/{run_id}/pagespeed")
+def pagespeed_endpoint(run_id: str, request: PageSpeedRequest) -> dict:
+    """Normalize bounded PageSpeed/Core Web Vitals fixtures."""
+    try:
+        store = _V2_RUNS.get(run_id)
+        return ProviderService(store).pagespeed_fixtures(
+            run_id,
+            scope=request.scope,
+            urls=tuple(request.urls),
+            observations=request.observations,
+            metric_scope=request.metric_scope,
+            strategy=request.strategy,
+            device=request.device,
+            data_source=request.data_source,
+            max_urls=request.max_urls,
+            version=request.version,
+            observed_at=request.observed_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/v2/diff")

@@ -105,6 +105,68 @@ class ProviderService:
         }
         return tuple(sorted(selected)[:limit])
 
+    @classmethod
+    def validate_pagespeed_scope(cls, scope: str, metric_scope: str = "page") -> str:
+        if metric_scope not in {"page", "origin"}:
+            raise ValueError("PageSpeed metric scope must be page or origin")
+        parsed = urlsplit(scope)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+            raise ValueError("PageSpeed scope must be an HTTP(S) URL without credentials")
+        return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}" or f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+
+    def pagespeed_fixtures(
+        self,
+        run_id: str,
+        *,
+        scope: str,
+        urls: tuple[str, ...] | list[str],
+        observations: Mapping[str, Mapping[str, Any]],
+        metric_scope: str = "page",
+        strategy: str = "mobile",
+        device: str = "mobile",
+        data_source: str = "field",
+        max_urls: int = 100,
+        version: str = "psi-v5",
+        observed_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Normalize bounded PageSpeed/CWV fixtures as external enrichment."""
+        if strategy not in {"mobile", "desktop"} or not strategy:
+            raise ValueError("PageSpeed strategy must be mobile or desktop")
+        if not device.strip() or len(device) > 40:
+            raise ValueError("PageSpeed device is invalid")
+        if data_source not in {"field", "lab"}:
+            raise ValueError("PageSpeed data source must be field or lab")
+        normalized_scope = self.validate_pagespeed_scope(scope, metric_scope)
+        selected = (normalized_scope,) if metric_scope == "origin" else self.select_urls(normalized_scope, urls, limit=max_urls)
+        timestamp = observed_at or datetime.now(UTC).isoformat(timespec="seconds")
+        parsed_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if parsed_time.tzinfo is None:
+            parsed_time = parsed_time.replace(tzinfo=UTC)
+        expires_at = (parsed_time + timedelta(seconds=self.cache_ttl_seconds)).isoformat(timespec="seconds")
+        allowed_metrics = {"lcp", "inp", "cls", "fcp", "ttfb", "performance_score"}
+        items: list[dict[str, Any]] = []
+        for url in selected:
+            raw = observations.get(url, {})
+            state = str(raw.get("state", "available"))
+            if state not in {"available", "unavailable", "insufficient_data"}:
+                state = "unavailable"
+            metrics: dict[str, Any] = {}
+            for name, value in raw.get("metrics", {}).items() if isinstance(raw.get("metrics", {}), Mapping) else ():
+                if str(name).lower() in allowed_metrics and isinstance(value, (int, float)) and not isinstance(value, bool):
+                    metrics[str(name).lower()] = value
+            if state == "available" and not metrics:
+                state = "insufficient_data"
+            item = {"url": url, "scope": metric_scope, "state": state, "metrics": metrics, "strategy": strategy, "device": device, "data_source": data_source, "version": version, "observed_at": timestamp, "expires_at": expires_at}
+            items.append(item)
+            for name, value in metrics.items():
+                metric = ExternalMetric("pagespeed", name, value, "score" if name == "performance_score" else "ms", f"pagespeed:{data_source}:{strategy}:{device}:{metric_scope}", version, timestamp)
+                self.store.put_metric(metric.to_record(run_id, url_key=None if metric_scope == "origin" else url))
+            self.store.put_evidence(run_id, f"pagespeed:{metric_scope}:{url}", item)
+        result = {"schema": "agentready.provider.pagespeed.v2", "provider": "pagespeed", "scope": normalized_scope, "metric_scope": metric_scope, "strategy": strategy, "device": device, "data_source": data_source, "sampled_count": len(items), "budget": max_urls, "freshness": {"observed_at": timestamp, "expires_at": expires_at, "fresh": True}, "items": items, "core_score_impact": "none"}
+        self.store.put_evidence(run_id, f"provider:pagespeed:{metric_scope}:summary", result)
+        logger.info("pagespeed enrichment complete run_id=%s scope=%s sampled=%d source=%s strategy=%s", run_id, metric_scope, len(items), data_source, strategy)
+        return result
+
     def inspect_url_fixtures(
         self,
         run_id: str,

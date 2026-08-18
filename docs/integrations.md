@@ -240,6 +240,13 @@ normalized to `indexed`, `not_indexed`, `unknown`, `blocked`, `error`, or
 freshness. Evidence is stored under each run URL and is queryable through the
 existing bounded metrics/inventory dashboard projection.
 
+PageSpeed/Core Web Vitals fixtures use
+`POST /v2/runs/{run_id}/pagespeed`. The request distinguishes page versus
+origin scope, mobile/desktop strategy and device, and field versus lab
+provenance. Missing observations become explicit `insufficient_data` or
+`unavailable` states; freshness is retained with each evidence record, and
+performance metrics remain external enrichment with no readiness-score impact.
+
 Generic inventory parity:
 
 ```bash
