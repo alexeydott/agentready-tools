@@ -43,6 +43,7 @@ from .i18n import (
 )
 from .jobs_v2 import AuditJobManager
 from .link_graph import LinkGraphProjection, project_link_graph
+from .page_priority import PRIORITY_MODEL_VERSION, rank_pages
 from .metrics import (
     ExternalMetric,
     ProviderConfig,
@@ -1795,6 +1796,33 @@ def audit_v2_graph_endpoint(
         selected = nodes[: limit + 1]
         items = selected[:limit]
         return {"run_id": run_id, "version": projection.version, "fingerprint": projection.fingerprint, "algorithm_version": projection.graph.algorithm_version, "items": [{"url": item.url, "inlinks": item.inlinks, "outlinks": item.outlinks, "unique_inlinks": item.unique_inlinks, "unique_outlinks": item.unique_outlinks, "depth": item.depth, "dead_end": item.dead_end, "disconnected": item.disconnected, "nofollow_inlinks": item.nofollow_inlinks, "redirect_inlinks": item.redirect_inlinks, "authority": item.authority} for item in items], "next_cursor": items[-1].url if len(selected) > limit else None, "total": len(nodes)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/runs/{run_id}/priority")
+def audit_v2_priority_endpoint(
+    run_id: str,
+    cursor: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    origin: str | None = None,
+) -> dict:
+    """Return deterministic page priorities with the complete factor breakdown."""
+    try:
+        store = _V2_RUNS.get(run_id)
+        pages = tuple(store.iter_pages(run_id))
+        authorities: dict[str, float] | None = None
+        if pages:
+            projection = _link_graph_projection(run_id, origin)
+            authorities = {node.url: node.authority for node in projection.nodes}
+        ranked = rank_pages(pages, store.iter_findings(run_id), authorities=authorities, metrics=store.iter_metrics(run_id))
+        if cursor:
+            ranked = tuple(item for item in ranked if item.url > cursor)
+        selected = ranked[: limit + 1]
+        items = selected[:limit]
+        return {"run_id": run_id, "model_version": PRIORITY_MODEL_VERSION, "items": [item.to_dict() for item in items], "next_cursor": items[-1].url if len(selected) > limit else None, "total": len(ranked)}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="run not found") from exc
     except ValueError as exc:

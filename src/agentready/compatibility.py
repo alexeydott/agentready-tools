@@ -42,6 +42,7 @@ V2_SURFACES = (
     "/v2/runs/{run_id}/sitemap/reconcile",
     "/v2/runs/{run_id}/graph",
     "/v2/runs/{run_id}/graph/node",
+    "/v2/runs/{run_id}/priority",
     "/v2/runs/{run_id}/duplicates",
     "/v2/runs/{run_id}/duplicates/{cluster_id}",
     "/v2/projects",

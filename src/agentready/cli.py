@@ -117,6 +117,14 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     inventory.add_argument("--format", choices=["json", "jsonl", "csv", "markdown", "html"], default="json")
     inventory.add_argument("--output", "-o")
 
+    priority = _add_command_parser(sub, "priority", help="Rank v2 run pages by explainable deterministic priority")
+    priority.add_argument("run_id")
+    priority.add_argument("--base-url", default="http://127.0.0.1:8765")
+    priority.add_argument("--limit", type=int, default=100)
+    priority.add_argument("--cursor")
+    priority.add_argument("--origin")
+    priority.add_argument("--output", "-o")
+
     view = _add_command_parser(sub, "view", help="List, inspect, or delete saved v2 inventory views")
     view.add_argument("action", choices=["list", "get", "delete"])
     view.add_argument("view_id", nargs="?")
@@ -849,6 +857,19 @@ def _cmd_inventory(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_priority(args: argparse.Namespace) -> int:
+    params = {"limit": args.limit}
+    if args.cursor:
+        params["cursor"] = args.cursor
+    if args.origin:
+        params["origin"] = args.origin
+    query = urllib.parse.urlencode(params)
+    page = _http_json(args.base_url, f"/v2/runs/{urllib.parse.quote(args.run_id, safe='')}/priority?{query}")
+    _write_cli_output(json.dumps(page, ensure_ascii=False, indent=2), args.output)
+    logger.info("CLI page priority query run_id=%s model=%s limit=%d", args.run_id, page.get("model_version"), args.limit)
+    return 0
+
+
 def _cmd_view(args: argparse.Namespace) -> int:
     if args.action != "list" and not args.view_id:
         raise ValueError("view get/delete requires a view_id")
@@ -1022,6 +1043,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_audit(args)
         if args.command == "inventory":
             return _cmd_inventory(args)
+        if args.command == "priority":
+            return _cmd_priority(args)
         if args.command == "view":
             return _cmd_view(args)
         if args.command == "rescan":

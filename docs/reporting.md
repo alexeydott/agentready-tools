@@ -139,3 +139,12 @@ streaming bounds and portable packaging; adding XLSX would require auditing an
 optional writer, multi-sheet memory behavior, and formula-injection tests before
 it can be enabled. No XLSX writer or formula-bearing workbook is accepted by
 the current contract.
+# Explainable page priority (v2)
+
+`GET /v2/runs/{run_id}/priority` and `agentready priority RUN_ID` return a stable,
+override-free ranking using model `page-priority-v1`. Each item includes the
+factor codes, normalized values, weights, availability, and source. The formula
+uses severity, URL state, internal link authority, available traffic/search
+metrics, recurrence, confidence, and freshness. Optional data is omitted from
+the weighted denominator when absent, so a page is never penalized for a
+provider that was not configured. Ties are resolved by canonical URL.
