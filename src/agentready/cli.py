@@ -33,6 +33,7 @@ from .report_storage import save_report
 from .report_v2 import classify_finding_changes, diff_reports, render_audit_report, semantic_diff
 from .seo_report import render_seo
 from .seo_scanner import audit_seo, compare_seo_baseline
+from .trusted_audit import TrustedLocalAuditConfig
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,10 @@ def _audit_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--output", "-o")
     p.add_argument("--lang", "--language", dest="language", choices=["en", "ru"], default="en")
     p.add_argument("--fail-on-checks", action="store_true", help="Exit 1 when a v2 finding fails")
+    p.add_argument("--trusted-origin", help="Explicit loopback origin for a CLI-only authenticated audit")
+    p.add_argument("--credential-ref", help="OS-vault reference for a CLI-only authenticated audit")
+    p.add_argument("--credential-header", choices=["Authorization", "Cookie", "X-API-Key"], default="Authorization")
+    p.add_argument("--credential-scheme", choices=["Bearer", "Basic"], default="Bearer")
 
 
 def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
@@ -124,6 +129,11 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     priority.add_argument("--cursor")
     priority.add_argument("--origin")
     priority.add_argument("--output", "-o")
+
+    trusted = _add_command_parser(sub, "trusted-credentials", help="Manage CLI-only trusted-audit OS-vault references")
+    trusted.add_argument("action", choices=["set", "clear"])
+    trusted.add_argument("reference")
+    trusted.add_argument("--value-stdin", action="store_true", help="Read the secret from stdin for set")
 
     view = _add_command_parser(sub, "view", help="List, inspect, or delete saved v2 inventory views")
     view.add_argument("action", choices=["list", "get", "delete"])
@@ -870,6 +880,20 @@ def _cmd_priority(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_trusted_credentials(args: argparse.Namespace) -> int:
+    from .credentials import clear_secret, store_secret
+
+    if args.action == "set":
+        if not args.value_stdin:
+            raise ValueError("trusted-credentials set requires --value-stdin")
+        value = sys.stdin.readline().rstrip("\r\n")
+        store_secret(args.reference, value)
+        print("Trusted-audit credential stored in the OS vault.")
+    else:
+        print("Trusted-audit credential removed." if clear_secret(args.reference) else "No trusted-audit credential found.")
+    return 0
+
+
 def _cmd_view(args: argparse.Namespace) -> int:
     if args.action != "list" and not args.view_id:
         raise ValueError("view get/delete requires a view_id")
@@ -1045,6 +1069,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_inventory(args)
         if args.command == "priority":
             return _cmd_priority(args)
+        if args.command == "trusted-credentials":
+            return _cmd_trusted_credentials(args)
         if args.command == "view":
             return _cmd_view(args)
         if args.command == "rescan":
@@ -1098,6 +1124,19 @@ def _cmd_audit(args: argparse.Namespace) -> int:
         print("agentready: min-score must be between 0 and 100", file=sys.stderr)
         return 2
     urls = tuple(args.url)
+    trusted_headers = {}
+    trusted_context = None
+    if args.trusted_origin or args.credential_ref:
+        if args.mode != "readiness" or len(urls) != 1 or not args.trusted_origin or not args.credential_ref:
+            raise ValueError("trusted authenticated audits require one readiness URL, --trusted-origin, and --credential-ref")
+        trusted_config = TrustedLocalAuditConfig(
+            args.trusted_origin,
+            args.credential_ref,
+            header_name=args.credential_header,
+            scheme=args.credential_scheme,
+        )
+        trusted_headers, trusted_context = trusted_config.resolve()
+        logger.info("trusted-local audit enabled origin=%s credential_ref=%s header=%s", trusted_config.origin, args.credential_ref, args.credential_header)
     if args.mode == "mobile":
         from .mobile_report import render_mobile
         from .mobile_scanner import audit_mobile
@@ -1178,6 +1217,10 @@ def _cmd_audit(args: argparse.Namespace) -> int:
             render=args.render,
             provider=args.provider,
             language=args.language,
+            trusted_origin=args.trusted_origin,
+            credential_ref=args.credential_ref,
+            credential_headers=trusted_headers,
+            security_context=trusted_context,
         )
     )
     output = render_audit_report(result.report, args.format)

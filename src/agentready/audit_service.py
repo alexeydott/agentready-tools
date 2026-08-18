@@ -20,7 +20,7 @@ from .discovery import (
     UrlListSource,
     discovery_plan_hash,
 )
-from .egress import EgressPolicy
+from .egress import EgressPolicy, TrustedLocalCredentialContext
 from .fetcher import Fetcher, FetchTransport
 from .http import CachedHttpTransport, HttpClient
 from .report_v2 import (
@@ -76,6 +76,10 @@ class AuditRequest:
     max_redirects: int = 5
     max_bytes: int = 5 * 1024 * 1024
     progress_callback: Callable[[dict[str, int | str]], None] | None = field(default=None, compare=False, repr=False)
+    trusted_origin: str | None = None
+    credential_ref: str | None = None
+    credential_headers: Mapping[str, str] = field(default_factory=dict, compare=False, repr=False)
+    security_context: TrustedLocalCredentialContext | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         if not self.target.strip():
@@ -100,6 +104,14 @@ class AuditRequest:
             raise ValueError("discovery_limit must be between 1 and 100000")
         if self.discovery_kind == "sitemap" and not self.discovery_sitemap_xml:
             raise ValueError("discovery_sitemap_xml is required for sitemap discovery")
+        if bool(self.trusted_origin) != bool(self.security_context):
+            raise ValueError("trusted_origin and security_context must be provided together")
+        if self.security_context and not self.credential_headers:
+            raise ValueError("trusted authenticated audits require resolved credential headers")
+        if self.security_context and self.render:
+            raise ValueError("trusted authenticated audits cannot enable rendered browser collection")
+        if self.security_context and self.mode != "readiness":
+            raise ValueError("trusted authenticated audits are limited to readiness mode")
 
     def configuration(self) -> dict[str, Any]:
         """Return the non-secret configuration used for run identity."""
@@ -131,6 +143,9 @@ class AuditRequest:
             "verify": self.verify,
             "max_redirects": self.max_redirects,
             "max_bytes": self.max_bytes,
+            "trusted_origin": self.trusted_origin,
+            "credential_ref": self.credential_ref,
+            "trusted_auth": bool(self.security_context),
         }
 
 
@@ -296,8 +311,18 @@ class AuditService:
         profile = resolve_profile(request.profile, overrides=profile_overrides, hard_caps=HARD_CAPS)
         config = profile.config
         origin = parse_target(target).origin
+        if request.security_context is not None:
+            if request.trusted_origin != origin or not request.security_context.permits(target):
+                raise ValueError("trusted authenticated audit target is outside the explicit trusted origin")
+            logger.info(
+                "trusted-local collection boundary run_id=%s origin=%s credential_ref=%s headers=%s",
+                context.run_id,
+                origin,
+                request.credential_ref or "none",
+                ",".join(sorted(request.credential_headers)),
+            )
         policy = EgressPolicy(
-            block_private=not request.allow_private,
+            block_private=not request.allow_private and request.security_context is None,
             max_redirects=request.max_redirects,
             max_response_bytes=request.max_bytes,
             allowed_origins=frozenset({origin}),
@@ -344,7 +369,7 @@ class AuditService:
         # The v2 service is the sole public readiness boundary.  The existing
         # rule implementations remain an internal adapter, but share the
         # collection client's cache with the crawler so a URL is fetched once.
-        if request.run_rules and request.transport is None and request.preset in {"all", "content", "api", "ai-search"}:
+        if request.run_rules and request.security_context is None and request.transport is None and request.preset in {"all", "content", "api", "ai-search"}:
             rule_client = HttpClient(timeout=request.timeout, allow_private=request.allow_private)
             crawler_transport = CachedHttpTransport(rule_client)
         try:
@@ -357,6 +382,9 @@ class AuditService:
                 "render": request.render,
                 "verify": request.verify,
             }
+            if request.security_context is not None:
+                crawler_kwargs["request_headers"] = dict(request.credential_headers)
+                crawler_kwargs["security_context"] = request.security_context
             if request.progress_callback is not None:
                 crawler_kwargs["progress_callback"] = request.progress_callback
             crawl = asyncio.run(

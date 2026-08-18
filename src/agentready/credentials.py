@@ -15,10 +15,37 @@ logger = logging.getLogger(__name__)
 
 SERVICE_NAME = "agentready-tools"
 ACCOUNT_KEY = "ga-gsc-service-account"
+TRUSTED_AUDIT_SERVICE = "agentready-tools/trusted-audit"
 
 
 class CredentialsError(RuntimeError):
     pass
+
+
+def store_secret(reference: str, value: str) -> None:
+    """Store a local-only trusted-audit secret in the OS credential vault."""
+    if not reference or not reference.strip() or not value:
+        raise CredentialsError("credential reference and value are required")
+    _keyring().set_password(TRUSTED_AUDIT_SERVICE, reference.strip(), value)
+    logger.info("Stored trusted-audit credential reference=%s", reference.strip())
+
+
+def load_secret(reference: str) -> str | None:
+    """Load a trusted-audit secret without ever logging or returning it in status payloads."""
+    if not reference or not reference.strip():
+        raise CredentialsError("credential reference is required")
+    return _keyring().get_password(TRUSTED_AUDIT_SERVICE, reference.strip())
+
+
+def clear_secret(reference: str) -> bool:
+    if not reference or not reference.strip():
+        raise CredentialsError("credential reference is required")
+    keyring = _keyring()
+    if keyring.get_password(TRUSTED_AUDIT_SERVICE, reference.strip()) is None:
+        return False
+    keyring.delete_password(TRUSTED_AUDIT_SERVICE, reference.strip())
+    logger.info("Removed trusted-audit credential reference=%s", reference.strip())
+    return True
 
 
 def _keyring():

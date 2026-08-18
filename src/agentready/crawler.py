@@ -29,6 +29,7 @@ from .audit_core.store import (
 from .audit_core.urls import UrlIdentity
 from .browser_pool import BrowserPool, BrowserPoolBoundary, BrowserPoolFactory
 from .egress import EgressPolicy
+from .egress import PassivePublicContext, TrustedLocalCredentialContext
 from .fetcher import (
     Fetcher,
     FetcherBoundary,
@@ -257,6 +258,8 @@ class AsyncCrawler:
         fetcher_factory: FetcherFactory | None = None,
         browser_pool_factory: BrowserPoolFactory | None = None,
         progress_callback: Callable[[dict[str, int | str]], None] | None = None,
+        request_headers: dict[str, str] | None = None,
+        security_context: PassivePublicContext | TrustedLocalCredentialContext | None = None,
     ) -> None:
         self.scope = scope
         self.config = config or CrawlConfig()
@@ -272,6 +275,10 @@ class AsyncCrawler:
         self.fetcher_factory = fetcher_factory or Fetcher
         self.browser_pool_factory = browser_pool_factory or BrowserPool
         self.progress_callback = progress_callback
+        self.request_headers = dict(request_headers or {})
+        self.security_context = security_context
+        if self.render and self.request_headers:
+            raise ValueError("trusted credentials cannot be used with rendered browser audits")
 
     async def crawl(self) -> CrawlResult:
         started = time.monotonic()
@@ -399,7 +406,15 @@ class AsyncCrawler:
                                 except Exception as exc:
                                     raise FetchError(str(exc), kind=FetchErrorKind.PROTOCOL) from exc
                             else:
-                                response = await fetcher.get(FetchRequest(item.url, purpose="crawl", run_id=run_id))
+                                response = await fetcher.get(
+                                    FetchRequest(
+                                        item.url,
+                                        purpose="crawl",
+                                        run_id=run_id,
+                                        headers=self.request_headers,
+                                        security_context=self.security_context,
+                                    )
+                                )
                         except FetchError as exc:
                             failed += 1
                             frontier.set_state(item.url, CrawlItemState.FAILED)

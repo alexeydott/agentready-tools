@@ -25,6 +25,21 @@ CLI-only, require loopback targets and an explicit header allowlist, and are
 blocked on cross-origin redirects unless an explicit policy opt-in is used.
 Remote API/MCP requests remain passive and cannot supply credential contexts.
 
+Trusted local audit credentials are referenced by name and stored through the
+OS vault, never in `.agentready.yml` or reports. Configure a reference from
+stdin and run the authenticated path explicitly:
+
+```bash
+agentready trusted-credentials set local-site --value-stdin
+agentready audit http://127.0.0.1:8765/ --trusted-origin http://127.0.0.1:8765 \
+  --credential-ref local-site
+```
+
+The target must be the exact configured loopback origin. Credential headers are
+injected only into the collection Fetcher; rendered browser audits are rejected
+for this mode, and redirects/subresources outside the origin allowlist are
+blocked. No authenticated audit route is exposed through FastAPI or MCP.
+
 FastAPI and MCP facades always operate in public-target mode.
 
 ## Commerce Safety

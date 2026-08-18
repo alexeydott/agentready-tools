@@ -30,10 +30,14 @@ class TrustedLocalCredentialContext:
     basic_auth_ref: str | None = None
     storage_state_ref: str | None = None
     proxy_url: str | None = None
+    allowed_origins: frozenset[str] = frozenset()
 
     def permits(self, url: str) -> bool:
         hostname = (urlsplit(url).hostname or "").lower()
         if self.interface != "cli" or hostname not in {"localhost", "127.0.0.1", "::1"}:
+            return False
+        origin = f"{urlsplit(url).scheme}://{urlsplit(url).netloc}"
+        if self.allowed_origins and origin not in self.allowed_origins:
             return False
         if self.proxy_url:
             proxy_host = (urlsplit(self.proxy_url).hostname or "").lower()
