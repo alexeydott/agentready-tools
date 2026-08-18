@@ -67,6 +67,7 @@ from .report_storage import save_report
 from .report_v2 import diff_reports, export_inventory, report_from_dict
 from .robots import RobotsInterpretation, RobotsSimulationService, parse_robots
 from .saved_views import SavedView, SavedViewRegistry
+from .sitemap_reconciliation import build_reconciliation_report
 from .seo_checks import SEO_CHECK_METADATA, SEO_CHECKS_BY_ID
 from .seo_crawler import CRAWL_CHECK_METADATA
 from .seo_report import render_seo_html
@@ -450,6 +451,18 @@ class RobotsSimulationRequest(BaseModel):
     observed_search_pages: list[str] = Field(default_factory=list, max_length=1000)
     interpretation: Literal["rfc9309", "google"] = "rfc9309"
     origin: str | None = Field(default=None, max_length=2048)
+
+
+class SitemapReconciliationRequest(BaseModel):
+    """Caller-supplied bounded sitemap documents; no network fetch is performed."""
+
+    documents: list[str] = Field(min_length=1, max_length=32)
+    origin: str = Field(min_length=1, max_length=2048)
+    category: str = "sitemap_only"
+    cursor: str | None = Field(default=None, max_length=2048)
+    limit: int = Field(default=100, ge=1, le=1000)
+    format: Literal["json", "csv"] = "json"
+    sitemap_id: str | None = Field(default=None, max_length=80)
 
 
 class SeoRequest(BaseModel):
@@ -1069,6 +1082,33 @@ def robots_simulate_endpoint(run_id: str, request: RobotsSimulationRequest) -> d
     try:
         return _robots_diff_payload(run_id, request)
     except (ValueError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/v2/runs/{run_id}/sitemap/reconcile")
+def sitemap_reconcile_endpoint(run_id: str, request: SitemapReconciliationRequest) -> object:
+    """Reconcile supplied sitemap XML with the stored run inventory."""
+    try:
+        store = _V2_RUNS.get(run_id)
+        records = {
+            page.url_key: {
+                "status_code": page.status_code,
+                "canonical": page.canonical,
+                "noindex": page.locally_indexable is False,
+                "blocked": False,
+            }
+            for page in store.iter_pages(run_id)
+        }
+        report = build_reconciliation_report(
+            request.documents, records, origin=request.origin, sitemap_id=request.sitemap_id
+        )
+        if request.format == "csv":
+            return {"run_id": run_id, "sitemap_id": report.sitemap_id, "category": request.category, "format": "csv", "content": report.export(request.category, "csv")}
+        page = report.page(request.category, cursor=request.cursor, limit=request.limit)
+        return {"run_id": run_id, "sitemap_id": report.sitemap_id, "source_count": report.source_count, "sitemap_urls": list(report.sitemap_urls), "classifications": {key: len(value) for key, value in report.classifications.categories.items()}, **page}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="run not found") from exc
+    except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

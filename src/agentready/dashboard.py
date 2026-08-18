@@ -841,6 +841,14 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div class="form-grid three"><label for="robots-live">{escape(text["robots_live"])}<textarea id="robots-live" rows="5"></textarea></label><label for="robots-proposed">{escape(text["robots_proposed"])}<textarea id="robots-proposed" rows="5"></textarea></label><div><label for="robots-user-agents">{escape(text["robots_user_agents"])}</label><input id="robots-user-agents" value="*"><button type="button" class="secondary" onclick="simulateRobots()">{escape(text["robots_simulate"])}</button></div></div>
 <div id="robots-simulation-status" role="status" aria-live="polite">{escape(text["robots_empty"])}</div><div id="robots-simulation-result" role="region" aria-live="polite"></div>
 </section>
+<section id="sitemap-reconciliation-panel" class="panel" hidden aria-labelledby="sitemap-reconciliation-title">
+<h2 id="sitemap-reconciliation-title">Sitemap reconciliation</h2>
+<p>Paste bounded sitemap XML documents. They are compared with the stored run inventory; no sitemap is submitted.</p>
+<label for="sitemap-reconciliation-origin">Origin</label><input id="sitemap-reconciliation-origin" type="url" placeholder="https://example.test">
+<label for="sitemap-reconciliation-xml">Sitemap XML (one or more documents separated by a blank line)</label><textarea id="sitemap-reconciliation-xml" rows="6"></textarea>
+<button type="button" class="secondary" onclick="reconcileSitemap()">Reconcile sitemap</button>
+<div id="sitemap-reconciliation-status" role="status" aria-live="polite"></div><div id="sitemap-reconciliation-result" role="region" aria-live="polite"></div>
+</section>
 <section id="ai-assistant-panel" class="panel ai-workspace" hidden aria-labelledby="ai-workspace-title">
 <div class="ai-workspace-header"><div class="ai-header-title"><h2 id="ai-workspace-title">{escape(text["ai_title"])}</h2><div class="ai-header-meta"><small>{escape(text["ai_hint"])}</small><span id="ai-model-chip" class="ai-model-chip" title="{escape(text["ai_model_chip"])}">{escape(text["ai_model_chip"])}: —</span></div></div><div class="ai-mode-switch"><button type="button" class="secondary ai-drawer-toggle history-toggle" title="{escape(text["ai_saved_chats"])}" onclick="toggleAiDrawer('history')">{escape(text["ai_saved_chats"])}</button><button type="button" class="secondary ai-drawer-toggle context-toggle" title="{escape(text["ai_mcp_hint"])}" onclick="toggleAiDrawer('context')">{escape(text["ai_mcp"])}</button><label class="sr-only" for="ai-mode">{escape(text["ai_mode"])}</label><div class="ai-mode-segmented" role="group" aria-label="{escape(text["ai_mode"])}"><button type="button" data-ai-mode="both" title="{escape(text["ai_mode_both_hint"])}" onclick="setAiMode('both')">{escape(text["ai_mode_both"])}</button><button type="button" data-ai-mode="seo" title="{escape(text["ai_mode_seo_hint"])}" onclick="setAiMode('seo')">{escape(text["ai_mode_seo"])}</button><button type="button" data-ai-mode="geo" title="{escape(text["ai_mode_geo_hint"])}" onclick="setAiMode('geo')">{escape(text["ai_mode_geo"])}</button></div><select id="ai-mode" onchange="updateAiModeHint()"><option value="both">{escape(text["ai_mode_both"])}</option><option value="seo">{escape(text["ai_mode_seo"])}</option><option value="geo">{escape(text["ai_mode_geo"])}</option></select><small id="ai-mode-hint" class="ai-mode-hint"></small></div></div>
 <div class="ai-workspace-grid">
@@ -1197,6 +1205,8 @@ function captureV2Report(reportText, required=false) {{
       window.agentreadyV2Report = JSON.parse(reportText.slice(start + v2Marker.length, end));
       const robotsPanel = document.getElementById("robots-simulation-panel");
       if (robotsPanel) robotsPanel.hidden = false;
+      const sitemapPanel = document.getElementById("sitemap-reconciliation-panel");
+      if (sitemapPanel) sitemapPanel.hidden = false;
       console.info("[FIX:ai-audit-context] Embedded audit report captured", {{bytes:reportText.length, findings:(window.agentreadyV2Report.findings || []).length}});
       return window.agentreadyV2Report;
     }}
@@ -1298,6 +1308,31 @@ async function simulateRobots() {{
     output.innerHTML = "<p>" + escapeHtml(data.label) + "</p><table><thead><tr><th>Change</th><th>URL</th></tr></thead><tbody>" + (rows || "<tr><td colspan='2'>No URL changes</td></tr>") + "</tbody></table>";
     status.textContent = translations[language.value].robots_result;
   }} catch (error) {{ status.textContent = translations[language.value].robots_result + ": " + error.message; }}
+}}
+
+async function reconcileSitemap() {{
+  const status = document.getElementById("sitemap-reconciliation-status");
+  const output = document.getElementById("sitemap-reconciliation-result");
+  if (!runId) {{ status.textContent = "Run an audit first"; return; }}
+  const documents = document.getElementById("sitemap-reconciliation-xml").value.split(/\n\s*\n/).map(value => value.trim()).filter(Boolean);
+  const origin = document.getElementById("sitemap-reconciliation-origin").value.trim();
+  try {{
+    const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/sitemap/reconcile", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{documents, origin, category:"sitemap_only", limit:100}})}});
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "request failed");
+    document.getElementById("sitemap-reconciliation-panel").hidden = false;
+    output.innerHTML = Object.entries(payload.classifications || {{}}).map(([category, count]) => `<button type="button" class="secondary" data-sitemap-category="${{escapeHtml(category)}}" onclick="loadSitemapCategory(this.dataset.sitemapCategory)">${{escapeHtml(category)}}: ${{count}}</button>`).join(" ") + `<pre>${{escapeHtml(JSON.stringify(payload.items || [], null, 2))}}</pre>`;
+    window.sitemapReconciliation = payload;
+    status.textContent = "Reconciliation complete";
+    logDashboardAction("sitemap.reconcile", {{run_id:runId, sitemap_id:payload.sitemap_id, classifications:payload.classifications}});
+  }} catch (error) {{ status.textContent = "Reconciliation failed: " + error.message; }}
+}}
+async function loadSitemapCategory(category) {{
+  const state = window.sitemapReconciliation;
+  if (!state || !runId) return;
+  const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/sitemap/reconcile", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{documents:[document.getElementById("sitemap-reconciliation-xml").value], origin:document.getElementById("sitemap-reconciliation-origin").value, category, limit:100}})}});
+  const payload = await response.json();
+  document.getElementById("sitemap-reconciliation-result").insertAdjacentHTML("beforeend", `<pre data-sitemap-items="${{escapeHtml(category)}}">${{escapeHtml(JSON.stringify(payload.items || [], null, 2))}}</pre>`);
 }}
 async function loadV2Inventory(kind=null, cursor=null) {{
   const report = window.agentreadyV2Report;

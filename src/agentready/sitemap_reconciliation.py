@@ -1,10 +1,18 @@
 """Bounded sitemap/crawl inventory reconciliation and export helpers."""
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
+import csv
+import hashlib
+import io
+import logging
 from typing import TYPE_CHECKING, Any
 from xml.etree.ElementTree import Element, SubElement, tostring
+
+from .sitemap import SitemapLimits, classify_sitemap_scope, parse_sitemap_collection
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .query_service import QueryService, QuerySpec
@@ -28,6 +36,58 @@ class SitemapClassification:
     blocked: tuple[str, ...] = ()
     noindex: tuple[str, ...] = ()
     noncanonical: tuple[str, ...] = ()
+    out_of_scope: tuple[str, ...] = ()
+    orphan_candidate: tuple[str, ...] = ()
+
+    @property
+    def categories(self) -> dict[str, tuple[str, ...]]:
+        return {
+            "sitemap_only": self.sitemap_only,
+            "crawl_only": self.crawl_only,
+            "broken": self.broken,
+            "redirects": self.redirects,
+            "blocked": self.blocked,
+            "noindex": self.noindex,
+            "noncanonical": self.noncanonical,
+            "out_of_scope": self.out_of_scope,
+            "orphan_candidate": self.orphan_candidate,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SitemapReconciliationReport:
+    """Deterministic, exportable reconciliation projection over stored facts."""
+
+    sitemap_id: str
+    classifications: SitemapClassification
+    sitemap_urls: tuple[str, ...]
+    source_count: int
+
+    def page(self, category: str, *, cursor: str | None = None, limit: int = 100) -> dict[str, object]:
+        if category not in self.classifications.categories:
+            raise ValueError("unsupported sitemap classification")
+        if limit <= 0 or limit > 1000:
+            raise ValueError("query limit must be between 1 and 1000")
+        values = self.classifications.categories[category]
+        if cursor is not None:
+            values = tuple(item for item in values if item > cursor)
+        selected = values[: limit + 1]
+        items = selected[:limit]
+        return {"category": category, "items": list(items), "next_cursor": items[-1] if len(selected) > limit else None, "total": len(values)}
+
+    def export(self, category: str, format: str = "json") -> str:
+        page = self.page(category, limit=1000)
+        items = page["items"]
+        if format == "json":
+            import json
+            return json.dumps({"sitemap_id": self.sitemap_id, **page}, ensure_ascii=False, sort_keys=True)
+        if format == "csv":
+            output = io.StringIO()
+            writer = csv.writer(output, lineterminator="\n")
+            writer.writerow(("category", "url"))
+            writer.writerows((category, item) for item in items)
+            return output.getvalue()
+        raise ValueError("unsupported export format")
 
 
 def classify_sitemap_records(
@@ -70,7 +130,36 @@ def classify_sitemap_records(
         tuple(blocked),
         tuple(noindex),
         tuple(noncanonical),
+        (),
+        tuple(sitemap_only),
     )
+
+
+def build_reconciliation_report(
+    documents: Iterable[bytes | str],
+    records: Mapping[str, Mapping[str, Any]],
+    *,
+    origin: str,
+    limit: int = 100_000,
+    sitemap_id: str | None = None,
+) -> SitemapReconciliationReport:
+    """Parse supplied sitemap documents and reconcile against stored crawl facts.
+
+    Documents are parsed locally; nested indexes must be supplied as bounded
+    documents by the caller. Cross-origin URLs are excluded from classification.
+    """
+    if not origin.strip():
+        raise ValueError("origin must not be empty")
+    payloads = tuple(item.encode("utf-8") if isinstance(item, str) else item for item in documents)
+    parsed = parse_sitemap_collection(payloads, limits=SitemapLimits(max_urls_total=limit))
+    raw_urls = tuple(url for result in parsed for url in result.urls)
+    scoped = classify_sitemap_scope(raw_urls, origin)
+    urls = tuple(sorted(dict.fromkeys(scoped.same_origin)))
+    classification = classify_sitemap_records(urls, records, limit=limit)
+    classification = replace(classification, out_of_scope=tuple(sorted(scoped.cross_origin_unknown)))
+    generated_id = sitemap_id or hashlib.sha256("\n".join(urls).encode("utf-8")).hexdigest()[:16]
+    logger.info("sitemap reconciliation sitemap_id=%s sources=%d classifications=%s", generated_id, len(payloads), {key: len(value) for key, value in classification.categories.items()})
+    return SitemapReconciliationReport(generated_id, classification, urls, len(payloads))
 
 
 def reconcile_sitemap_urls(

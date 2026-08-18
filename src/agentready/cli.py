@@ -148,6 +148,19 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     simulate.add_argument("--base-url", default="http://127.0.0.1:8765")
     simulate.add_argument("--output", "-o")
 
+    sitemap = _add_command_parser(sub, "sitemap", help="Reconcile or export a supplied sitemap over a stored v2 run")
+    sitemap_commands = sitemap.add_subparsers(dest="sitemap_command", required=True)
+    reconcile = _add_command_parser(sitemap_commands, "reconcile", help="Reconcile sitemap XML without refetching")
+    reconcile.add_argument("run_id")
+    reconcile.add_argument("--document", action="append", required=True, help="Local sitemap XML document (repeat for nested indexes)")
+    reconcile.add_argument("--origin", required=True)
+    reconcile.add_argument("--category", default="sitemap_only")
+    reconcile.add_argument("--cursor")
+    reconcile.add_argument("--limit", type=int, default=100)
+    reconcile.add_argument("--format", choices=["json", "csv"], default="json")
+    reconcile.add_argument("--base-url", default="http://127.0.0.1:8765")
+    reconcile.add_argument("--output", "-o")
+
 
 def build_parser() -> argparse.ArgumentParser:
     logger.debug("Building CLI parser: frozen=%s", bool(getattr(sys, "frozen", False)))
@@ -792,6 +805,24 @@ def _cmd_view(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_sitemap(args: argparse.Namespace) -> int:
+    if args.sitemap_command != "reconcile":
+        raise ValueError("unsupported sitemap command")
+    payload = {
+        "documents": [Path(path).read_text(encoding="utf-8") for path in args.document],
+        "origin": args.origin,
+        "category": args.category,
+        "cursor": args.cursor,
+        "limit": args.limit,
+        "format": args.format,
+    }
+    result = _http_json(args.base_url, f"/v2/runs/{urllib.parse.quote(args.run_id, safe='')}/sitemap/reconcile", method="POST", payload=payload)
+    content = result.get("content") if args.format == "csv" else json.dumps(result, ensure_ascii=False, indent=2)
+    _write_cli_output(str(content), args.output)
+    logger.info("CLI sitemap reconciliation run_id=%s category=%s", args.run_id, args.category)
+    return 0
+
+
 def _cmd_rescan(args: argparse.Namespace) -> int:
     payload = {
         "url": args.url,
@@ -868,6 +899,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_compare(args)
         if args.command == "robots":
             return _cmd_robots(args)
+        if args.command == "sitemap":
+            return _cmd_sitemap(args)
         if args.command == "ai":
             return _cmd_ai(args)
         if args.command == "checks":

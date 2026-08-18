@@ -83,6 +83,15 @@ response includes policy hashes, newly allowed/blocked URLs, sitemap and
 important-page conflicts, and per-bot diffs. The dashboard exposes the same
 bounded diff after a v2 run is loaded.
 
+Sitemap reconciliation is a local, read-only projection over a completed run.
+Supply one or more bounded XML documents (including nested index children) to
+`POST /v2/runs/{run_id}/sitemap/reconcile` with `origin`, `category`, `limit`,
+and optional `cursor`. The CLI equivalent is
+`agentready sitemap reconcile RUN_ID --document sitemap.xml --origin https://example.test`.
+Duplicate and cross-origin URLs are handled deterministically; CSV/JSON output
+uses the same URL set as the table, and no generated sitemap is submitted
+automatically.
+
 The `/dashboard` v2 preset uses `POST /v2/audit/dashboard` and renders the
 canonical `AuditService` result in an escaped HTML projection. The dashboard's
 advanced panel exposes the vNext crawl profile (`quick`, `standard`, `deep`),

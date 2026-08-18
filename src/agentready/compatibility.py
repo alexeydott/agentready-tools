@@ -14,6 +14,7 @@ V2_SCHEMAS = (
     "agentready.remediation-plan.v2",
     "agentready.protocol-findings.v2",
     "agentready.robots-simulation.v2",
+    "agentready.sitemap-reconciliation.v2",
     "agentready.ai-assistant.v2",
 )
 V2_SURFACES = (
@@ -35,6 +36,7 @@ V2_SURFACES = (
     "/v2/runs/{run_id}/provider-enrichment",
     "/v2/runs/{run_id}/provider-jobs",
     "/v2/runs/{run_id}/robots/simulate",
+    "/v2/runs/{run_id}/sitemap/reconcile",
     "/v2/diff",
     "/v2/export",
     "/v2/saved-views",

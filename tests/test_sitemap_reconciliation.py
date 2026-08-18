@@ -8,6 +8,7 @@ from agentready.sitemap_reconciliation import (
     classify_sitemap_records,
     generate_sitemap_documents,
     generate_sitemap_from_query,
+    build_reconciliation_report,
     reconcile_sitemap_urls,
 )
 
@@ -127,3 +128,19 @@ def test_sitemap_reconciliation_and_parser_reject_invalid_limits_and_xxe():
         limits=SitemapLimits(max_uncompressed_bytes=10),
     )
     assert limited.evaluation == SitemapEvaluation.PARTIAL_SAFETY_LIMIT
+
+
+def test_product_reconciliation_handles_nested_documents_scope_and_export_parity():
+    report = build_reconciliation_report(
+        [
+            "<sitemapindex><sitemap><loc>https://example.test/child.xml</loc></sitemap></sitemapindex>",
+            "<urlset><url><loc>https://example.test/a</loc></url><url><loc>https://example.test/a</loc></url><url><loc>https://other.test/out</loc></url></urlset>",
+        ],
+        {"https://example.test/a": {"status_code": 200}},
+        origin="https://example.test",
+    )
+    assert report.sitemap_urls == ("https://example.test/a",)
+    assert report.classifications.out_of_scope == ("https://other.test/out",)
+    assert report.page("sitemap_only", limit=1)["items"] == []
+    assert '"items": []' in report.export("sitemap_only")
+    assert report.export("sitemap_only", "csv").splitlines()[0] == "category,url"

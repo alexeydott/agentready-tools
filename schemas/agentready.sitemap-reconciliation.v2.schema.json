@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentready.sitemap-reconciliation.v2",
+  "type": "object",
+  "required": ["run_id", "sitemap_id", "category", "items", "next_cursor", "total"],
+  "properties": {
+    "run_id": {"type": "string"},
+    "sitemap_id": {"type": "string"},
+    "category": {"type": "string", "enum": ["sitemap_only", "crawl_only", "broken", "redirects", "blocked", "noindex", "noncanonical", "out_of_scope", "orphan_candidate"]},
+    "items": {"type": "array", "items": {"type": "string", "format": "uri"}},
+    "next_cursor": {"type": ["string", "null"]},
+    "total": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}
