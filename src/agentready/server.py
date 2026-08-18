@@ -46,11 +46,8 @@ from .metrics import (
     ExternalMetric,
     ProviderConfig,
     ProviderStatus,
-    ga4_adapter,
-    gsc_adapter,
-    pagespeed_adapter,
-    url_inspection_adapter,
 )
+from .provider_service import ProviderService
 from .mobile_checks import MOBILE_CHECK_METADATA
 from .mobile_report import render_mobile_html
 from .mobile_scanner import audit_mobile
@@ -294,34 +291,15 @@ def _run_provider_enrichment(run_id: str, request: ProviderEnrichmentRequest) ->
             "metrics": [],
         }
     else:
-        adapter = {
-            "pagespeed": pagespeed_adapter,
-            "ga4": ga4_adapter,
-            "gsc": gsc_adapter,
-            "url-inspection": url_inspection_adapter,
-        }[request.provider](ProviderConfig())
-
-        async def cached_operation(_: str | None) -> tuple[ExternalMetric, ...]:
-            return metrics
-
-        result = adapter.run(cached_operation, cached=metrics).to_dict()
+        service_result = ProviderService(store).enrich(
+            run_id,
+            request.provider,
+            config=ProviderConfig(),
+            cached=metrics,
+            sample_urls=tuple(urls),
+        )
+        result = service_result.to_dict()
         result["sample_count"] = len(urls)
-        for item in request.cached_metrics:
-            if item.url_key is None:
-                targets = urls[:1] or [None]
-            else:
-                targets = [item.url_key]
-            metric = ExternalMetric(
-                request.provider,
-                item.name,
-                item.value,
-                item.unit,
-                item.source,
-                item.version,
-                item.observed_at,
-            )
-            for url_key in targets:
-                store.put_metric(metric.to_record(run_id, url_key=url_key))
         store.put_evidence(run_id, f"provider:{request.provider}:summary", result)
     logger.info(
         "provider enrichment complete run_id=%s provider=%s status=%s samples=%d metrics=%d",
@@ -479,7 +457,9 @@ def dashboard(request: Request, language: Literal["en", "ru"] | None = None) -> 
 @app.get("/v2/capabilities")
 def v2_capabilities() -> dict:
     """Discover canonical v2 product-workflow capabilities and version."""
-    return _AUDIT_SERVICE.workflow_capabilities()
+    payload = _AUDIT_SERVICE.workflow_capabilities()
+    payload["providers"] = [item.to_dict() for item in ProviderService.capabilities()]
+    return payload
 
 
 class V2AuditRequest(BaseModel):

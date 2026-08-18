@@ -218,6 +218,13 @@ GA4/Search Console analytics checks using the stored service account (see
 Getting Started). Provider enrichment is timestamped, bounded, cached/opt-in,
 and excluded from the core score.
 
+The application-level `ProviderService` is the only scheduling, budget, cache,
+credential-reference, provenance, and persistence boundary for provider
+enrichment. `GET /v2/capabilities` publishes provider capability metadata;
+unavailable, quota, timeout, and stale-cache states remain explicit. Transport
+handlers do not instantiate provider adapters directly, and raw credentials or
+authenticated responses are not persisted.
+
 Generic inventory parity:
 
 ```bash
