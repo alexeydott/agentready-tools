@@ -11,6 +11,10 @@ from agentready.server import _V2_RUNS, app
 
 
 def test_api_mcp_export_and_dashboard_share_inventory_contract():
+    # The API/dashboard halves remain useful in the server profile, while the
+    # MCP projection is exercised only when the explicit MCP extra is present.
+    pytest.importorskip("mcp")
+
     run_id = "parity-run-37"
     store = MemorySiteStore()
     store.begin_run(RunRecord(run_id, "config-hash", "tool", "rules"))
@@ -24,7 +28,7 @@ def test_api_mcp_export_and_dashboard_share_inventory_contract():
     assert api["items"] == exported
     assert api["next_cursor"] == "https://example.test/a"
 
-    mcp = pytest.importorskip("agentready.mcp_server")
+    from agentready import mcp_server as mcp
     mcp_payload = mcp.run_inventory_v2(run_id, kind="pages", limit=1)
     assert mcp_payload["run_id"] == api["run_id"]
     assert mcp_payload["items"] == api["items"]

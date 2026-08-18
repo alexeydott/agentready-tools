@@ -9,6 +9,8 @@ def test_ci_profiles_install_explicit_dependency_sets_and_isolate_mcp_collection
 
     assert 'python -m pip install -e ".[dev,server]"' in ci
     assert 'python -m pip install -e ".[dev,mcp,server]"' in ci
+    assert 'tests/test_acceptance_mcp.py' in ci
+    assert 'tests/test_cross_surface_parity.py' in ci
     assert 'python -m pip install -e ".[dev,portable]"' in ci
     assert "--ignore=tests/test_acceptance_mcp.py" in ci
     assert 'python -m pip install -e ".[dev,mcp,portable]"' in release

@@ -5,11 +5,12 @@ from __future__ import annotations
 import pytest
 
 from agentready.cli import build_parser
-from agentready.server import V2AuditRequest
 
 
 def test_l2_cli_api_mcp_surface_contracts_preserve_shared_fields():
     pytest.importorskip("mcp")
+    pytest.importorskip("fastapi")
+    from agentready.server import V2AuditRequest
     from agentready.mcp_server import audit_v2
 
     parser = build_parser()
