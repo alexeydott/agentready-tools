@@ -21,7 +21,7 @@ from agentready.security import SecretRedactor
 from .urls import UrlIdentity
 
 logger = logging.getLogger(__name__)
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 EVIDENCE_CLAIM_STALE_SECONDS = 3600.0
 
 
@@ -156,6 +156,39 @@ class RunRecord:
             object.__setattr__(self, "started_at", _now())
 
 
+@dataclass(frozen=True, slots=True)
+class ProjectRecord:
+    project_id: str
+    name: str
+    target: str
+    default_profile: str = "standard"
+    default_ruleset: str | None = None
+    created_at: str = ""
+    retention_policy: str = "metadata-only"
+
+    def __post_init__(self) -> None:
+        if not self.project_id.strip() or not self.name.strip() or not self.target.strip():
+            raise ValueError("project id, name and target are required")
+        if not self.created_at:
+            object.__setattr__(self, "created_at", _now())
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectRunRecord:
+    project_id: str
+    run_id: str
+    parent_run_id: str | None = None
+    baseline_run_id: str | None = None
+    trigger: str = "manual"
+    created_at: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.project_id.strip() or not self.run_id.strip():
+            raise ValueError("project_id and run_id are required")
+        if not self.created_at:
+            object.__setattr__(self, "created_at", _now())
+
+
 class RunUrlState(StrEnum):
     DISCOVERED = "discovered"
     QUEUED = "queued"
@@ -269,6 +302,12 @@ class MetricRecord:
 
 class SiteStore(Protocol):
     def begin_run(self, run: RunRecord) -> RunRecord: ...
+    def put_project(self, project: ProjectRecord) -> ProjectRecord: ...
+    def get_project(self, project_id: str) -> ProjectRecord: ...
+    def iter_projects(self) -> Iterator[ProjectRecord]: ...
+    def put_project_run(self, relation: ProjectRunRecord) -> ProjectRunRecord: ...
+    def iter_project_runs(self, project_id: str) -> Iterator[ProjectRunRecord]: ...
+    def delete_project(self, project_id: str) -> None: ...
     def update_run_state(self, run_id: str, state: str, *, finished_at: str | None = None) -> None: ...
     def put_run_url(self, record: RunUrlRecord) -> None: ...
     def put_fetch(self, fetch: FetchFact) -> None: ...
@@ -313,6 +352,8 @@ class MemorySiteStore:
     def __init__(self, *, retention: ContentRetention = ContentRetention.METADATA_ONLY) -> None:
         self.retention = retention
         self._runs: dict[str, RunRecord] = {}
+        self._projects: dict[str, ProjectRecord] = {}
+        self._project_runs: dict[tuple[str, str], ProjectRunRecord] = {}
         self._pages: dict[tuple[str, str], PageRecord] = {}
         self._run_urls: dict[tuple[str, str], RunUrlRecord] = {}
         self._fetches: dict[str, FetchFact] = {}
@@ -335,6 +376,39 @@ class MemorySiteStore:
         self._runs[run.id] = run
         logger.debug("[WP3.1] memory run created id=%s", run.id)
         return run
+
+    def put_project(self, project: ProjectRecord) -> ProjectRecord:
+        existing = self._projects.get(project.project_id)
+        if existing is not None:
+            return existing
+        self._projects[project.project_id] = project
+        logger.info("project created project_id=%s", project.project_id)
+        return project
+
+    def get_project(self, project_id: str) -> ProjectRecord:
+        try:
+            return self._projects[project_id]
+        except KeyError as exc:
+            raise KeyError("project not found") from exc
+
+    def iter_projects(self) -> Iterator[ProjectRecord]:
+        yield from (self._projects[key] for key in sorted(self._projects))
+
+    def put_project_run(self, relation: ProjectRunRecord) -> ProjectRunRecord:
+        self.get_project(relation.project_id)
+        key = (relation.project_id, relation.run_id)
+        self._project_runs.setdefault(key, relation)
+        return self._project_runs[key]
+
+    def iter_project_runs(self, project_id: str) -> Iterator[ProjectRunRecord]:
+        rows = [item for (owner, _), item in self._project_runs.items() if owner == project_id]
+        yield from sorted(rows, key=lambda item: (item.created_at, item.run_id), reverse=True)
+
+    def delete_project(self, project_id: str) -> None:
+        self._projects.pop(project_id, None)
+        for key in tuple(self._project_runs):
+            if key[0] == project_id:
+                self._project_runs.pop(key, None)
 
     def update_run_state(self, run_id: str, state: str, *, finished_at: str | None = None) -> None:
         run = self._runs[run_id]
@@ -627,6 +701,8 @@ class SQLiteSiteStore:
                     (SCHEMA_VERSION, _now()),
                 )
                 self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+            self._connection.executescript(_MIGRATION_7)
+            self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             self._connection.execute("PRAGMA optimize")
 
     @contextmanager
@@ -644,6 +720,44 @@ class SQLiteSiteStore:
     def _write_guard(self) -> None:
         if self.read_only:
             raise StoreError("store is read-only because its schema is newer than supported")
+
+    def put_project(self, project: ProjectRecord) -> ProjectRecord:
+        self._write_guard()
+        with self._transaction():
+            self._connection.execute(
+                "INSERT OR IGNORE INTO projects(project_id,name,target,default_profile,default_ruleset,created_at,retention_policy) VALUES (?,?,?,?,?,?,?)",
+                (project.project_id, project.name, project.target, project.default_profile, project.default_ruleset, project.created_at, project.retention_policy),
+            )
+        return self.get_project(project.project_id)
+
+    def get_project(self, project_id: str) -> ProjectRecord:
+        row = self._connection.execute("SELECT * FROM projects WHERE project_id=?", (project_id,)).fetchone()
+        if row is None:
+            raise KeyError("project not found")
+        return ProjectRecord(row["project_id"], row["name"], row["target"], row["default_profile"], row["default_ruleset"], row["created_at"], row["retention_policy"])
+
+    def iter_projects(self) -> Iterator[ProjectRecord]:
+        for row in self._connection.execute("SELECT * FROM projects ORDER BY project_id"):
+            yield ProjectRecord(row["project_id"], row["name"], row["target"], row["default_profile"], row["default_ruleset"], row["created_at"], row["retention_policy"])
+
+    def put_project_run(self, relation: ProjectRunRecord) -> ProjectRunRecord:
+        self._write_guard()
+        self.get_project(relation.project_id)
+        with self._transaction():
+            self._connection.execute(
+                "INSERT OR IGNORE INTO project_runs(project_id,run_id,parent_run_id,baseline_run_id,trigger,created_at) VALUES (?,?,?,?,?,?)",
+                (relation.project_id, relation.run_id, relation.parent_run_id, relation.baseline_run_id, relation.trigger, relation.created_at),
+            )
+        return next(item for item in self.iter_project_runs(relation.project_id) if item.run_id == relation.run_id)
+
+    def iter_project_runs(self, project_id: str) -> Iterator[ProjectRunRecord]:
+        for row in self._connection.execute("SELECT * FROM project_runs WHERE project_id=? ORDER BY created_at DESC, run_id DESC", (project_id,)):
+            yield ProjectRunRecord(row["project_id"], row["run_id"], row["parent_run_id"], row["baseline_run_id"], row["trigger"], row["created_at"])
+
+    def delete_project(self, project_id: str) -> None:
+        self._write_guard()
+        with self._transaction():
+            self._connection.execute("DELETE FROM projects WHERE project_id=?", (project_id,))
 
     def begin_run(self, run: RunRecord) -> RunRecord:
         self._write_guard()
@@ -1332,6 +1446,25 @@ CREATE INDEX IF NOT EXISTS idx_pages_run_url ON pages(run_id, url_key);
 CREATE INDEX IF NOT EXISTS idx_pages_run_status_url ON pages(run_id, status_code, url_key);
 CREATE INDEX IF NOT EXISTS idx_findings_run_item ON findings(run_id, item_id);
 CREATE INDEX IF NOT EXISTS idx_run_urls_run_url_state ON run_urls(run_id, url_key, state);
+CREATE TABLE IF NOT EXISTS projects (
+    project_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    target TEXT NOT NULL,
+    default_profile TEXT NOT NULL,
+    default_ruleset TEXT,
+    created_at TEXT NOT NULL,
+    retention_policy TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS project_runs (
+    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    parent_run_id TEXT,
+    baseline_run_id TEXT,
+    trigger TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(project_id, run_id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_project_runs_history ON project_runs(project_id, created_at DESC, run_id DESC);
 """
 
 _MIGRATION_6 = """
@@ -1341,4 +1474,26 @@ CREATE TABLE IF NOT EXISTS evidence_claims (
     claimed_at TEXT NOT NULL,
     PRIMARY KEY(run_id, item_id)
 ) WITHOUT ROWID;
+"""
+
+_MIGRATION_7 = """
+CREATE TABLE IF NOT EXISTS projects (
+    project_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    target TEXT NOT NULL,
+    default_profile TEXT NOT NULL,
+    default_ruleset TEXT,
+    created_at TEXT NOT NULL,
+    retention_policy TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS project_runs (
+    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    parent_run_id TEXT,
+    baseline_run_id TEXT,
+    trigger TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(project_id, run_id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_project_runs_history ON project_runs(project_id, created_at DESC, run_id DESC);
 """

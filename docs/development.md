@@ -197,3 +197,9 @@ python -m agentready.cli audit https://example.com --profile quick --max-pages 1
 The opt-in scale suite is `AGENTREADY_SCALE_TESTS=1 pytest -q --import-mode=importlib tests/test_scale_budgets.py`. It uses deterministic synthetic Memory-store fixtures plus temporary SQLite databases for write/query/keyset-pagination coverage and records only operation, fixture size, duration, peak bytes, rows, and truncation. Generated databases are deleted with the test temporary directory; provider/browser/network work is excluded from this storage gate.
 
 Local budget targets are 60 seconds wall time and 512 MiB peak memory per operation at 100k rows; 1k and 10k fixtures are smoke points for regression trends. The suite is skipped in the default fast regression run, but the deterministic fixture contract is always checked. Crawler cancellation and BrowserPool bounds remain covered by their focused integration tests and are not exercised by this network-free storage gate. Any budget regression must be fixed in the shared projection/query/graph/duplicate/export algorithm rather than in dashboard or transport adapters.
+
+Project metadata and project-run memberships use the same forward-only SQLite
+repository as audit inventory (schema v7); `ProjectService` does not open SQL
+connections directly. Before upgrading a durable database, make a backup copy.
+There are no down-migrations. Deleting project metadata removes memberships but
+retains immutable runs unless a future explicit retention operation is added.
