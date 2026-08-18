@@ -1788,7 +1788,10 @@ async function compareV2Inventory() {{
   try {{
     const response = await fetch("/v2/diff", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{request:{{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:selectedV2MaxPages()}},baseline:JSON.parse(baseline)}})}});
     if (!response.ok) throw new Error("HTTP " + response.status);
-    status.textContent = "Comparison complete";
+    const payload = await response.json();
+    const findings = payload.findings || {{}};
+    const count = name => Array.isArray(findings[name]) ? findings[name].length : 0;
+    status.textContent = `Comparison complete: ${{count("regressed")}} regressions, ${{count("resolved")}} fixed, ${{count("added")}} new, ${{count("removed")}} removed`;
   }} catch (error) {{ status.textContent = translations[language.value].v2_inventory_error + ": " + error.message; }}
 }}
 async function rescanV2Selection() {{

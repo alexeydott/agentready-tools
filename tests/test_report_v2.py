@@ -16,6 +16,7 @@ from agentready.report_v2 import (
     export_inventory,
     paginate_inventory,
     render_audit_report,
+    semantic_diff,
 )
 
 
@@ -202,6 +203,37 @@ def test_inventory_diff_classifies_three_changed_rows_in_large_projection():
         f"https://example.test/{index}" for index in range(3)
     )
     assert len(diff["technical"]["unchanged"]) == 997
+
+
+def test_semantic_diff_categorizes_findings_coverage_inventory_and_rules():
+    current = _report().to_dict()
+    current["run_id"] = "run-b"
+    current["rule_catalog_version"] = "2"
+    current["inventory"] = {"pages": [{"url": "https://example.com/a", "state_hash": "new"}]}
+    baseline = dict(current)
+    baseline["run_id"] = "run-a"
+    baseline["rule_catalog_version"] = "1"
+    baseline["coverage"] = dict(current["coverage"])
+    baseline["coverage"]["urls_fetched"] = 0
+    baseline["inventory"] = {"pages": [{"url": "https://example.com/a", "state_hash": "old"}, {"url": "https://example.com/deleted", "state_hash": "old"}]}
+    result = semantic_diff(current, baseline)
+    assert result.comparable
+    assert result.coverage["urls_fetched"] == {"before": 0, "after": None}
+    assert result.inventory["pages"]["changed"] == ("https://example.com/a",)
+    assert result.inventory["pages"]["removed"] == ("https://example.com/deleted",)
+    assert result.rule_versions["changed"]
+
+
+def test_semantic_diff_ignores_localized_text_and_input_order_but_rejects_incomparable_runs():
+    current = AuditReport("https://example.com", (Finding("a", "EN", FindingStatus.PASS, "text"), Finding("b", "B", FindingStatus.WARN, "text")), Coverage(2, 2, 2, 2)).to_dict()
+    baseline = dict(current)
+    baseline["findings"] = list(reversed(baseline["findings"]))
+    baseline["findings"][0] = {**baseline["findings"][0], "title": "RU", "reason": "локализованный текст"}
+    assert semantic_diff(current, baseline).findings["unchanged"] == ("a", "b")
+    incompatible = {**baseline, "target": "https://other.example"}
+    result = semantic_diff(current, incompatible)
+    assert not result.comparable
+    assert result.reason == "targets differ"
 
 
 def test_job_manager_completes_work():

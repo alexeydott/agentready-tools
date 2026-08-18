@@ -351,6 +351,28 @@ class BaselineDiff:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class SemanticDiff:
+    """Bounded, machine-readable comparison of two compatible v2 runs."""
+
+    comparable: bool
+    reason: str | None
+    findings: dict[str, tuple[str, ...]]
+    coverage: dict[str, dict[str, Any]]
+    inventory: dict[str, dict[str, tuple[str, ...]]]
+    rule_versions: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "comparable": self.comparable,
+            "reason": self.reason,
+            "findings": {key: list(value) for key, value in self.findings.items()},
+            "coverage": self.coverage,
+            "inventory": {category: {key: list(value) for key, value in changes.items()} for category, changes in self.inventory.items()},
+            "rule_versions": self.rule_versions,
+        }
+
+
 def classify_finding_changes(
     current: AuditReport,
     baseline: Mapping[str, Any],
@@ -437,6 +459,55 @@ def diff_reports(current: AuditReport, baseline: Mapping[str, Any]) -> BaselineD
         tuple(sorted(new.keys() - old.keys())),
         tuple(sorted(old.keys() - new.keys())),
     )
+
+
+def semantic_diff(current: Mapping[str, Any], baseline: Mapping[str, Any], *, max_inventory_rows: int = 1000) -> SemanticDiff:
+    """Compare reports while keeping localized prose and ordering out of identity."""
+    if max_inventory_rows <= 0 or max_inventory_rows > 10_000:
+        raise ValueError("max_inventory_rows must be between 1 and 10000")
+    reason = _comparison_reason(current, baseline)
+    if reason is not None:
+        return SemanticDiff(False, reason, {}, {}, {}, {"compatible": False})
+    current_report = report_from_dict(current)
+    findings = classify_finding_changes(current_report, baseline)
+    coverage = _diff_coverage(current.get("coverage", {}), baseline.get("coverage", {}))
+    current_inventory = current.get("inventory", current.get("inventories", {}))
+    baseline_inventory = baseline.get("inventory", baseline.get("inventories", {}))
+    inventory = diff_inventory(
+        {str(key): tuple(value)[:max_inventory_rows] for key, value in current_inventory.items()} if isinstance(current_inventory, Mapping) else {},
+        {str(key): tuple(value)[:max_inventory_rows] for key, value in baseline_inventory.items()} if isinstance(baseline_inventory, Mapping) else {},
+    )
+    rule_versions = _diff_rule_versions(current, baseline)
+    logger.info("semantic diff run_pair=%s/%s comparable=true findings=%d inventory_categories=%d", current.get("run_id", "current"), baseline.get("run_id", "baseline"), sum(len(value) for value in findings.values()), len(inventory))
+    return SemanticDiff(True, None, findings, coverage, inventory, rule_versions)
+
+
+def _comparison_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) -> str | None:
+    if current.get("schema") != SCHEMA or baseline.get("schema") != SCHEMA:
+        return "reports must use agentready.audit.v2 schema"
+    if current.get("target") != baseline.get("target"):
+        return "targets differ"
+    if current.get("version", REPORT_VERSION) != baseline.get("version", REPORT_VERSION):
+        return "report versions differ"
+    return None
+
+
+def _diff_coverage(current: Mapping[str, Any], baseline: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    for key in sorted(set(current) | set(baseline)):
+        old = baseline.get(key)
+        new = current.get(key)
+        if old == new:
+            continue
+        result[key] = {"before": old, "after": new}
+    return result
+
+
+def _diff_rule_versions(current: Mapping[str, Any], baseline: Mapping[str, Any]) -> dict[str, Any]:
+    keys = ("rule_version", "rule_catalog_version", "ruleset", "rules_version")
+    before = {key: baseline.get(key) for key in keys if key in baseline}
+    after = {key: current.get(key) for key in keys if key in current}
+    return {"changed": before != after, "before": before, "after": after}
 
 
 def diff_inventory(

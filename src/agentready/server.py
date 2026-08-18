@@ -68,7 +68,7 @@ from .projects import ProjectService, project_run_to_dict, project_to_dict
 from .registry import CHECKS
 from .remediation import remediation_for
 from .report_storage import save_report
-from .report_v2 import diff_reports, export_inventory, report_from_dict
+from .report_v2 import diff_reports, export_inventory, report_from_dict, semantic_diff
 from .robots import RobotsInterpretation, RobotsSimulationService, parse_robots
 from .saved_views import SavedView, SavedViewRegistry
 from .sitemap_reconciliation import build_reconciliation_report
@@ -1435,7 +1435,10 @@ def audit_v2_diff_endpoint(payload: dict) -> dict:
     try:
         request = V2AuditRequest.model_validate(payload["request"])
         current = _run_v2_scan(request)
-        return diff_reports(report_from_dict(current), payload["baseline"]).to_dict()
+        baseline = payload["baseline"]
+        result = semantic_diff(current, baseline)
+        legacy = diff_reports(report_from_dict(current), baseline).to_dict() if result.comparable else {}
+        return {**legacy, **result.to_dict()}
     except (KeyError, TargetError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -116,6 +116,12 @@ Regression types include:
 - newly introduced scored failure
 - maturity-level decrease
 
+The v2 diff projection also reports new, fixed, persisting, changed, and
+regressed findings; coverage and bounded inventory deltas; rule-version
+changes; and explicitly incomparable run pairs. Localized text and input order
+do not alter finding identity. Different targets, schemas, or report versions
+are rejected as incomparable instead of producing a misleading regression.
+
 ## Remediation Prompts
 
 Reports include ready-to-paste coding-agent prompts for failed/warning checks to speed implementation follow-ups.

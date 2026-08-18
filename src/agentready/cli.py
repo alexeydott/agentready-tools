@@ -30,7 +30,7 @@ from .indexnow import (
 )
 from .registry import CHECKS
 from .report_storage import save_report
-from .report_v2 import classify_finding_changes, diff_reports, render_audit_report
+from .report_v2 import classify_finding_changes, diff_reports, render_audit_report, semantic_diff
 from .seo_report import render_seo
 from .seo_scanner import audit_seo, compare_seo_baseline
 
@@ -1165,7 +1165,7 @@ def _cmd_audit(args: argparse.Namespace) -> int:
         if changes["regressed"]:
             print("baseline regressions: " + ", ".join(changes["regressed"]), file=sys.stderr)
             return 1
-        diff_reports(result.report, baseline)
+        logger.info("semantic baseline comparison findings=%d", sum(len(value) for value in semantic_diff(result.report.to_dict(), baseline).findings.values()))
     if args.min_score is not None and result.report.score < args.min_score:
         logger.warning("[FIX:cli-contract] readiness score gate failed: score=%d required=%d", result.report.score, args.min_score)
         return 1
