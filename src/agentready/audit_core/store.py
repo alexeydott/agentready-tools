@@ -21,7 +21,7 @@ from agentready.security import SecretRedactor
 from .urls import UrlIdentity
 
 logger = logging.getLogger(__name__)
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 EVIDENCE_CLAIM_STALE_SECONDS = 3600.0
 
 
@@ -189,6 +189,45 @@ class ProjectRunRecord:
             object.__setattr__(self, "created_at", _now())
 
 
+@dataclass(frozen=True, slots=True)
+class ScheduleRecord:
+    schedule_id: str
+    project_id: str
+    interval_seconds: int
+    next_run_at: str
+    enabled: bool = True
+    lease_owner: str | None = None
+    lease_until: str | None = None
+    failure_count: int = 0
+    last_run_id: str | None = None
+    created_at: str = ""
+    updated_at: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.schedule_id.strip() or not self.project_id.strip():
+            raise ValueError("schedule and project IDs are required")
+        if self.interval_seconds <= 0:
+            raise ValueError("schedule interval must be positive")
+        if self.failure_count < 0:
+            raise ValueError("schedule failure count must not be negative")
+        now = _now()
+        if not self.created_at:
+            object.__setattr__(self, "created_at", now)
+        if not self.updated_at:
+            object.__setattr__(self, "updated_at", self.created_at)
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduleExecutionRecord:
+    execution_id: str
+    schedule_id: str
+    run_id: str | None
+    started_at: str
+    finished_at: str | None = None
+    status: str = "running"
+    error: str | None = None
+
+
 class RunUrlState(StrEnum):
     DISCOVERED = "discovered"
     QUEUED = "queued"
@@ -309,6 +348,14 @@ class SiteStore(Protocol):
     def update_project_run(self, relation: ProjectRunRecord) -> ProjectRunRecord: ...
     def iter_project_runs(self, project_id: str) -> Iterator[ProjectRunRecord]: ...
     def delete_project(self, project_id: str) -> None: ...
+    def put_schedule(self, schedule: ScheduleRecord) -> ScheduleRecord: ...
+    def get_schedule(self, schedule_id: str) -> ScheduleRecord: ...
+    def iter_schedules(self, project_id: str | None = None) -> Iterator[ScheduleRecord]: ...
+    def update_schedule(self, schedule: ScheduleRecord) -> ScheduleRecord: ...
+    def delete_schedule(self, schedule_id: str) -> None: ...
+    def claim_due_schedule(self, now: str, worker_id: str, lease_until: str) -> ScheduleRecord | None: ...
+    def put_schedule_execution(self, execution: ScheduleExecutionRecord) -> ScheduleExecutionRecord: ...
+    def iter_schedule_executions(self, schedule_id: str) -> Iterator[ScheduleExecutionRecord]: ...
     def update_run_state(self, run_id: str, state: str, *, finished_at: str | None = None) -> None: ...
     def put_run_url(self, record: RunUrlRecord) -> None: ...
     def put_fetch(self, fetch: FetchFact) -> None: ...
@@ -355,6 +402,9 @@ class MemorySiteStore:
         self._runs: dict[str, RunRecord] = {}
         self._projects: dict[str, ProjectRecord] = {}
         self._project_runs: dict[tuple[str, str], ProjectRunRecord] = {}
+        self._schedules: dict[str, ScheduleRecord] = {}
+        self._schedule_executions: dict[str, ScheduleExecutionRecord] = {}
+        self._schedule_lock = threading.Lock()
         self._pages: dict[tuple[str, str], PageRecord] = {}
         self._run_urls: dict[tuple[str, str], RunUrlRecord] = {}
         self._fetches: dict[str, FetchFact] = {}
@@ -415,6 +465,50 @@ class MemorySiteStore:
         for key in tuple(self._project_runs):
             if key[0] == project_id:
                 self._project_runs.pop(key, None)
+        for schedule_id, schedule in tuple(self._schedules.items()):
+            if schedule.project_id == project_id:
+                self._schedules.pop(schedule_id, None)
+
+    def put_schedule(self, schedule: ScheduleRecord) -> ScheduleRecord:
+        self.get_project(schedule.project_id)
+        with self._schedule_lock:
+            self._schedules[schedule.schedule_id] = schedule
+        return schedule
+
+    def get_schedule(self, schedule_id: str) -> ScheduleRecord:
+        try:
+            return self._schedules[schedule_id]
+        except KeyError as exc:
+            raise KeyError("schedule not found") from exc
+
+    def iter_schedules(self, project_id: str | None = None) -> Iterator[ScheduleRecord]:
+        rows = self._schedules.values() if project_id is None else (s for s in self._schedules.values() if s.project_id == project_id)
+        yield from sorted(rows, key=lambda item: item.schedule_id)
+
+    def update_schedule(self, schedule: ScheduleRecord) -> ScheduleRecord:
+        self.get_schedule(schedule.schedule_id)
+        return self.put_schedule(schedule)
+
+    def delete_schedule(self, schedule_id: str) -> None:
+        with self._schedule_lock:
+            self._schedules.pop(schedule_id, None)
+
+    def claim_due_schedule(self, now: str, worker_id: str, lease_until: str) -> ScheduleRecord | None:
+        with self._schedule_lock:
+            candidates = [s for s in self._schedules.values() if s.enabled and s.next_run_at <= now and (s.lease_until is None or s.lease_until <= now)]
+            if not candidates:
+                return None
+            schedule = min(candidates, key=lambda item: (item.next_run_at, item.schedule_id))
+            claimed = ScheduleRecord(**{**asdict(schedule), "lease_owner": worker_id, "lease_until": lease_until, "updated_at": now})
+            self._schedules[schedule.schedule_id] = claimed
+            return claimed
+
+    def put_schedule_execution(self, execution: ScheduleExecutionRecord) -> ScheduleExecutionRecord:
+        self._schedule_executions[execution.execution_id] = execution
+        return execution
+
+    def iter_schedule_executions(self, schedule_id: str) -> Iterator[ScheduleExecutionRecord]:
+        yield from sorted((item for item in self._schedule_executions.values() if item.schedule_id == schedule_id), key=lambda item: item.started_at, reverse=True)
 
     def update_run_state(self, run_id: str, state: str, *, finished_at: str | None = None) -> None:
         run = self._runs[run_id]
@@ -708,6 +802,7 @@ class SQLiteSiteStore:
                 )
                 self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             self._connection.executescript(_MIGRATION_7)
+            self._connection.executescript(_MIGRATION_8)
             self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             self._connection.execute("PRAGMA optimize")
 
@@ -776,6 +871,59 @@ class SQLiteSiteStore:
         self._write_guard()
         with self._transaction():
             self._connection.execute("DELETE FROM projects WHERE project_id=?", (project_id,))
+
+    def put_schedule(self, schedule: ScheduleRecord) -> ScheduleRecord:
+        self._write_guard()
+        self.get_project(schedule.project_id)
+        with self._transaction():
+            self._connection.execute(
+                "INSERT INTO schedules(schedule_id,project_id,interval_seconds,next_run_at,enabled,lease_owner,lease_until,failure_count,last_run_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(schedule_id) DO UPDATE SET project_id=excluded.project_id,interval_seconds=excluded.interval_seconds,next_run_at=excluded.next_run_at,enabled=excluded.enabled,lease_owner=excluded.lease_owner,lease_until=excluded.lease_until,failure_count=excluded.failure_count,last_run_id=excluded.last_run_id,updated_at=excluded.updated_at",
+                (schedule.schedule_id, schedule.project_id, schedule.interval_seconds, schedule.next_run_at, int(schedule.enabled), schedule.lease_owner, schedule.lease_until, schedule.failure_count, schedule.last_run_id, schedule.created_at, schedule.updated_at),
+            )
+        return self.get_schedule(schedule.schedule_id)
+
+    def get_schedule(self, schedule_id: str) -> ScheduleRecord:
+        row = self._connection.execute("SELECT * FROM schedules WHERE schedule_id=?", (schedule_id,)).fetchone()
+        if row is None:
+            raise KeyError("schedule not found")
+        return _schedule_from_row(row)
+
+    def iter_schedules(self, project_id: str | None = None) -> Iterator[ScheduleRecord]:
+        if project_id is None:
+            rows = self._connection.execute("SELECT * FROM schedules ORDER BY schedule_id")
+        else:
+            rows = self._connection.execute("SELECT * FROM schedules WHERE project_id=? ORDER BY schedule_id", (project_id,))
+        for row in rows:
+            yield _schedule_from_row(row)
+
+    def update_schedule(self, schedule: ScheduleRecord) -> ScheduleRecord:
+        return self.put_schedule(schedule)
+
+    def delete_schedule(self, schedule_id: str) -> None:
+        self._write_guard()
+        with self._transaction():
+            self._connection.execute("DELETE FROM schedules WHERE schedule_id=?", (schedule_id,))
+
+    def claim_due_schedule(self, now: str, worker_id: str, lease_until: str) -> ScheduleRecord | None:
+        self._write_guard()
+        with self._transaction():
+            row = self._connection.execute("SELECT * FROM schedules WHERE enabled=1 AND next_run_at<=? AND (lease_until IS NULL OR lease_until<=?) ORDER BY next_run_at, schedule_id LIMIT 1", (now, now)).fetchone()
+            if row is None:
+                return None
+            changed = self._connection.execute("UPDATE schedules SET lease_owner=?, lease_until=?, updated_at=? WHERE schedule_id=? AND enabled=1 AND (lease_until IS NULL OR lease_until<=?)", (worker_id, lease_until, now, row["schedule_id"], now)).rowcount
+            if not changed:
+                return None
+        return self.get_schedule(row["schedule_id"])
+
+    def put_schedule_execution(self, execution: ScheduleExecutionRecord) -> ScheduleExecutionRecord:
+        self._write_guard()
+        with self._transaction():
+            self._connection.execute("INSERT OR REPLACE INTO schedule_executions(execution_id,schedule_id,run_id,started_at,finished_at,status,error) VALUES (?,?,?,?,?,?,?)", (execution.execution_id, execution.schedule_id, execution.run_id, execution.started_at, execution.finished_at, execution.status, execution.error))
+        return execution
+
+    def iter_schedule_executions(self, schedule_id: str) -> Iterator[ScheduleExecutionRecord]:
+        for row in self._connection.execute("SELECT * FROM schedule_executions WHERE schedule_id=? ORDER BY started_at DESC", (schedule_id,)):
+            yield ScheduleExecutionRecord(row["execution_id"], row["schedule_id"], row["run_id"], row["started_at"], row["finished_at"], row["status"], row["error"])
 
     def begin_run(self, run: RunRecord) -> RunRecord:
         self._write_guard()
@@ -1205,6 +1353,17 @@ def _run_from_row(row: sqlite3.Row) -> RunRecord:
     )
 
 
+def _schedule_from_row(row: sqlite3.Row) -> ScheduleRecord:
+    return ScheduleRecord(
+        schedule_id=row["schedule_id"], project_id=row["project_id"],
+        interval_seconds=row["interval_seconds"], next_run_at=row["next_run_at"],
+        enabled=bool(row["enabled"]), lease_owner=row["lease_owner"],
+        lease_until=row["lease_until"], failure_count=row["failure_count"],
+        last_run_id=row["last_run_id"], created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
 def _page_from_row(row: sqlite3.Row) -> PageRecord:
     return PageRecord(
         run_id=row["run_id"], url_key=row["url_key"], requested_url=row["requested_url"],
@@ -1514,4 +1673,31 @@ CREATE TABLE IF NOT EXISTS project_runs (
     PRIMARY KEY(project_id, run_id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_project_runs_history ON project_runs(project_id, created_at DESC, run_id DESC);
+"""
+
+_MIGRATION_8 = """
+CREATE TABLE IF NOT EXISTS schedules (
+    schedule_id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+    interval_seconds INTEGER NOT NULL,
+    next_run_at TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    lease_owner TEXT,
+    lease_until TEXT,
+    failure_count INTEGER NOT NULL DEFAULT 0,
+    last_run_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_schedules_due ON schedules(enabled, next_run_at, schedule_id);
+CREATE TABLE IF NOT EXISTS schedule_executions (
+    execution_id TEXT PRIMARY KEY,
+    schedule_id TEXT NOT NULL REFERENCES schedules(schedule_id) ON DELETE CASCADE,
+    run_id TEXT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    status TEXT NOT NULL,
+    error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_schedule_executions_history ON schedule_executions(schedule_id, started_at DESC);
 """

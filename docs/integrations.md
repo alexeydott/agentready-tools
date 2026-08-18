@@ -101,6 +101,12 @@ project with `POST /v2/projects`, start an audit with
 `projects baseline`. Only non-secret target/profile/ruleset references are
 stored; credentials are never accepted or persisted.
 
+Local scheduled audits are opt-in through `agentready.schedules.ScheduleService`
+and an explicitly started `ScheduleWorker`. Schedule and execution records use
+the shared Memory/SQLite `SiteStore`; one missed occurrence is caught up after
+restart, failures use bounded exponential backoff, and stopping the worker
+prevents execution. No operating-system scheduler is installed.
+
 The Link Graph explorer projects the canonical `link_occurrences` inventory
 without another crawl. `GET /v2/runs/{run_id}/graph` returns bounded,
 cursor-paginated nodes with inbound/outbound counts, unique degrees, depth,

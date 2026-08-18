@@ -290,7 +290,7 @@ def test_sqlite_migration_is_idempotent_and_recovery_is_durable(tmp_path: Path):
     second = SQLiteSiteStore(path)
     try:
         assert second.recover_interrupted_runs() == 0
-        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 8
         assert second._connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 1
         assert second.resume_run("run-recovery").state == "running"
     finally:
