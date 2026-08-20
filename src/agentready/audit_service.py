@@ -680,6 +680,7 @@ class AuditService:
         from .plan_compiler import PlanCompiler
         from .seo.engine import run_atomic_rules
         from .seo.evidence import evidence_from_parsed_page
+        from .seo.compatibility import resolve_selection_ids
         from .seo.site_rules import evaluate_site_rules
         from .seo_models import SeoCheckResult, SeoReport
         from .seo_recommendations import rank_recommendations
@@ -742,16 +743,10 @@ class AuditService:
             ).crawl()
         )
         checks: list[SeoCheckResult] = []
-        aliases = {
-            "page-metadata": "metadata", "page-indexability": "indexability",
-            "duplicate-metadata": "duplicate-metadata-site", "broken-links": "link-architecture-site",
-            "redirect-chains": "redirect-inventory-site", "internal-nofollow": "link-architecture-site",
-            "link-counts": "link-depth-site", "insecure-links-pages": "link-architecture-site",
-        }
-        requested_ids = {aliases.get(value, value) for value in request.include}
+        requested_ids = resolve_selection_ids(request.include)
         atomic_catalog = {"page-available", "metadata", "indexability", "canonical", "hreflang", "jsonld", "title-length"}
         atomic_ids = {value for value in requested_ids if value in atomic_catalog}
-        excluded_ids = set(request.exclude)
+        excluded_ids = resolve_selection_ids(request.exclude)
         fact_views = self._fact_views(crawl)
         for view in fact_views:
             if view.facts is None:
