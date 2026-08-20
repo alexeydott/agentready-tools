@@ -387,6 +387,7 @@ def test_dashboard_report_actions_are_shared_by_single_and_combined_exports():
     assert "dashboardReportKey = \"agentready.dashboard.report.v2\"" in html
     assert "boundedV2ReportForStorage" in html
     assert "window.agentreadyV2Report = state.v2Report || null" in html
+    assert "if (!window.agentreadyV2Report) captureV2Report(state.html)" in html
     assert "state.preset !== \"v2\" || Boolean(window.agentreadyV2Report)" in html
     assert "restoreReportState();" in html
 
@@ -428,6 +429,9 @@ def test_dashboard_ai_workspace_has_history_conversation_and_context_zones():
     assert 'onclick="openAiPromptPicker()"' in html
     assert 'function openAiPromptPicker()' in html
     assert 'function toggleAiDrawer(kind)' in html
+    assert 'window.aiRequestTimeoutMs' in html
+    assert 'timeout_seconds' in html
+    assert 'detail && typeof detail === "object"' in html
 
 
 def test_dashboard_report_navigation_stays_inside_frame():
@@ -482,7 +486,7 @@ def test_link_graph_filters_use_compact_checkboxes_and_have_hints():
 def test_link_graph_has_bounded_local_visual_projection_and_localized_controls():
     english = render_dashboard("en")
     russian = render_dashboard("ru")
-    for html, labels in ((english, ("Node cap", "Minimum authority", "Depth", "Visual projection", "renderLinkGraphVisual", "link-graph-visual")), (russian, ("Лимит узлов", "Минимальная авторитетность", "Глубина", "Визуальная проекция"))):
+    for html, labels in ((english, ("Node cap", "All nodes", "Minimum authority", "Depth", "Visual projection", "renderLinkGraphVisual", "link-graph-visual")), (russian, ("Лимит узлов", "Все узлы", "Минимальная авторитетность", "Глубина", "Визуальная проекция"))):
         for label in labels:
             assert label in html
     assert 'id="link-graph-node-cap"' in english
@@ -491,3 +495,4 @@ def test_link_graph_has_bounded_local_visual_projection_and_localized_controls()
     assert 'payload.items = (payload.items || []).filter' in english
     assert 'slice(0, 100)' in english
     assert 'payload.edges || []' in english
+    assert 'while (cursor)' in english

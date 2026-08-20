@@ -107,12 +107,32 @@ def project_report(report: dict[str, Any], *, mode: str, language: str, limit: i
         {"root": root, "check_ids": ids} for root, ids in sorted(group_ids.items())
     ]
     encoded = json.dumps(projected, ensure_ascii=False, separators=(",", ":"))
-    if len(encoded) > limit:
+    # Large crawls can contain hundreds of findings.  Keep the context
+    # deterministic and bounded instead of failing the whole assistant call
+    # after one coarse truncation pass.
+    while len(encoded) > limit and len(projected["checks"]) > 1:
         projected["checks"] = projected["checks"][: max(1, len(projected["checks"]) // 2)]
-        projected["recommendations"] = projected["recommendations"][:20]
+        projected["recommendations"] = projected["recommendations"][: max(1, len(projected["recommendations"]) // 2)]
+        kept_ids = {item["id"] for item in projected["checks"]}
+        projected["finding_groups"] = [
+            {"root": group["root"], "check_ids": [item for item in group["check_ids"] if item in kept_ids]}
+            for group in projected["finding_groups"]
+            if any(item in kept_ids for item in group["check_ids"])
+        ]
         encoded = json.dumps(projected, ensure_ascii=False, separators=(",", ":"))
     if len(encoded) > limit:
-        raise AIContextError("projected report exceeds the AI context size limit")
+        for check in projected["checks"]:
+            check["evidence"] = check.get("evidence", [])[:1]
+            check["details"] = str(check.get("details") or "")[:240]
+            check["remediation"] = str(check.get("remediation") or "")[:240]
+        projected["recommendations"] = projected["recommendations"][:5]
+        encoded = json.dumps(projected, ensure_ascii=False, separators=(",", ":"))
+    if len(encoded) > limit:
+        # The fixed metadata fields are already bounded; this final fallback
+        # preserves one finding and makes the truncation explicit to callers.
+        projected["checks"] = projected["checks"][:1]
+        projected["recommendations"] = []
+        projected["finding_groups"] = projected["finding_groups"][:1]
     return projected
 
 

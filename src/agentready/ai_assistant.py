@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Any
 
@@ -41,6 +42,17 @@ class AIAssistant:
     async def run(self, request: AssistantRequest, *, model: str) -> AssistantResponse:
         language = request.language
         context = project_report(request.report or _empty_report(request.target), mode=request.mode, language=language, limit=self.context_limit)
+        logger.info(
+            "AI context projected schema=%s input_keys=%d checks=%d recommendations=%d bytes=%d history=%d attachments=%d limit=%d",
+            context.get("schema"),
+            len(request.report or {}),
+            len(context.get("checks", [])),
+            len(context.get("recommendations", [])),
+            len(json.dumps(context, ensure_ascii=False, separators=(",", ":"))),
+            len(request.history),
+            len(request.attachments),
+            self.context_limit,
+        )
         message = (request.message or "")[: self.message_limit]
         history = request.history[-self.history_limit :]
         if history:

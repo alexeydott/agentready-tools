@@ -1,4 +1,5 @@
 import asyncio
+import json
 import sys
 from types import SimpleNamespace
 
@@ -99,6 +100,25 @@ def test_ai_context_projects_v2_evidence_and_coverage():
     assert projected["provider_freshness"] == {}
     assert projected["checks"][0]["evidence"][0]["url"].endswith("/robots.txt")
     assert projected["finding_groups"][0]["root"] == "robots"
+
+
+def test_ai_context_truncates_large_v2_reports_without_failing():
+    report = {
+        "schema": "agentready.audit.v2",
+        "target": "https://example.com",
+        "findings": [
+            {
+                "id": f"rule-{index}",
+                "status": "fail",
+                "reason": "x" * 400,
+                "evidence": [{"summary": "x" * 400, "url": f"https://example.com/{index}"}],
+            }
+            for index in range(500)
+        ],
+    }
+    projected = project_report(report, mode="seo", language="en", limit=12000)
+    assert projected["checks"]
+    assert len(json.dumps(projected, ensure_ascii=False, separators=(",", ":"))) <= 12000
 
 
 def test_agent_findings_projects_v2_without_legacy_fields():

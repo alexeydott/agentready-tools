@@ -770,6 +770,11 @@ def ai_status_endpoint(http_request: Request) -> dict:
         "enabled": ai_cfg["enabled"],
         "transport_enabled": ai_cfg["transport_enabled"],
         "model": ai_cfg["model"],
+        # The dashboard uses these redacted limits to wait long enough for a
+        # bounded provider retry cycle.  They contain no credential data.
+        "timeout_seconds": float(ai_cfg["timeout"]),
+        "max_retries": int(ai_cfg["max_retries"]),
+        "context_limit": int(ai_cfg["context_limit"]),
         "active_provider": active["id"],
         "credential": api_key_status(active["credential_id"]),
         "providers": [

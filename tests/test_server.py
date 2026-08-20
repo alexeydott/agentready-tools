@@ -954,6 +954,9 @@ def test_ai_provider_profiles_are_selectable_and_shared(monkeypatch, tmp_path):
     assert status.json()["active_provider"] == "gateway"
     assert status.json()["enabled"] is True
     assert status.json()["transport_enabled"] is True
+    assert status.json()["timeout_seconds"] >= 1
+    assert status.json()["max_retries"] >= 0
+    assert status.json()["context_limit"] >= 1000
     gateway = next(item for item in status.json()["providers"] if item["id"] == "gateway")
     assert gateway["credential"]["configured"] is True
     assert gateway["chat_only"] is True

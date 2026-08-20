@@ -280,6 +280,7 @@ _TEXT = {
         "duplicate_clusters": "Duplicate clusters",
         "duplicate_clusters_hint": "Compare exact and near-duplicate content signatures from the stored run. Loading results does not start a new crawl.",
         "duplicate_all": "All", "duplicate_exact": "Exact", "duplicate_near": "Near", "duplicate_kind_hint": "Filter clusters by exact or near-duplicate similarity.", "duplicate_load": "Load clusters", "duplicates_loaded": "Loaded {loaded} of {total} clusters", "duplicate_failed": "Duplicate query failed",
+        "graph_all_nodes": "All nodes",
         "projects": "Projects and run history",
         "projects_hint": "Create or update a local project and review its stored audit runs. No remote project service is contacted.",
         "project_id_hint": "Stable local identifier used to find this project and its audit history.", "project_name_hint": "Display name shown with the local project and its run history.",
@@ -602,6 +603,7 @@ _TEXT = {
         "duplicate_clusters": "Кластеры дубликатов",
         "duplicate_clusters_hint": "Сравнивает точные и близкие сигнатуры дубликатов сохранённого запуска. Загрузка результатов не запускает новый обход.",
         "duplicate_all": "Все", "duplicate_exact": "Точные", "duplicate_near": "Близкие", "duplicate_kind_hint": "Фильтрует кластеры по точному или близкому сходству дубликатов.", "duplicate_load": "Загрузить кластеры", "duplicates_loaded": "Загружено кластеров: {loaded} из {total}", "duplicate_failed": "Ошибка запроса дубликатов",
+        "graph_all_nodes": "Все узлы",
         "projects": "Проекты и история запусков",
         "projects_hint": "Создаёт или обновляет локальный проект и показывает сохранённые запуски аудита. Внешний сервис проектов не используется.",
         "project_id_hint": "Стабильный локальный идентификатор проекта и его истории аудитов.", "project_name_hint": "Отображаемое имя локального проекта и его истории запусков.",
@@ -1049,7 +1051,7 @@ rules:
 <section id="link-graph-panel" class="panel" hidden aria-labelledby="link-graph-title">
 <h2 id="link-graph-title">{escape(text["link_graph"])} {_hint(text, "link_graph_hint")}</h2>
 <p class="section-hint">{escape(text["link_graph_hint"])}</p>
-<div class="form-grid four"><label for="link-graph-node-cap">{escape(text["graph_node_cap"])} {_hint(text, "graph_node_cap_hint")}</label><select id="link-graph-node-cap"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option></select><label for="link-graph-min-authority">{escape(text["graph_min_authority"])} {_hint(text, "graph_min_authority_hint")}</label><input id="link-graph-min-authority" type="number" min="0" max="1" step="0.01" value="0"></div>
+<div class="form-grid four"><label for="link-graph-node-cap">{escape(text["graph_node_cap"])} {_hint(text, "graph_node_cap_hint")}</label><select id="link-graph-node-cap"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option><option value="all">{escape(text["graph_all_nodes"])}</option></select><label for="link-graph-min-authority">{escape(text["graph_min_authority"])} {_hint(text, "graph_min_authority_hint")}</label><input id="link-graph-min-authority" type="number" min="0" max="1" step="0.01" value="0"></div>
 <div class="form-grid four"><label for="link-graph-depth">{escape(text["graph_depth"])} {_hint(text, "graph_depth_hint")}</label><select id="link-graph-depth"><option value="all">{escape(text["graph_depth_all"])}</option><option value="0">{escape(text["graph_depth_root"])}</option><option value="1">{escape(text["graph_depth_1"])}</option><option value="2">{escape(text["graph_depth_2"])}</option><option value="3+">{escape(text["graph_depth_3_plus"])}</option></select><label><input id="link-graph-dead-end" type="checkbox"> {escape(text["graph_dead_ends"])} {_hint(text, "graph_dead_ends_hint")}</label><label><input id="link-graph-disconnected" type="checkbox"> {escape(text["graph_disconnected"])} {_hint(text, "graph_disconnected_hint")}</label><button type="button" class="secondary" onclick="loadLinkGraph()">{escape(text["graph_load"])}</button></div>
 <div id="link-graph-status" role="status" aria-live="polite"></div><div id="link-graph-result" role="region" aria-live="polite"></div><h3>{escape(text["graph_visual"])} {_hint(text, "graph_visual_hint")}</h3><div id="link-graph-visual" role="img" aria-label="{escape(text["graph_visual"])}" class="link-graph-visual"></div>
 </section>
@@ -1485,6 +1487,10 @@ function restoreReportState() {{
       return false;
     }}
     window.agentreadyV2Report = state.v2Report || null;
+    // Browser persistence may omit the bounded copy for a large report, while
+    // the embedded canonical v2 JSON is still present in the saved HTML.
+    // Recover that exact report before deciding whether AI context is ready.
+    if (!window.agentreadyV2Report) captureV2Report(state.html);
     if (window.agentreadyV2Report && window.agentreadyV2Report.run) loadSessionRobots(window.agentreadyV2Report.run.id);
     renderReport(state.html, false);
     const contextReady = state.preset !== "v2" || Boolean(window.agentreadyV2Report);
@@ -1737,7 +1743,9 @@ async function loadLinkGraph() {{
   if (!runId) {{ status.textContent = translations[language.value].run_audit_first; return; }}
   const deadEnd = document.getElementById("link-graph-dead-end").checked;
   const disconnected = document.getElementById("link-graph-disconnected").checked;
-  const nodeCap = Math.min(100, Math.max(25, Number(document.getElementById("link-graph-node-cap").value) || 100));
+  const nodeCapValue = document.getElementById("link-graph-node-cap").value;
+  const allNodes = nodeCapValue === "all";
+  const nodeCap = allNodes ? 1000 : Math.min(100, Math.max(25, Number(nodeCapValue) || 100));
   const minAuthority = Math.min(1, Math.max(0, Number(document.getElementById("link-graph-min-authority").value) || 0));
   const depth = document.getElementById("link-graph-depth").value;
   const query = new URLSearchParams({{limit:String(nodeCap), dead_end:String(deadEnd), disconnected:String(disconnected)}});
@@ -1747,6 +1755,17 @@ async function loadLinkGraph() {{
     const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/graph?" + query.toString());
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "graph request failed");
+    if (allNodes) {{
+      let cursor = payload.next_cursor;
+      while (cursor) {{
+        const pageResponse = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/graph?" + new URLSearchParams({{...Object.fromEntries(query), cursor}}).toString());
+        const page = await pageResponse.json();
+        if (!pageResponse.ok) throw new Error(page.detail || "graph page request failed");
+        payload.items = (payload.items || []).concat(page.items || []);
+        cursor = page.next_cursor;
+      }}
+      payload.next_cursor = null;
+    }}
     document.getElementById("link-graph-panel").hidden = false;
     payload.items = (payload.items || []).filter(item => (Number(item.authority) || 0) >= minAuthority && (depth === "all" || (depth === "3+" ? Number(item.depth) >= 3 : Number(item.depth) === Number(depth))));
     const t = translations[language.value];
@@ -2508,6 +2527,13 @@ async function clearAiProvider() {{
 async function refreshAiProviders() {{
   const response = await fetch("/ai/status");
   const data = await response.json();
+  const timeoutSeconds = Number(data.timeout_seconds);
+  const maxRetries = Number(data.max_retries);
+  if (Number.isFinite(timeoutSeconds) && Number.isFinite(maxRetries)) {{
+    // Per-attempt timeout + exponential retry backoff + response margin.
+    const backoffSeconds = Math.min(31, Math.max(0, 2 ** maxRetries - 1));
+    window.aiRequestTimeoutMs = Math.max(45000, (timeoutSeconds * (maxRetries + 1) + backoffSeconds + 15) * 1000);
+  }}
   window.aiProviders = data.providers || [];
   renderAiProviders(data);
 }}
@@ -2923,11 +2949,17 @@ async function runAi(path="/ai/recommend", retry=false) {{
     logDashboardAction("ai.request", {{operation:path === "/ai/chat" ? "chat" : "recommend", retry, has_report:Boolean(window.agentreadyV2Report), message_length:message ? message.length : 0}});
     setAiBusy(true);
     const controller = new AbortController();
-    timeoutId = window.setTimeout(() => controller.abort(), 45000);
+    // Allow the configured provider retry budget to complete for large reports.
+    const providerTimeout = Number(window.aiRequestTimeoutMs) || 180000;
+    timeoutId = window.setTimeout(() => controller.abort(), providerTimeout);
     const history = path === "/ai/chat" ? aiConversationHistory.slice(0, retry ? aiConversationHistory.length : -1).slice(-12) : aiConversationHistory.slice(-12);
     const response = await fetch(path, {{method:"POST", headers:{{"Content-Type":"application/json"}}, signal:controller.signal, body:JSON.stringify({{target,report:window.agentreadyV2Report || null,mode:document.getElementById("ai-mode").value,model:document.getElementById("ai-model").value || null,language:language.value,message,history,skills:selectedValues("ai-skill"),mcp_tools:selectedValues("ai-mcp-tool"),attachments:aiAttachments}})}});
     const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || ("HTTP " + response.status));
+    if (!response.ok) {{
+      const detail = data && data.detail;
+      const detailMessage = detail && typeof detail === "object" ? (detail.message || JSON.stringify(detail)) : detail;
+      throw new Error(detailMessage || ("HTTP " + response.status));
+    }}
     if (path === "/ai/chat") {{
       prependChatResponseInfo(data);
       appendChatMessage("assistant", data.summary || translations[language.value].ai_report_title);
