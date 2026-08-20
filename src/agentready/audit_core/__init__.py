@@ -1,6 +1,13 @@
 """Versioned, transport-independent contracts for the vNext audit core."""
 
 from .collection import CollectedPage, FactView, RepresentationObservation
+from .fact_schema import (
+    DEFAULT_FACT_SCHEMA_VERSIONS,
+    FactCompatibility,
+    FactSchemaRegistry,
+    FactSchemaRequirement,
+    FactSchemaResult,
+)
 from .contracts import (
     Effort,
     EvidenceRef,
@@ -71,6 +78,11 @@ __all__ = [
     "FactEnvelope",
     "FactView",
     "RepresentationObservation",
+    "DEFAULT_FACT_SCHEMA_VERSIONS",
+    "FactCompatibility",
+    "FactSchemaRegistry",
+    "FactSchemaRequirement",
+    "FactSchemaResult",
     "FetchFact",
     "FetchRecord",
     "FindingContract",

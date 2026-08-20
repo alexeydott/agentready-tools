@@ -6,6 +6,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from ..page_parser import ParsedFacts, ParsedPage, Representation
+from .fact_schema import (
+    DEFAULT_FACT_SCHEMA_VERSIONS,
+    FactSchemaRegistry,
+    FactSchemaResult,
+    FactSchemaRequirement,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +43,7 @@ class CollectedPage:
     redirect_records: tuple[object, ...] = ()
     rendered: RepresentationObservation | None = None
     parsed: ParsedPage | None = None
+    fact_schema_versions: tuple[tuple[str, str], ...] = tuple(DEFAULT_FACT_SCHEMA_VERSIONS.items())
 
     @property
     def available(self) -> bool:
@@ -96,3 +103,14 @@ class FactView:
     @property
     def body(self) -> bytes | None:
         return self.page.body
+
+    @property
+    def fact_schema_registry(self) -> FactSchemaRegistry:
+        return FactSchemaRegistry(dict(self.page.fact_schema_versions))
+
+    def check_fact_requirements(
+        self,
+        requirements: tuple[FactSchemaRequirement, ...],
+    ) -> tuple[FactSchemaResult, ...]:
+        registry = self.fact_schema_registry
+        return tuple(registry.check(requirement) for requirement in requirements)
