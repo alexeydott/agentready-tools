@@ -161,6 +161,7 @@ def seo_audit_v2(
     recommendation_limit: int = 10,
     crawl: bool = False,
     max_pages: int = 25,
+    timeout: float = 5.0,
     render: bool = False,
     ga_property: str | None = None,
     gsc_site: str | None = None,
@@ -173,6 +174,7 @@ def seo_audit_v2(
     ``render=True`` uses a headless browser for JS-driven pages.
     ``ga_property`` / ``gsc_site`` enable GA4/Search Console analytics checks
     using the service account stored via `agentready credentials set`.
+    ``timeout`` is the maximum wait for each website network request.
     """
     report = audit_seo(
         url,
@@ -181,6 +183,7 @@ def seo_audit_v2(
         language=language,
         crawl=crawl,
         max_pages=max_pages,
+        timeout=timeout,
         render=render,
         ga_property=ga_property,
         gsc_site=gsc_site,
@@ -457,11 +460,13 @@ def mobile_audit_v2(
     render: bool = False,
     language: str = "en",
     recommendation_limit: int = 10,
+    timeout: float = 5.0,
 ) -> dict:
     """Audit one or more public pages for mobile-friendliness (Google Mobile-Friendly signals).
 
     Returns per-page and aggregate scores with static HTML/CSS checks and,
     when ``render=True``, Playwright-rendered viewport/tap-target/font metrics.
+    ``timeout`` is the maximum wait for each website network request.
     """
     logger.debug("mobile_audit: urls=%d render=%s lang=%s", len(urls), render, language)
     report = audit_mobile(
@@ -469,6 +474,7 @@ def mobile_audit_v2(
         render=render,
         allow_private=False,
         recommendation_limit=recommendation_limit,
+        timeout=timeout,
         language=language,
     )
     return report.to_dict()
@@ -480,6 +486,7 @@ def mobile_findings(
     render: bool = False,
     language: str = "en",
     recommendation_limit: int = 10,
+    timeout: float = 5.0,
 ) -> dict:
     """Return only the mobile-friendliness gaps for a coding agent (single page)."""
     logger.debug("mobile_findings: url=%s render=%s lang=%s", url, render, language)
@@ -488,6 +495,7 @@ def mobile_findings(
         render=render,
         allow_private=False,
         recommendation_limit=recommendation_limit,
+        timeout=timeout,
         language=language,
     )
     return build_findings(report.pages[0], language)
@@ -499,6 +507,7 @@ def mobile_remediation_plan(
     render: bool = False,
     language: str = "en",
     recommendation_limit: int = 10,
+    timeout: float = 5.0,
 ) -> dict:
     """Return a prioritized mobile-friendliness fix plan for a coding agent (single page)."""
     logger.debug("mobile_remediation_plan: url=%s render=%s lang=%s", url, render, language)
@@ -507,6 +516,7 @@ def mobile_remediation_plan(
         render=render,
         allow_private=False,
         recommendation_limit=recommendation_limit,
+        timeout=timeout,
         language=language,
     )
     return build_remediation_plan(report.pages[0], language)
@@ -522,6 +532,8 @@ def _run_ai(
     model: str | None = None,
     message: str | None = None,
     history: list[dict[str, str]] | None = None,
+    provider_timeout: float | None = None,
+    provider_max_retries: int | None = None,
 ) -> dict:
     import asyncio
 
@@ -552,8 +564,8 @@ def _run_ai(
     provider = OpenAICompatibleProvider(
         base_url=selected_provider["base_url"],
         credential_id=selected_provider["credential_id"],
-        timeout=ai_cfg["timeout"],
-        max_retries=ai_cfg["max_retries"],
+        timeout=provider_timeout if provider_timeout is not None else ai_cfg["timeout"],
+        max_retries=provider_max_retries if provider_max_retries is not None else ai_cfg["max_retries"],
         allow_loopback_http=ai_cfg["allow_loopback_http"],
     )
     return asyncio.run(AIAssistant(provider, context_limit=ai_cfg["context_limit"], max_concurrent=ai_cfg["max_concurrent"]).run(request, model=model or selected_provider.get("model") or ai_cfg["model"])).to_dict()
@@ -566,9 +578,11 @@ def ai_recommend(
     mode: str = "both",
     language: str = "en",
     model: str | None = None,
+    provider_timeout: float | None = None,
+    provider_max_retries: int | None = None,
 ) -> dict:
-    """Generate opt-in SEO/GEO recommendations using supplied audit evidence."""
-    return _run_ai(operation="recommend", target=target, report=report, mode=mode, language=language, model=model)
+    """Generate recommendations; timeout is per provider attempt and retries are extra attempts."""
+    return _run_ai(operation="recommend", target=target, report=report, mode=mode, language=language, model=model, provider_timeout=provider_timeout, provider_max_retries=provider_max_retries)
 
 
 @mcp.tool()
@@ -580,9 +594,11 @@ def ai_chat(
     language: str = "en",
     model: str | None = None,
     history: list[dict[str, str]] | None = None,
+    provider_timeout: float | None = None,
+    provider_max_retries: int | None = None,
 ) -> dict:
-    """Run one stateless, opt-in SEO/GEO assistant chat turn."""
-    return _run_ai(operation="chat", target=target, report=report, mode=mode, language=language, model=model, message=message, history=history)
+    """Run one chat turn; timeout is per provider attempt and retries are extra attempts."""
+    return _run_ai(operation="chat", target=target, report=report, mode=mode, language=language, model=model, message=message, history=history, provider_timeout=provider_timeout, provider_max_retries=provider_max_retries)
 
 
 def main(host: str = "127.0.0.1", port: int = 8766) -> None:

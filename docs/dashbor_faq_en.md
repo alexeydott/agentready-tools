@@ -43,6 +43,11 @@ Open **Advanced parameters** when you need more control:
 - **Commerce URL** — an endpoint where commerce discovery signals should be
   checked.
 - **Timeout** — maximum time to wait for one network request.
+- **AI provider timeout** — maximum time to wait for one model response. This
+  is separate from the website crawl timeout and can be increased up to 120
+  seconds for large reports.
+- **AI provider retries** — number of additional attempts after a transient
+  error or timeout. Retries increase the total wait and provider quota usage.
 - **Workers** — number of checks that can run in parallel.
 - **Level threshold** — minimum requirement ratio for advancing to the next
   maturity level.
@@ -166,7 +171,10 @@ system credential store rather than in ordinary dashboard text.
 2. Click **Check service health**.
 3. Confirm that the AI provider is enabled and that the selected model exists.
 4. Turn on **Debug results** and save the error message.
-5. If the AI times out, check the provider URL, model, and network access.
+5. If the AI times out, check the provider URL, model, and network access. The
+   dashboard waits for the configured provider timeout and retry budget, so a
+   large report may take longer than a small request. Large reports are
+   projected deterministically into the configured context limit.
 
 ## See Also
 

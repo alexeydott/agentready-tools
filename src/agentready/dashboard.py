@@ -52,6 +52,10 @@ _TEXT = {
         "language": "Language",
         "advanced": "Advanced parameters",
         "timeout": "Timeout (seconds)",
+        "ai_provider_timeout": "AI provider timeout (seconds)",
+        "ai_provider_timeout_hint": "Maximum wait for one AI provider response. Increase it for large audit context or slower models; it does not change the website crawl timeout.",
+        "ai_provider_retries": "AI provider retries",
+        "ai_provider_retries_hint": "Number of additional provider attempts after a timeout or transient failure. More retries can delay the final result and consume provider quota.",
         "workers": "Workers",
         "threshold": "Level threshold",
         "recommendations": "Recommendation limit",
@@ -251,7 +255,7 @@ _TEXT = {
         "v2_discovery_robots": "Robots sitemap",
         "v2_discovery_crawl": "All discovered pages (bounded)",
         "v2_full_discovered": "Audit the full discovered set (up to server cap)",
-        "v2_full_discovered_hint": "Runs until the same-origin discovered frontier is exhausted or the server hard cap of 25,000 pages is reached.",
+        "v2_full_discovered_hint": "Runs until the same-origin discovered frontier is exhausted or the server hard cap of 25,000 pages is reached. When enabled, the depth field is ignored and the server depth cap is used.",
         "v2_inventory_hint": "Browse bounded server-side inventory for the latest crawl.",
         "v2_inventory_kind_hint": "Select the inventory projection to inspect for the latest completed run.",
         "v2_rows_hint": "Maximum rows shown in one inventory page.",
@@ -375,6 +379,10 @@ _TEXT = {
         "language": "Язык",
         "advanced": "Дополнительные параметры",
         "timeout": "Таймаут (секунды)",
+        "ai_provider_timeout": "Таймаут AI-провайдера (секунды)",
+        "ai_provider_timeout_hint": "Максимальное ожидание одного ответа AI-провайдера. Увеличьте значение для больших контекстов аудита или медленных моделей; таймаут обхода сайта оно не меняет.",
+        "ai_provider_retries": "Повторные попытки AI-провайдера",
+        "ai_provider_retries_hint": "Число дополнительных попыток после таймаута или временной ошибки. Большие значения увеличивают ожидание и расход квоты провайдера.",
         "workers": "Параллельные задачи",
         "threshold": "Порог уровня",
         "recommendations": "Лимит рекомендаций",
@@ -574,7 +582,7 @@ _TEXT = {
         "v2_discovery_robots": "Sitemap из robots",
         "v2_discovery_crawl": "Все обнаруженные страницы (с ограничениями)",
         "v2_full_discovered": "Проверить полный набор обнаруженных страниц (до лимита сервера)",
-        "v2_full_discovered_hint": "Выполняет обход до исчерпания очереди обнаруженных страниц или жёсткого серверного лимита 25 000 страниц.",
+        "v2_full_discovered_hint": "Выполняет обход до исчерпания очереди обнаруженных страниц или жёсткого серверного лимита 25 000 страниц. При включении поле глубины игнорируется и используется серверный предел глубины.",
         "v2_inventory_hint": "Просмотр ограниченного серверного инвентаря последнего обхода.",
         "v2_inventory_kind_hint": "Выберите проекцию инвентаря для просмотра в последнем завершённом запуске.",
         "v2_rows_hint": "Максимальное число строк на одной странице инвентаря.",
@@ -971,6 +979,8 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <div><label for="content-url">{escape(text["content_url"])} {_hint(text, "content_url_hint")}</label><input id="content-url" type="url"></div>
 <div><label for="commerce-url">{escape(text["commerce_url"])} {_hint(text, "commerce_url_hint")}</label><input id="commerce-url" type="url"></div>
 <div><label for="timeout">{escape(text["timeout"])} {_hint(text, "timeout_hint")}</label><input id="timeout" type="number" min="1" max="30" value="5"></div>
+<div><label for="ai-provider-timeout">{escape(text["ai_provider_timeout"])} {_hint(text, "ai_provider_timeout_hint")}</label><input id="ai-provider-timeout" type="number" min="1" max="120" value="120"></div>
+<div><label for="ai-provider-retries">{escape(text["ai_provider_retries"])} {_hint(text, "ai_provider_retries_hint")}</label><input id="ai-provider-retries" type="number" min="0" max="5" value="2"></div>
 </div><div class="form-grid four" style="margin-top:14px">
 <div><label for="workers">{escape(text["workers"])} {_hint(text, "workers_hint")}</label><input id="workers" type="number" min="1" max="24" value="8"></div>
 <div><label for="threshold">{escape(text["threshold"])} {_hint(text, "threshold_hint")}</label><input id="threshold" type="text" inputmode="decimal" data-decimal min="0.01" max="1" step="0.01" value="0.8"></div>
@@ -1124,7 +1134,7 @@ helpToggle.onclick = () => {{
 const dashboardStateKey = "agentready.dashboard.state.v2";
 const dashboardStateCacheKey = "/dashboard/state";
 const dashboardReportKey = "agentready.dashboard.report.v2";
-const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-discovery","v2-max-pages","v2-max-depth","v2-render","v2-full-discovered","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only","robots-live","robots-proposed","robots-user-agents","sitemap-reconciliation-origin","sitemap-reconciliation-xml","custom-rules-document","link-graph-node-cap","link-graph-min-authority","link-graph-depth","link-graph-dead-end","link-graph-disconnected","duplicate-clusters-kind","project-id","project-name"];
+const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","ai-provider-timeout","ai-provider-retries","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-discovery","v2-max-pages","v2-max-depth","v2-render","v2-full-discovered","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only","robots-live","robots-proposed","robots-user-agents","sitemap-reconciliation-origin","sitemap-reconciliation-xml","custom-rules-document","link-graph-node-cap","link-graph-min-authority","link-graph-depth","link-graph-dead-end","link-graph-disconnected","duplicate-clusters-kind","project-id","project-name"];
 let dashboardStateSaveTimer = null;
 function readDashboardState() {{
   try {{
@@ -1395,8 +1405,8 @@ const v2ProfileDefaults = {{quick:3, standard:25, deep:100}};
 let v2LastProfile = document.getElementById("v2-profile").value;
 function selectedV2MaxPages() {{ if (document.getElementById("v2-full-discovered")?.checked) return 25000; const value = Number(document.getElementById("v2-max-pages").value); return Number.isFinite(value) && value >= 0 ? value : 3; }}
 function selectedV2Discovery() {{ return document.getElementById("v2-full-discovered")?.checked ? "crawl" : document.getElementById("v2-discovery").value; }}
-function syncFullDiscoveredControl() {{ const full = document.getElementById("v2-full-discovered"); const limit = document.getElementById("v2-max-pages"); const discovery = document.getElementById("v2-discovery"); if (!full || !limit || !discovery) return; const applicable = discovery.value === "crawl"; if (!applicable) full.checked = false; full.disabled = !applicable; limit.disabled = full.checked; limit.setAttribute("aria-readonly", full.checked ? "true" : "false"); }}
-function selectedV2Limits() {{ const value = document.getElementById("v2-max-depth").value.trim(); return value === "" ? {{check_limit:Number(document.getElementById("check-limit").value) || 0}} : {{check_limit:Number(document.getElementById("check-limit").value) || 0,max_depth:Math.max(0,Math.min(32,Number(value)))}}; }}
+function syncFullDiscoveredControl() {{ const full = document.getElementById("v2-full-discovered"); const limit = document.getElementById("v2-max-pages"); const depth = document.getElementById("v2-max-depth"); const discovery = document.getElementById("v2-discovery"); if (!full || !limit || !depth || !discovery) return; const applicable = discovery.value === "crawl"; if (!applicable) full.checked = false; full.disabled = !applicable; limit.disabled = full.checked; limit.setAttribute("aria-readonly", full.checked ? "true" : "false"); depth.disabled = full.checked; depth.setAttribute("aria-readonly", full.checked ? "true" : "false"); }}
+function selectedV2Limits() {{ const value = document.getElementById("v2-max-depth").value.trim(); const full = document.getElementById("v2-full-discovered")?.checked; if (full) return {{check_limit:Number(document.getElementById("check-limit").value) || 0,max_depth:32}}; return value === "" ? {{check_limit:Number(document.getElementById("check-limit").value) || 0}} : {{check_limit:Number(document.getElementById("check-limit").value) || 0,max_depth:Math.max(0,Math.min(32,Number(value)))}}; }}
 async function cancelActiveV2Job() {{
   const jobId = activeV2JobId;
   if (!jobId) return;
@@ -2529,6 +2539,10 @@ async function refreshAiProviders() {{
   const data = await response.json();
   const timeoutSeconds = Number(data.timeout_seconds);
   const maxRetries = Number(data.max_retries);
+  const timeoutControl = document.getElementById("ai-provider-timeout");
+  const retriesControl = document.getElementById("ai-provider-retries");
+  if (timeoutControl && !Object.prototype.hasOwnProperty.call(restoredDashboardState, "ai-provider-timeout") && Number.isFinite(timeoutSeconds)) timeoutControl.value = String(timeoutSeconds);
+  if (retriesControl && !Object.prototype.hasOwnProperty.call(restoredDashboardState, "ai-provider-retries") && Number.isFinite(maxRetries)) retriesControl.value = String(maxRetries);
   if (Number.isFinite(timeoutSeconds) && Number.isFinite(maxRetries)) {{
     // Per-attempt timeout + exponential retry backoff + response margin.
     const backoffSeconds = Math.min(31, Math.max(0, 2 ** maxRetries - 1));
@@ -2950,10 +2964,15 @@ async function runAi(path="/ai/recommend", retry=false) {{
     setAiBusy(true);
     const controller = new AbortController();
     // Allow the configured provider retry budget to complete for large reports.
-    const providerTimeout = Number(window.aiRequestTimeoutMs) || 180000;
+    const configuredTimeout = Number(document.getElementById("ai-provider-timeout")?.value);
+    const configuredRetries = Number(document.getElementById("ai-provider-retries")?.value);
+    const providerTimeoutSeconds = Number.isFinite(configuredTimeout) ? Math.min(120, Math.max(1, configuredTimeout)) : 120;
+    const retryCount = Number.isFinite(configuredRetries) ? Math.min(5, Math.max(0, configuredRetries)) : 2;
+    const backoffSeconds = Math.min(31, Math.max(0, 2 ** retryCount - 1));
+    const providerTimeout = (providerTimeoutSeconds * (retryCount + 1) + backoffSeconds + 15) * 1000;
     timeoutId = window.setTimeout(() => controller.abort(), providerTimeout);
     const history = path === "/ai/chat" ? aiConversationHistory.slice(0, retry ? aiConversationHistory.length : -1).slice(-12) : aiConversationHistory.slice(-12);
-    const response = await fetch(path, {{method:"POST", headers:{{"Content-Type":"application/json"}}, signal:controller.signal, body:JSON.stringify({{target,report:window.agentreadyV2Report || null,mode:document.getElementById("ai-mode").value,model:document.getElementById("ai-model").value || null,language:language.value,message,history,skills:selectedValues("ai-skill"),mcp_tools:selectedValues("ai-mcp-tool"),attachments:aiAttachments}})}});
+    const response = await fetch(path, {{method:"POST", headers:{{"Content-Type":"application/json"}}, signal:controller.signal, body:JSON.stringify({{target,report:window.agentreadyV2Report || null,mode:document.getElementById("ai-mode").value,model:document.getElementById("ai-model").value || null,language:language.value,message,history,skills:selectedValues("ai-skill"),mcp_tools:selectedValues("ai-mcp-tool"),attachments:aiAttachments,provider_timeout:providerTimeoutSeconds,provider_max_retries:retryCount}})}});
     const data = await response.json();
     if (!response.ok) {{
       const detail = data && data.detail;

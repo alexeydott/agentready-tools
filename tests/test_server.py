@@ -680,6 +680,10 @@ def test_dashboard_is_localized_and_describes_each_operation():
     assert "AI-помощник обрабатывает запрос..." in response.text
     assert "function setAiBusy(busy)" in response.text
     assert 'id="threshold" type="text" inputmode="decimal" data-decimal' in response.text
+    assert 'id="ai-provider-timeout"' in response.text
+    assert 'id="ai-provider-retries"' in response.text
+    assert "provider_timeout:providerTimeoutSeconds" in response.text
+    assert "provider_max_retries:retryCount" in response.text
     assert 'value="0.8"' in response.text
     assert "function decimalValue(id, fallback=0)" in response.text
     assert 'replace(/^(-?)\\./, "$10.")' in response.text

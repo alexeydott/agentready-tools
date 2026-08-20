@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.13.6
+
+### AI context reliability and release documentation
+
+- Replaced the dashboard's fixed AI request timeout with a deadline derived
+  from the configured provider timeout, retry count, backoff, and response
+  margin.
+- Kept large v2 audit reports usable by deterministically bounding the AI
+  projection instead of failing after a single coarse truncation pass.
+- Restored the embedded canonical v2 report when browser persistence omitted a
+  large bounded copy, so resumed sessions keep their AI context.
+- Added redacted AI context diagnostics and clearer structured provider errors;
+  credentials and report contents are never written to logs.
+- Synchronized package, compatibility, and portable executable metadata at
+  `0.13.6`; refreshed the release and AI troubleshooting documentation.
+
 ## 0.13.5
 
 ### Dashboard tool persistence and Virtual Robots parity

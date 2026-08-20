@@ -158,6 +158,8 @@ agentready ai credentials set
 agentready ai credentials status
 agentready ai recommend https://example.com --mode both
 agentready ai chat https://example.com --mode seo --message "Prioritize technical fixes"
+# Allow a slower model more time per attempt and one extra retry.
+agentready ai chat https://example.com --provider-timeout 120 --provider-max-retries 1 --message "Summarize the highest-impact fixes"
 ```
 
 `OPENAI_API_KEY` is supported as a process-environment fallback. Keys are never

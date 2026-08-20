@@ -80,7 +80,7 @@ def _audit_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--profile", choices=["quick", "standard", "deep", "custom"], default="standard")
     p.add_argument("--ruleset", help="Local rules YAML path or inline versioned rules document")
     p.add_argument("--max-pages", type=int, default=25, help="Maximum pages to fetch; use 0 with --discovery crawl to audit all discovered pages up to the server hard cap")
-    p.add_argument("--timeout", type=float, default=5.0)
+    p.add_argument("--timeout", type=float, default=5.0, help="Maximum seconds to wait for each website network request (1-30)")
     p.add_argument("--max-depth", type=int)
     p.add_argument("--max-duration", type=float)
     p.add_argument("--concurrency", type=int)
@@ -298,6 +298,8 @@ def build_parser() -> argparse.ArgumentParser:
     recommend.add_argument("--report")
     recommend.add_argument("--mode", choices=["seo", "geo", "both"], default="both")
     recommend.add_argument("--model", help="Override the configured AI model")
+    recommend.add_argument("--provider-timeout", type=float, help="Per-attempt AI provider timeout in seconds (1-120); overrides config")
+    recommend.add_argument("--provider-max-retries", type=int, help="Additional AI provider attempts after a failure (0-5); overrides config")
     recommend.add_argument("--lang", "--language", dest="language", choices=["en", "ru"], default="en")
     recommend.add_argument("--config")
     chat = _add_command_parser(
@@ -314,6 +316,8 @@ def build_parser() -> argparse.ArgumentParser:
     chat.add_argument("--report")
     chat.add_argument("--mode", choices=["seo", "geo", "both"], default="both")
     chat.add_argument("--model", help="Override the configured AI model")
+    chat.add_argument("--provider-timeout", type=float, help="Per-attempt AI provider timeout in seconds (1-120); overrides config")
+    chat.add_argument("--provider-max-retries", type=int, help="Additional AI provider attempts after a failure (0-5); overrides config")
     chat.add_argument("--message")
     chat.add_argument("--interactive", action="store_true", help="Continue with an in-process user/assistant history")
     chat.add_argument("--history", help="JSON file containing bounded user/assistant messages")
@@ -768,8 +772,8 @@ def _cmd_ai(args: argparse.Namespace) -> int:
     provider = OpenAICompatibleProvider(
         base_url=selected_provider["base_url"],
         credential_id=selected_provider["credential_id"],
-        timeout=ai_cfg["timeout"],
-        max_retries=ai_cfg["max_retries"],
+        timeout=args.provider_timeout if args.provider_timeout is not None else ai_cfg["timeout"],
+        max_retries=args.provider_max_retries if args.provider_max_retries is not None else ai_cfg["max_retries"],
         allow_loopback_http=ai_cfg["allow_loopback_http"],
     )
     if args.ai_command == "chat" and args.interactive:

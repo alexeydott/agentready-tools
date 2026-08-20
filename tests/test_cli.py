@@ -195,6 +195,15 @@ def test_ai_cli_accepts_model_override():
     assert args.model == "provider-model"
 
 
+def test_ai_cli_exposes_provider_timeout_controls():
+    command = next(action for action in build_parser()._actions if action.dest == "command")
+    ai_parser = command.choices["ai"]
+    recommend = next(action for action in ai_parser._actions if action.dest == "ai_command").choices["recommend"]
+    args = recommend.parse_args(["https://example.com", "--provider-timeout", "90", "--provider-max-retries", "1"])
+    assert args.provider_timeout == 90
+    assert args.provider_max_retries == 1
+
+
 def test_ai_nested_help_includes_simple_and_complex_examples():
     command = next(action for action in build_parser()._actions if action.dest == "command")
     ai_parser = command.choices["ai"]

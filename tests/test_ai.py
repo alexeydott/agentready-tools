@@ -16,10 +16,18 @@ from agentready.ai_provider import (
     OpenAICompatibleProvider,
     ProviderModel,
     ProviderResult,
+    _error_code,
     model_capabilities,
     validate_base_url,
 )
 from agentready.config import active_ai_provider, load_config, save_ai_provider_config
+
+
+def test_ai_provider_timeout_is_classified_and_default_budget_is_long_enough(monkeypatch, tmp_path):
+    assert _error_code(TimeoutError("Request timed out.")) == "timeout"
+    monkeypatch.chdir(tmp_path)
+    config, _ = load_config()
+    assert config["ai"]["timeout"] == 120.0
 
 
 class FakeProvider:

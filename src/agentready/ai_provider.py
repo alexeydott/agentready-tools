@@ -105,12 +105,16 @@ class OpenAICompatibleProvider:
         *,
         base_url: str,
         credential_id: str,
-        timeout: float = 30.0,
+        timeout: float = 120.0,
         max_retries: int = 2,
         allow_loopback_http: bool = False,
     ) -> None:
         self.base_url = validate_base_url(base_url, allow_loopback_http=allow_loopback_http)
         self.credential_id = credential_id
+        if not 1 <= timeout <= 120:
+            raise ValueError("AI provider timeout must be between 1 and 120 seconds")
+        if not 0 <= max_retries <= 5:
+            raise ValueError("AI provider max_retries must be between 0 and 5")
         self.timeout = timeout
         self.max_retries = max_retries
 
@@ -252,6 +256,12 @@ def _is_retryable(error: Exception) -> bool:
 
 
 def _error_code(error: Exception) -> str:
+    if (
+        isinstance(error, (TimeoutError, asyncio.TimeoutError))
+        or "timeout" in type(error).__name__.lower()
+        or "timed out" in str(error).lower()
+    ):
+        return "timeout"
     status = getattr(error, "status_code", None)
     if status == 404:
         return "model_not_found"

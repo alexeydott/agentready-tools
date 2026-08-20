@@ -177,9 +177,10 @@ scope, normalized URL identity, bounded frontier, explicit item states, and
 coverage accounting. Protocol profiles audit passive documents and expose
 evidence through the same report and agent/MCP projection boundaries.
 
-Release `0.12.0` completes the v2 transport parity milestone. The compatibility
-manifest lists only v2 schemas and surfaces; legacy report identifiers and
-routes are rejected rather than silently adapted.
+Release `0.13.6` carries the v2 transport parity milestone plus the bounded AI
+context and provider-aware dashboard handoff. The compatibility manifest lists
+only v2 schemas and surfaces; legacy report identifiers and routes are rejected
+rather than silently adapted.
 
 The dashboard is available at `/dashboard` and preserves bounded form/chat
 state in browser `localStorage`. Credential status is restored only as
@@ -341,6 +342,14 @@ fallback. CLI supports a per-call override with `--model`; serve accepts
 `model` in the loopback AI request; MCP exposes an optional `model` argument on
 `ai_recommend` and `ai_chat`.
 
+AI response timing is separate from the website crawl timeout. The dashboard
+exposes **AI provider timeout** (1–120 seconds per provider attempt) and
+**AI provider retries** (0–5 additional attempts) under Advanced parameters.
+CLI accepts the same per-call controls with `--provider-timeout` and
+`--provider-max-retries`; MCP exposes `provider_timeout` and
+`provider_max_retries` on `ai_recommend` and `ai_chat`. Omitted values use the
+configured defaults.
+
 The serve dashboard loads an OpenAI-compatible provider's `/models` catalog
 from `GET /ai/providers/{provider_id}/models` after provider selection. Models
 are shown in both provider settings and the chat selector with capability
@@ -365,6 +374,18 @@ AgentReady MCP context options invoke the local `seo_findings` and
 skills and MCP tools are persisted through `GET/POST /ai/tools` in the serve
 data directory. The response is advisory, evidence-grounded, localized, and
 does not modify the target.
+
+The dashboard derives its request deadline from the redacted `timeout_seconds`
+and `max_retries` values returned by `GET /ai/status`, including bounded retry
+backoff and a response margin. This prevents a large but valid report from
+being aborted by a shorter client-side timer. The server projects every report
+through the allow-listed `context_limit`; oversized reports are reduced
+deterministically while preserving the canonical schema, coverage, findings,
+and evidence URLs. If browser persistence omitted a large bounded copy, a
+restored session recovers the embedded canonical v2 JSON from the saved HTML.
+Provider failures use structured `{code, message}` details, while diagnostics
+log only schema, counts, byte sizes, limits, and elapsed time—not report text,
+URLs beyond the normal provider request, or credentials.
 
 The dashboard also provides a prompt library and chat archive. The first
 request to `GET /ai/prompts` creates `<data-dir>/prompts.json` with common
@@ -394,9 +415,9 @@ The portable `agentready.exe` also bundles the MCP facade, so `agentready mcp`
 works in the standalone Win64 build.
 
 When AI is explicitly enabled, MCP also exposes `ai_recommend` and `ai_chat`.
-They accept only target/report context, mode, language, and bounded history;
-provider and credential overrides are not part of the tool schema. MCP remains
-loopback-only.
+They accept target/report context, mode, language, bounded history, and the
+bounded provider timeout/retry controls above; provider selection and
+credentials are not part of the tool schema. MCP remains loopback-only.
 
 Endpoint:
 

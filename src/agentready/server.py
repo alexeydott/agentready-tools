@@ -704,6 +704,8 @@ class AIRequest(BaseModel):
     skills: list[str] = Field(default_factory=list, max_length=8)
     mcp_tools: list[str] = Field(default_factory=list, max_length=8)
     attachments: list[dict[str, str]] = Field(default_factory=list, max_length=5)
+    provider_timeout: float | None = Field(default=None, ge=1.0, le=120.0, description="Per-attempt AI provider timeout in seconds.")
+    provider_max_retries: int | None = Field(default=None, ge=0, le=5, description="Additional AI provider attempts after a failure.")
 
 
 class AICredentialRequest(BaseModel):
@@ -2459,8 +2461,8 @@ def _ai_assistant(request: AIRequest):
         provider = OpenAICompatibleProvider(
             base_url=selected_provider["base_url"],
             credential_id=selected_provider["credential_id"],
-            timeout=ai_cfg["timeout"],
-            max_retries=ai_cfg["max_retries"],
+            timeout=request.provider_timeout if request.provider_timeout is not None else ai_cfg["timeout"],
+            max_retries=request.provider_max_retries if request.provider_max_retries is not None else ai_cfg["max_retries"],
             allow_loopback_http=ai_cfg["allow_loopback_http"],
         )
         result = asyncio.run(AIAssistant(

@@ -44,7 +44,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
         ],
         "api_mode": "chat_completions",
         "response_mode": "structured",
-        "timeout": 30.0,
+        # Large evidence-grounded prompts can legitimately take longer than
+        # a short interactive request.  Keep the provider boundary generous
+        # by default; callers may still lower it explicitly (1..120s).
+        "timeout": 120.0,
         "max_retries": 2,
         "context_limit": 12000,
         "history_limit": 12,
@@ -197,7 +200,7 @@ def _validate_ai_config(ai: dict[str, Any]) -> None:
         active_provider = ai.get("active_provider")
         if active_provider is not None and active_provider not in provider_ids:
             raise ValueError("ai.active_provider must reference an ai.providers.id")
-    timeout = float(ai.get("timeout", 30.0))
+    timeout = float(ai.get("timeout", DEFAULT_CONFIG["ai"]["timeout"]))
     if not 1 <= timeout <= 120:
         raise ValueError("ai.timeout must be between 1 and 120")
     retries = int(ai.get("max_retries", 2))
@@ -274,7 +277,7 @@ ai:
       credential_id: openai-api-key
   api_mode: chat_completions
   response_mode: structured
-  timeout: 30.0
+  timeout: 120.0
   max_retries: 2
   context_limit: 12000
   history_limit: 12

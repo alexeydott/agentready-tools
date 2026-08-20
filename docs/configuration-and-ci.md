@@ -48,7 +48,7 @@ ai:
       name: OpenAI
       base_url: https://api.openai.com/v1
       credential_id: openai-api-key
-  timeout: 30.0
+  timeout: 120.0
   max_retries: 2
   language: en
 ```

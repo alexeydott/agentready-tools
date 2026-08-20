@@ -2,7 +2,7 @@
 
 # Development
 
-The current release is **0.13.5**. The package version, compatibility manifest,
+The current release is **0.13.6**. The package version, compatibility manifest,
 report defaults, and Win64 file metadata are synchronized from the same release
 change.
 
@@ -96,7 +96,9 @@ installs `.[dev,mcp]`. The browser profile installs `.[dev,portable]` and a
 Chromium binary. The full-release profile installs `.[dev,mcp,portable]` and
 rejects unexpected skips; only the explicitly marked scale suite is excluded.
 Local development uses the complete explicit profile through
-`requirements-dev.txt`.
+`requirements-dev.txt`. The AI assistant's dashboard deadline is derived from
+the configured provider timeout/retry budget; large reports are projected into
+a deterministic bounded context instead of failing collection.
 
 ### L0-L4 acceptance matrix
 
@@ -123,6 +125,8 @@ Build the standalone executable with:
 
 The output is `dist\portable\agentready.exe`. The PyInstaller spec embeds
 version information and `packaging\agentready.ico` as the application icon.
+Release builds must report the same `0.13.6` version in package metadata,
+`src/agentready/compatibility.py`, and the executable file properties.
 
 ## Source archive
 
