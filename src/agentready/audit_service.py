@@ -12,7 +12,7 @@ from typing import Any
 
 from . import __version__
 from .audit_core import AuditRunContext, CollectedPage, FactView, RunSnapshot, RunState
-from .crawl_profiles import HARD_CAPS, resolve_profile
+from .crawl_profiles import HARD_CAPS, resolve_profile, resolve_request_profile
 from .custom_rules import CustomRuleDocument, apply_rules, compile_rules, css_matches_from_html
 from .crawler import AsyncCrawler, CrawlResult, CrawlScope
 from .discovery import (
@@ -33,7 +33,6 @@ from .report_v2 import (
     FindingStatus,
 )
 from .target import parse_target
-from .structured_data import extract_jsonld_nodes
 from .workflows import (
     InventoryRequest,
     InventoryResponse,
@@ -64,6 +63,7 @@ class AuditRequest:
     discovery_limit: int = 1000
     full_discovered: bool = False
     render: bool = False
+    pair_rendered: bool = False
     provider: str | None = None
     ga_property: str | None = None
     gsc_site: str | None = None
@@ -97,6 +97,17 @@ class AuditRequest:
             raise ValueError("timeout must be positive")
         if self.mode not in {"readiness", "seo", "mobile"}:
             raise ValueError("mode must be readiness, seo, or mobile")
+        if self.mode == "seo" and self.full_discovered and not self.crawl:
+            raise ValueError("SEO full_discovered requires crawl=True")
+        if self.mode == "seo" and self.provider is not None:
+            raise ValueError("provider is not supported in SEO mode")
+        if self.mode == "seo" and (
+            self.discovery_kind != "single"
+            or self.discovery_urls
+            or self.discovery_sitemap_xml
+            or self.discovery_sitemap_urls
+        ):
+            raise ValueError("discovery sources other than the SEO target are not supported in SEO mode")
         if self.recommendation_limit < 0:
             raise ValueError("recommendation_limit must not be negative")
         if self.max_redirects < 0:
@@ -113,7 +124,7 @@ class AuditRequest:
             raise ValueError("trusted_origin and security_context must be provided together")
         if self.security_context and not self.credential_headers:
             raise ValueError("trusted authenticated audits require resolved credential headers")
-        if self.security_context and self.render:
+        if self.security_context and (self.render or self.pair_rendered):
             raise ValueError("trusted authenticated audits cannot enable rendered browser collection")
         if self.security_context and self.mode != "readiness":
             raise ValueError("trusted authenticated audits are limited to readiness mode")
@@ -138,6 +149,7 @@ class AuditRequest:
             "discovery_limit": self.discovery_limit,
             "full_discovered": self.full_discovered,
             "render": self.render,
+            "pair_rendered": self.pair_rendered,
             "provider": self.provider,
             "ga_property": self.ga_property,
             "gsc_site": self.gsc_site,
@@ -185,7 +197,7 @@ def _apply_ruleset(document: CustomRuleDocument, fact_views: tuple[FactView, ...
     for view in fact_views:
         facts = view.facts
         body_text = view.body.decode("utf-8", errors="replace") if view.body else ""
-        structured_data = extract_jsonld_nodes(body_text)[0] if body_text else []
+        structured_data = facts.jsonld_nodes if facts else ()
         links = tuple(item.resolved_url or item.raw_href for item in (facts.links if facts else ()))
         resources = tuple(item.resolved_url or item.url for item in (facts.resources if facts else ()))
         css_matches: dict[str, tuple[str, ...]] = {}
@@ -314,6 +326,10 @@ class AuditService:
                     page.headers,
                     page.body,
                     page.requested_url,
+                    page.fetch_error_kind.value if page.fetch_error_kind is not None else None,
+                    page.redirect_records,
+                    page.rendered,
+                    page.parsed,
                 )
             )
             for page in crawl.pages
@@ -378,14 +394,13 @@ class AuditService:
             ",".join(execution_plan.capabilities),
         )
 
-        profile_overrides = {key: value for key, value in request.limits.items() if key != "check_limit"}
-        profile_overrides["max_pages"] = request.max_pages
-        profile_overrides["timeout"] = request.timeout
-        if request.full_discovered:
-            profile_overrides["max_pages"] = HARD_CAPS.max_pages
-            profile_overrides["max_depth"] = HARD_CAPS.max_depth
-            profile_overrides["max_duration"] = HARD_CAPS.max_duration
-        profile = resolve_profile(request.profile, overrides=profile_overrides, hard_caps=HARD_CAPS)
+        profile = resolve_request_profile(
+            request.profile,
+            max_pages=request.max_pages,
+            timeout=request.timeout,
+            limits=dict(request.limits),
+            full_discovered=request.full_discovered,
+        )
         config = profile.config
         origin = parse_target(target).origin
         if request.security_context is not None:
@@ -460,6 +475,8 @@ class AuditService:
                 "render": request.render,
                 "verify": request.verify,
             }
+            if request.pair_rendered:
+                crawler_kwargs["pair_rendered"] = True
             if request.security_context is not None:
                 crawler_kwargs["request_headers"] = dict(request.credential_headers)
                 crawler_kwargs["security_context"] = request.security_context
@@ -680,6 +697,7 @@ class AuditService:
         from .plan_compiler import PlanCompiler
         from .seo.engine import run_atomic_rules
         from .seo.evidence import evidence_from_parsed_page
+        from .seo.compatibility import normalize_selection
         from .seo.site_rules import evaluate_site_rules
         from .seo_models import SeoCheckResult, SeoReport
         from .seo_recommendations import rank_recommendations
@@ -701,10 +719,13 @@ class AuditService:
             ruleset_version=ruleset_document.version if ruleset_document else None,
             ruleset_hash=ruleset_document.rule_hash if ruleset_document else None,
         )
-        profile_overrides = {key: value for key, value in request.limits.items() if key != "check_limit"}
-        profile_overrides["max_pages"] = request.max_pages if request.crawl else 1
-        profile_overrides["timeout"] = request.timeout
-        profile = resolve_profile(request.profile, overrides=profile_overrides, hard_caps=HARD_CAPS)
+        profile = resolve_request_profile(
+            request.profile,
+            max_pages=request.max_pages if request.crawl else 1,
+            timeout=request.timeout,
+            limits=dict(request.limits),
+            full_discovered=request.full_discovered,
+        )
         origin = parse_target(target).origin
         policy = EgressPolicy(
             block_private=not request.allow_private,
@@ -733,6 +754,8 @@ class AuditService:
             "render": request.render,
             "verify": request.verify,
         }
+        if request.pair_rendered:
+            crawler_kwargs["pair_rendered"] = True
         if request.progress_callback is not None:
             crawler_kwargs["progress_callback"] = request.progress_callback
         crawl = asyncio.run(
@@ -742,16 +765,8 @@ class AuditService:
             ).crawl()
         )
         checks: list[SeoCheckResult] = []
-        aliases = {
-            "page-metadata": "metadata", "page-indexability": "indexability",
-            "duplicate-metadata": "duplicate-metadata-site", "broken-links": "link-architecture-site",
-            "redirect-chains": "redirect-inventory-site", "internal-nofollow": "link-architecture-site",
-            "link-counts": "link-depth-site", "insecure-links-pages": "link-architecture-site",
-        }
-        requested_ids = {aliases.get(value, value) for value in request.include}
-        atomic_catalog = {"page-available", "metadata", "indexability", "canonical", "hreflang", "jsonld", "title-length"}
-        atomic_ids = {value for value in requested_ids if value in atomic_catalog}
-        excluded_ids = set(request.exclude)
+        selection = normalize_selection(request.include, request.exclude)
+        requested_ids = selection.include
         fact_views = self._fact_views(crawl)
         for view in fact_views:
             if view.facts is None:
@@ -768,9 +783,9 @@ class AuditService:
                 content_type=content_type,
             )
             for finding in run_atomic_rules(evidence):
-                if atomic_ids and finding.rule.id not in atomic_ids:
+                if requested_ids and finding.rule.id not in requested_ids:
                     continue
-                if finding.rule.id in excluded_ids:
+                if finding.rule.id in selection.exclude:
                     continue
                 checks.append(
                     SeoCheckResult(
@@ -796,6 +811,26 @@ class AuditService:
                 robots_policy=request.limits.get("robots_policy"),
             )
         )
+        if ruleset_document is not None:
+            for item in _apply_ruleset(ruleset_document, fact_views):
+                for match in item["matches"]:
+                    check_id = f"custom-rule:{match['rule_id']}"
+                    count = int(match["count"])
+                    checks.append(
+                        SeoCheckResult(
+                            id=check_id,
+                            title=str(match["title"] or match["rule_id"]),
+                            category="custom",
+                            status="fail" if count else "pass",
+                            scored=False,
+                            details=f"{count} match(es) for custom rule {match['rule_id']}",
+                            evidence=[Evidence(
+                                action=f"evaluate custom rule {match['rule_id']}",
+                                url=str(item["url"]),
+                                finding=str(match["matches"]),
+                            )],
+                        )
+                    )
         if request.ga_property or request.gsc_site:
             from .seo_analytics import ANALYTICS_CHECKS, AnalyticsContext
 
@@ -810,9 +845,6 @@ class AuditService:
                         title=check.__name__.replace("check_", "").replace("_", " ").title(),
                         category="analytics", status="error", scored=True, details=str(exc),
                     ))
-        if requested_ids:
-            checks = [item for item in checks if item.id in requested_ids or item.category == "analytics"]
-        checks = self._apply_check_limit(checks, request.limits)
         coverage_status = "pass" if crawl.coverage.classification.value == "complete_within_scope" else "warn"
         checks.append(
             SeoCheckResult(
@@ -832,6 +864,10 @@ class AuditService:
                 )],
             )
         )
+        if requested_ids:
+            checks = [item for item in checks if item.id in requested_ids]
+        checks = [item for item in checks if item.id not in selection.exclude]
+        checks = self._apply_check_limit(checks, request.limits)
         # Keep SEO reports actionable: atomic/site rules share the canonical
         # check model, but their remediation is produced at this boundary so
         # every fail/warn/error can feed both recommendations and instructions.

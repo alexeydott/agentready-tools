@@ -96,6 +96,7 @@ def _result(
         experimental=spec.experimental,
         supplemental=spec.supplemental,
         geo_scored=spec.geo_scored,
+        score_role=spec.score_role,
     )
 
 

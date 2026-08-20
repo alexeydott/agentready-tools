@@ -5,7 +5,19 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from ..page_parser import ParsedFacts, Representation
+from ..page_parser import ParsedFacts, ParsedPage, Representation
+
+
+@dataclass(frozen=True, slots=True)
+class RepresentationObservation:
+    source: str
+    parsed: ParsedPage | None
+    body: bytes | None = None
+    error: str | None = None
+
+    @property
+    def representation(self) -> Representation | None:
+        return self.parsed.representation if self.parsed is not None else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +33,10 @@ class CollectedPage:
     headers: tuple[tuple[str, str], ...] = ()
     body: bytes | None = None
     requested_url: str | None = None
+    fetch_error_kind: str | None = None
+    redirect_records: tuple[object, ...] = ()
+    rendered: RepresentationObservation | None = None
+    parsed: ParsedPage | None = None
 
     @property
     def available(self) -> bool:
@@ -48,6 +64,34 @@ class FactView:
     @property
     def headers(self) -> Mapping[str, str]:
         return dict(self.page.headers)
+
+    def header_values(self, name: str) -> tuple[str, ...]:
+        """Return all values for a response header using case-insensitive names."""
+        wanted = name.casefold()
+        return tuple(value for key, value in self.page.headers if key.casefold() == wanted)
+
+    @property
+    def x_robots(self) -> str:
+        return ", ".join(self.header_values("x-robots-tag"))
+
+    @property
+    def transport(self) -> dict[str, object]:
+        return {
+            "requested_url": self.page.requested_url or self.page.url,
+            "final_url": self.page.url,
+            "status_code": self.page.status_code,
+            "error_kind": self.page.fetch_error_kind,
+            "redirects": self.page.redirect_records,
+        }
+
+    @property
+    def representations(self) -> tuple[RepresentationObservation, ...]:
+        static = RepresentationObservation(
+            self.page.representation.source if self.page.representation is not None else "static-html",
+            self.page.parsed,
+            self.page.body,
+        )
+        return (static, self.page.rendered) if self.page.rendered is not None else (static,)
 
     @property
     def body(self) -> bytes | None:

@@ -32,3 +32,36 @@ def test_seo_evidence_projects_collected_fact_view_without_legacy_title_attribut
         content_type="text/html",
     )
     assert evidence.title == "Collected"
+
+
+def test_seo_evidence_preserves_case_insensitive_x_robots_values():
+    page = parse_page(b"<title>Collected</title>")
+    view = FactView(
+        CollectedPage(
+            "https://example.test/",
+            0,
+            200,
+            page.representation,
+            page.facts,
+            headers=(("x-robots-tag", "noindex"), ("X-Robots-Tag", "nofollow")),
+        )
+    )
+    evidence = evidence_from_parsed_page(
+        view,
+        url="https://example.test/",
+        final_url="https://example.test/",
+        status_code=200,
+        content_type="text/html",
+    )
+    assert evidence.x_robots == "noindex, nofollow"
+
+
+def test_shared_parser_preserves_jsonld_nodes_and_errors():
+    page = parse_page(
+        b'<script type="application/ld+json">{"@type":"Article"}</script>'
+        b'<script type="application/ld+json">{bad}</script>'
+    )
+    assert page.facts is not None
+    assert page.facts.jsonld_nodes == ({"@type": "Article"},)
+    assert page.facts.jsonld_errors
+    assert page.facts.jsonld_block_count == 2

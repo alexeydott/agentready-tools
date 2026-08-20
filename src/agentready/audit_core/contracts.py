@@ -7,7 +7,13 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from .models import Applicability, EvaluationCompleteness, Status
+from .models import (
+    Applicability,
+    EvaluationCompleteness,
+    EvaluationOutcome,
+    OperationalState,
+    Status,
+)
 from .urls import UrlIdentity
 
 
@@ -74,12 +80,24 @@ class FindingStateHash:
         status: Status,
         applicability: Applicability,
         completeness: EvaluationCompleteness,
+        outcome: EvaluationOutcome | None = None,
+        operational_state: OperationalState = OperationalState.NONE,
         evidence_ids: tuple[str, ...] = (),
         fact_ids: tuple[str, ...] = (),
     ) -> FindingStateHash:
+        if outcome is None:
+            outcome = {
+                Status.PASS: EvaluationOutcome.PASS,
+                Status.FAIL: EvaluationOutcome.FAIL,
+                Status.WARN: EvaluationOutcome.WARN,
+                Status.SKIP: EvaluationOutcome.NOT_APPLICABLE,
+                Status.ERROR: EvaluationOutcome.UNKNOWN,
+            }[status]
         payload = {
             "key": key.to_string(),
             "status": status.value,
+            "outcome": outcome.value,
+            "operational_state": operational_state.value,
             "applicability": applicability.value,
             "completeness": completeness.value,
             "evidence_ids": sorted(evidence_ids),
@@ -101,10 +119,23 @@ class FindingContract:
     effort: Effort
     priority: int
     evidence: tuple[EvidenceRef, ...] = ()
+    outcome: EvaluationOutcome | None = None
+    operational_state: OperationalState = OperationalState.NONE
 
     def __post_init__(self) -> None:
         if self.priority < 0:
             raise ValueError("finding priority must not be negative")
+        if self.outcome is None:
+            outcome = {
+                Status.PASS: EvaluationOutcome.PASS,
+                Status.FAIL: EvaluationOutcome.FAIL,
+                Status.WARN: EvaluationOutcome.WARN,
+                Status.SKIP: EvaluationOutcome.NOT_APPLICABLE,
+                Status.ERROR: EvaluationOutcome.UNKNOWN,
+            }[self.status]
+            object.__setattr__(self, "outcome", outcome)
+        if self.status is Status.ERROR and self.operational_state is OperationalState.NONE:
+            object.__setattr__(self, "operational_state", OperationalState.ERROR)
 
     def to_report_finding(
         self,
@@ -117,11 +148,14 @@ class FindingContract:
         """Project canonical machine state into the v2 report DTO."""
         from ..report_v2 import Finding, FindingEvidence, FindingStatus
 
-        status = (
-            FindingStatus.UNAVAILABLE
-            if self.status is Status.ERROR
-            else FindingStatus(self.status.value)
-        )
+        if self.operational_state is not OperationalState.NONE:
+            status = FindingStatus.UNAVAILABLE
+        elif self.outcome is EvaluationOutcome.NOT_APPLICABLE:
+            status = FindingStatus.SKIP
+        elif self.outcome is EvaluationOutcome.UNKNOWN:
+            status = FindingStatus.SKIP
+        else:
+            status = FindingStatus(self.outcome.value)
         evidence = tuple(
             FindingEvidence(item.id, item.summary, url or self.key.target.normalized())
             for item in self.evidence
@@ -132,4 +166,5 @@ class FindingContract:
             status=status,
             reason=reason,
             evidence=evidence,
+            rule_version=self.key.rule_version,
         )

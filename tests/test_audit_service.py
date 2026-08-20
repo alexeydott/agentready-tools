@@ -184,6 +184,36 @@ def test_audit_service_seo_mode_uses_shared_crawler_and_atomic_facts() -> None:
     assert result.to_dict()["request"]["mode"] == "seo"
 
 
+def test_audit_service_seo_ruleset_changes_report():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/html"}, content=b"<p>agent marker</p>")
+
+    result = AuditService().run(AuditRequest(
+        target="https://example.test/",
+        mode="seo",
+        ruleset=(
+            "version: 1\nrules:\n"
+            "  - id: marker\n"
+            "    title: Marker\n"
+            "    assert:\n"
+            "      kind: text\n"
+            "      pattern: agent\n"
+        ),
+        allow_private=True,
+        transport=httpx.MockTransport(handler),
+    ))
+    custom = next(check for check in result.seo_report.checks if check.id == "custom-rule:marker")
+    assert custom.status == "fail"
+    assert result.run.context.ruleset_hash
+
+
+def test_audit_service_rejects_ignored_seo_parameters():
+    with pytest.raises(ValueError, match="provider is not supported"):
+        AuditRequest(target="https://example.test/", mode="seo", provider="pagespeed")
+    with pytest.raises(ValueError, match="discovery sources"):
+        AuditRequest(target="https://example.test/", mode="seo", discovery_kind="crawl")
+
+
 def test_audit_service_seo_mode_adds_site_wide_diagnostics() -> None:
     pages = {
         "https://example.test/": b'<title>Same</title><h1>Home</h1><a href="/de">de</a>',
@@ -213,6 +243,38 @@ def test_audit_service_seo_mode_adds_site_wide_diagnostics() -> None:
         "hreflang-reciprocity-site",
     } <= ids
     assert next(check for check in result.seo_report.checks if check.id == "duplicate-metadata-site").status == "fail"
+
+
+def test_audit_service_seo_selection_is_symmetric_for_site_rules() -> None:
+    pages = {
+        "https://example.test/": b"<title>Same</title><h1>Home</h1><a href='/de'>de</a>",
+        "https://example.test/de": b"<title>Same</title><h1>Home</h1><a href='/'>en</a>",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/html"}, content=pages[str(request.url)])
+
+    included = AuditService().run(AuditRequest(
+        target="https://example.test/",
+        mode="seo",
+        crawl=True,
+        max_pages=2,
+        include=("duplicate-metadata-site",),
+        allow_private=True,
+        transport=httpx.MockTransport(handler),
+    ))
+    assert {check.id for check in included.seo_report.checks} == {"duplicate-metadata-site"}
+
+    excluded = AuditService().run(AuditRequest(
+        target="https://example.test/",
+        mode="seo",
+        crawl=True,
+        max_pages=2,
+        exclude=("duplicate-metadata-site",),
+        allow_private=True,
+        transport=httpx.MockTransport(handler),
+    ))
+    assert all(check.id != "duplicate-metadata-site" for check in excluded.seo_report.checks)
 
 
 def test_audit_service_profile_selection_changes_config_identity_deterministically():

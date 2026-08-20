@@ -27,7 +27,13 @@ from .audit_core.store import (
     SiteStore,
 )
 from .audit_core.urls import UrlIdentity
-from .browser_pool import BrowserPool, BrowserPoolBoundary, BrowserPoolFactory
+from .browser_pool import (
+    BrowserPool,
+    BrowserPoolBoundary,
+    BrowserPoolFactory,
+    CapabilityUnavailableError,
+)
+from .audit_core.collection import RepresentationObservation
 from .egress import EgressPolicy
 from .egress import PassivePublicContext, TrustedLocalCredentialContext
 from .fetcher import (
@@ -178,6 +184,9 @@ class CrawledPage:
     headers: tuple[tuple[str, str], ...] = ()
     body: bytes | None = None
     requested_url: str | None = None
+    fetch_error_kind: FetchErrorKind | None = None
+    redirect_records: tuple[object, ...] = ()
+    rendered: RepresentationObservation | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +263,7 @@ class AsyncCrawler:
         store: SiteStore | None = None,
         run_context: AuditRunContext | None = None,
         render: bool = False,
+        pair_rendered: bool = False,
         verify: bool = True,
         fetcher_factory: FetcherFactory | None = None,
         browser_pool_factory: BrowserPoolFactory | None = None,
@@ -271,6 +281,9 @@ class AsyncCrawler:
         self.store = store
         self.run_context = run_context
         self.render = render
+        self.pair_rendered = pair_rendered
+        if self.render and self.pair_rendered:
+            raise ValueError("render and pair_rendered are mutually exclusive")
         self.verify = verify
         self.fetcher_factory = fetcher_factory or Fetcher
         self.browser_pool_factory = browser_pool_factory or BrowserPool
@@ -419,7 +432,14 @@ class AsyncCrawler:
                             failed += 1
                             frontier.set_state(item.url, CrawlItemState.FAILED)
                             record_url(item.url, RunUrlState.FAILED, item.depth, error_kind=exc.kind.value)
-                            pages[item.url] = CrawledPage(item.url, item.depth, None, None, str(exc))
+                            pages[item.url] = CrawledPage(
+                                item.url,
+                                item.depth,
+                                None,
+                                None,
+                                str(exc),
+                                fetch_error_kind=getattr(exc, "kind", None),
+                            )
                             continue
                     if time.monotonic() >= deadline:
                         deadline_hit = True
@@ -517,6 +537,30 @@ class AsyncCrawler:
                                 )
                     else:
                         frontier.set_state(item.url, CrawlItemState.FETCHED)
+                    rendered_observation = (
+                        RepresentationObservation("rendered-dom", None, error="browser capability unavailable")
+                        if self.pair_rendered and browser_pool is None
+                        else None
+                    )
+                    if self.pair_rendered and browser_pool is not None and response.status_code == 200:
+                        try:
+                            async with browser_pool.page() as rendered_page:
+                                await browser_pool.goto(rendered_page, item.url, wait_until="domcontentloaded")
+                                rendered_body = (await rendered_page.content()).encode("utf-8")
+                                rendered_representation = Representation.from_body(
+                                    rendered_body,
+                                    run_id=run_id,
+                                    url_key=item.url,
+                                    source=RepresentationSource.RENDERED_DOM,
+                                    content_type="text/html",
+                                )
+                                rendered_observation = RepresentationObservation(
+                                    "rendered-dom",
+                                    parse_page(rendered_body, representation=rendered_representation),
+                                    rendered_body,
+                                )
+                        except Exception as exc:
+                            rendered_observation = RepresentationObservation("rendered-dom", None, error=str(exc))
                     record_url(
                         item.url,
                         RunUrlState.PARSED if parsed is not None else RunUrlState.FETCHED,
@@ -530,6 +574,8 @@ class AsyncCrawler:
                         headers=tuple(sorted(response.headers.items())),
                         body=response.body,
                         requested_url=item.url,
+                        redirect_records=tuple(response.redirect_records),
+                        rendered=rendered_observation,
                     )
                     completed_items += 1
                     if self.store is not None:
@@ -578,7 +624,14 @@ class AsyncCrawler:
                     failed += 1
                     frontier.set_state(item.url, CrawlItemState.FAILED)
                     record_url(item.url, RunUrlState.FAILED, item.depth, error_kind=type(exc).__name__)
-                    pages[item.url] = CrawledPage(item.url, item.depth, None, None, str(exc))
+                    pages[item.url] = CrawledPage(
+                        item.url,
+                        item.depth,
+                        None,
+                        None,
+                        str(exc),
+                        fetch_error_kind=getattr(exc, "kind", None),
+                    )
                     logger.exception(
                         "[FIX:crawler-worker] page isolated run_id=%s url=%s error_type=%s",
                         run_id,
@@ -591,10 +644,16 @@ class AsyncCrawler:
                         active_items -= 1
                     await refill()
 
-        browser_pool = self.browser_pool_factory(self.policy) if self.render else None
+        browser_pool = self.browser_pool_factory(self.policy) if self.render or self.pair_rendered else None
         try:
             if browser_pool is not None:
-                await browser_pool.start()
+                try:
+                    await browser_pool.start()
+                except CapabilityUnavailableError:
+                    if self.render:
+                        raise
+                    logger.warning("optional rendered representation unavailable run_id=%s", run_id)
+                    browser_pool = None
             async with self.fetcher_factory(
                 policy=self.policy,
                 timeout=self.config.timeout,

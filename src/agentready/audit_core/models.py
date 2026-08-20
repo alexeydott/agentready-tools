@@ -46,6 +46,20 @@ class Status(StrEnum):
     ERROR = "error"
 
 
+class EvaluationOutcome(StrEnum):
+    PASS = "pass"
+    FAIL = "fail"
+    WARN = "warn"
+    UNKNOWN = "unknown"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class OperationalState(StrEnum):
+    NONE = "none"
+    UNAVAILABLE = "unavailable"
+    ERROR = "error"
+
+
 @dataclass(frozen=True, slots=True)
 class RuleVersion:
     version: str

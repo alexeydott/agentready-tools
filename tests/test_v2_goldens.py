@@ -39,9 +39,9 @@ def test_v2_json_and_html_goldens_are_stable():
     }
 
     expected = {
-                "scan_json": "96c3aca7973f22e35f8c58096a1297f7c72856498c3854acfe595563f2f2527d",
+                "scan_json": "2c9b59ea19f58c3b74e1c51ace7293b3ab779e5f0ef804078de3b043ff1feae8",
             "scan_html": "fbfb3e71274cfcf905cabf0cafc31470c7b84b34b7f6e6a8f5624dba3091ee34",
-                "seo_json": "f76b6df6729c6482f98037e092955cef41dfcf05da3a82b07e12f9725093494c",
+                "seo_json": "2a8044bd4082e3484f4bdd25f74e7f79c5a2956099b3281367f462d4336bba64",
                 "seo_html": "6df9809b9c1d7147af75b8a8d31e524ba21c241459599787a7ba9254deff0c59",
                 "mobile_json": "60071a6febe47e51bc5760a00f7db269205dc3f917a5e66dd056cffc7baeaa99",
             "mobile_html": "8ee6554d49c1d6d7feb1fe971f7a6d6d54df184715bd7c0c51d9a364dcb93532",

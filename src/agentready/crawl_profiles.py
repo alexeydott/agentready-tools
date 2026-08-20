@@ -53,3 +53,22 @@ def resolve_profile(name: str = "standard", *, overrides: dict[str, Any] | None 
         max_duration=min(profile.config.max_duration, hard_caps.max_duration),
     )
     return CrawlProfile(profile.name, config, profile.normative_limits)
+
+
+def resolve_request_profile(
+    name: str,
+    *,
+    max_pages: int,
+    timeout: float,
+    limits: dict[str, Any],
+    full_discovered: bool,
+    hard_caps: CrawlConfig = HARD_CAPS,
+) -> CrawlProfile:
+    """Resolve one bounded profile contract for every v2 audit mode."""
+    overrides = {key: value for key, value in limits.items() if key != "check_limit"}
+    overrides["max_pages"] = hard_caps.max_pages if full_discovered else max_pages
+    overrides["timeout"] = timeout
+    if full_discovered:
+        overrides["max_depth"] = hard_caps.max_depth
+        overrides["max_duration"] = hard_caps.max_duration
+    return resolve_profile(name, overrides=overrides, hard_caps=hard_caps)

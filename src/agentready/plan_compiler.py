@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .audit_service import AuditRequest
-from .crawl_profiles import resolve_profile
+from .crawl_profiles import resolve_request_profile
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,9 +48,13 @@ class PlanCompiler:
     """Compile requests without touching the network or optional providers."""
 
     def compile(self, request: AuditRequest) -> ExecutionPlan:
-        overrides = {key: value for key, value in request.limits.items() if key != "check_limit"}
-        overrides.update(max_pages=request.max_pages, timeout=request.timeout)
-        profile = resolve_profile(request.profile, overrides=overrides)
+        profile = resolve_request_profile(
+            request.profile,
+            max_pages=request.max_pages if request.mode != "seo" or request.crawl else 1,
+            timeout=request.timeout,
+            limits=dict(request.limits),
+            full_discovered=request.full_discovered,
+        )
         capabilities = ["crawl", "static-facts", "coverage"]
         if request.mode == "seo":
             capabilities.extend(("seo", "parsed-facts", "atomic-seo-rules"))
@@ -93,4 +97,3 @@ class PlanCompiler:
             tuple(capabilities),
             config_hash,
         )
-

@@ -6,10 +6,11 @@ from collections import defaultdict
 from .seo_models import SeoCategoryScore, SeoCheckResult
 
 logger = logging.getLogger(__name__)
+SCORE_MODEL_ID = "seo-binary-v1"
 
 
 def score_checks(checks: list[SeoCheckResult]) -> tuple[int, list[SeoCategoryScore]]:
-    applicable = [check for check in checks if check.scored and check.status not in {"skip"}]
+    applicable = [check for check in checks if check.is_score_eligible and check.status not in {"skip", "error"}]
     passed = sum(check.status == "pass" for check in applicable)
     score = round(passed * 100 / len(applicable)) if applicable else 0
     grouped: dict[str, list[SeoCheckResult]] = defaultdict(list)

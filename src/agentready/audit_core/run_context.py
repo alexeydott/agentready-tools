@@ -32,8 +32,17 @@ class AuditRunContext:
     tool_version: str
     rule_catalog_version: str
     created_at: str
+    rule_catalog_digest: str = ""
     ruleset_version: str | None = None
     ruleset_hash: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.rule_catalog_digest:
+            object.__setattr__(
+                self,
+                "rule_catalog_digest",
+                hashlib.sha256(self.rule_catalog_version.encode("utf-8")).hexdigest(),
+            )
 
     @classmethod
     def create(
@@ -43,6 +52,7 @@ class AuditRunContext:
         *,
         tool_version: str,
         rule_catalog_version: str,
+        rule_catalog_digest: str | None = None,
         run_id: str | None = None,
         ruleset_version: str | None = None,
         ruleset_hash: str | None = None,
@@ -55,6 +65,7 @@ class AuditRunContext:
             config_hash=config_hash,
             tool_version=tool_version,
             rule_catalog_version=rule_catalog_version,
+            rule_catalog_digest=rule_catalog_digest or hashlib.sha256(rule_catalog_version.encode("utf-8")).hexdigest(),
             created_at=datetime.now(UTC).isoformat(),
             ruleset_version=ruleset_version,
             ruleset_hash=ruleset_hash,

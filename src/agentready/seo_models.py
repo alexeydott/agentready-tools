@@ -7,6 +7,7 @@ from . import __version__
 from .models import Evidence, Remediation
 
 SeoStatus = Literal["pass", "fail", "warn", "skip", "error"]
+ScoreRole = Literal["eligible", "observation", "guard", "legacy-only"]
 SeoImpact = Literal["high", "medium", "low"]
 SeoEffort = Literal["low", "medium", "high"]
 
@@ -22,6 +23,16 @@ class SeoCheckResult:
     duration_ms: int = 0
     evidence: list[Evidence] = field(default_factory=list)
     remediation: Remediation | None = None
+    score_role: ScoreRole = "eligible"
+    score_included: bool | None = None
+
+    @property
+    def is_score_eligible(self) -> bool:
+        return (
+            self.score_included
+            if self.score_included is not None
+            else self.scored and self.score_role == "eligible"
+        )
 
     @property
     def passed(self) -> bool:
@@ -66,6 +77,7 @@ class SeoReport:
     inventory: dict[str, Any] = field(default_factory=dict)
     provider_freshness: dict[str, Any] = field(default_factory=dict)
     comparison: dict[str, Any] = field(default_factory=dict)
+    score_model_id: str = "seo-binary-v1"
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

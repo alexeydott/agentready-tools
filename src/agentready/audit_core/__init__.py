@@ -1,6 +1,6 @@
 """Versioned, transport-independent contracts for the vNext audit core."""
 
-from .collection import CollectedPage, FactView
+from .collection import CollectedPage, FactView, RepresentationObservation
 from .contracts import (
     Effort,
     EvidenceRef,
@@ -15,7 +15,9 @@ from .evidence import Evidence, FetchRecord
 from .models import (
     Applicability,
     AuthorityLevel,
+    EvaluationOutcome,
     EvaluationCompleteness,
+    OperationalState,
     RequirementLevel,
     RuleSpec,
     RuleVersion,
@@ -63,10 +65,12 @@ __all__ = [
     "ContentRetention",
     "Effort",
     "EvaluationCompleteness",
+    "EvaluationOutcome",
     "Evidence",
     "EvidenceRef",
     "FactEnvelope",
     "FactView",
+    "RepresentationObservation",
     "FetchFact",
     "FetchRecord",
     "FindingContract",
@@ -79,6 +83,7 @@ __all__ = [
     "MemorySiteStore",
     "MetricRecord",
     "Origin",
+    "OperationalState",
     "PageRecord",
     "PageStorageQuery",
     "ProjectRecord",

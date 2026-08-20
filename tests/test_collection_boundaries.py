@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import Self
 
 import pytest
+import httpx
 
 from agentready.audit_core.collection import CollectedPage, FactView
 from agentready.browser_pool import (
@@ -271,4 +272,38 @@ def test_rendered_crawler_closes_browser_pool_after_cancellation() -> None:
 
     pool = asyncio.run(run())
     assert pool.page_closed
+    assert pool.closed
+
+
+def test_pair_rendered_preserves_static_and_rendered_representations() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            content=b"<title>Static</title>",
+        )
+
+    async def run() -> tuple[object, _FakeBrowserPool]:
+        pool = _FakeBrowserPool()
+        crawler = AsyncCrawler(
+            CrawlScope(("https://example.test/",), allowed_origins=("https://example.test",)),
+            config=CrawlConfig(max_pages=1, concurrency=1, min_request_interval_ms=0, max_duration=10),
+            policy=EgressPolicy(allowed_origins=frozenset({"https://example.test"})),
+            transport=httpx.MockTransport(handler),
+            pair_rendered=True,
+            browser_pool_factory=lambda _: pool,
+        )
+        result = await crawler.crawl()
+        return result, pool
+
+    result, pool = asyncio.run(run())
+    page = result.pages[0]
+    assert page.parsed is not None
+    assert page.parsed.facts is not None
+    assert page.parsed.facts.titles == ("Static",)
+    assert page.rendered is not None
+    assert page.rendered.parsed is not None
+    assert page.rendered.parsed.facts is not None
+    assert page.rendered.parsed.facts.titles == ("Rendered",)
+    assert page.parsed.representation is not page.rendered.parsed.representation
     assert pool.closed
