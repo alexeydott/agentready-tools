@@ -166,4 +166,5 @@ class FindingContract:
             status=status,
             reason=reason,
             evidence=evidence,
+            rule_version=self.key.rule_version,
         )

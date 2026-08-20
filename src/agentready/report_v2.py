@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 SCHEMA = "agentready.audit.v2"
 REPORT_VERSION = "v2"
+DEFAULT_RULE_CATALOG_VERSION = "v2"
+DEFAULT_RULE_CATALOG_DIGEST = hashlib.sha256(DEFAULT_RULE_CATALOG_VERSION.encode("utf-8")).hexdigest()
 MAX_PAGES = 100
 MAX_TIMEOUT = 30.0
 
@@ -107,6 +109,7 @@ class Finding:
     status: FindingStatus
     reason: str
     evidence: tuple[FindingEvidence, ...] = ()
+    rule_version: str = "1.0.0"
 
     def to_contract(self, *, target: str, rule_version: str = "1.0.0") -> Any:
         """Return the canonical machine identity behind this v2 DTO."""
@@ -147,7 +150,7 @@ class Finding:
             if self.status in {FindingStatus.SKIP, FindingStatus.UNAVAILABLE}
             else EvaluationCompleteness.COMPLETE
         )
-        key = FindingKey(self.id, rule_version, UrlIdentity.parse(target))
+        key = FindingKey(self.id, self.rule_version or rule_version, UrlIdentity.parse(target))
         evidence = tuple(EvidenceRef(item.id, item.url or target, item.summary) for item in self.evidence)
         return FindingContract(
             key=key,
@@ -196,6 +199,7 @@ class Finding:
             "id": self.id,
             "status": self.status.value,
             "evidence": [{"id": item.id, "url": item.url} for item in self.evidence],
+            "rule_version": self.rule_version,
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
@@ -208,6 +212,7 @@ class Finding:
             "fingerprint": self.fingerprint,
             "state_hash": self.state_hash,
             "evidence": [item.to_dict() for item in self.evidence],
+            "rule_version": self.rule_version,
         }
 
 
@@ -249,6 +254,8 @@ class AuditReport:
     evidence: tuple[FindingEvidence, ...] = ()
     run_id: str | None = None
     score_model_id: str = "readiness-transparent-v2"
+    rule_catalog_version: str = DEFAULT_RULE_CATALOG_VERSION
+    rule_catalog_digest: str = DEFAULT_RULE_CATALOG_DIGEST
 
     @property
     def score(self) -> int:
@@ -275,6 +282,8 @@ class AuditReport:
         if self.run_id is not None:
             result["run_id"] = self.run_id
         result["score_model_id"] = self.score_model_id
+        result["rule_catalog_version"] = self.rule_catalog_version
+        result["rule_catalog_digest"] = self.rule_catalog_digest
         return result
 
 
@@ -325,7 +334,14 @@ def report_from_checks(target: str, checks: Iterable[Any]) -> AuditReport:
         evidence.extend(check_evidence)
         raw_status = getattr(check, "status", "unavailable")
         status = FindingStatus("unavailable" if raw_status == "error" else raw_status)
-        dto = Finding(check.id, check.title, status, check.details, check_evidence)
+        dto = Finding(
+            check.id,
+            check.title,
+            status,
+            check.details,
+            check_evidence,
+            str(getattr(check, "version", "1.0.0")),
+        )
         contract = dto.to_contract(target=target, rule_version=str(getattr(check, "version", "1.0.0")))
         findings.append(contract.to_report_finding(
             title=dto.title,
@@ -351,6 +367,7 @@ def report_from_dict(payload: Mapping[str, Any]) -> AuditReport:
             FindingStatus(item["status"]),
             item.get("reason", ""),
             tuple(FindingEvidence(e["id"], e["summary"], e.get("url")) for e in item.get("evidence", ())),
+            item.get("rule_version", "1.0.0"),
         )
         for item in payload.get("findings", ())
     )
@@ -372,6 +389,8 @@ def report_from_dict(payload: Mapping[str, Any]) -> AuditReport:
         payload.get("version", REPORT_VERSION),
         run_id=payload.get("run_id"),
         score_model_id=payload.get("score_model_id", "readiness-transparent-v2"),
+        rule_catalog_version=payload.get("rule_catalog_version", DEFAULT_RULE_CATALOG_VERSION),
+        rule_catalog_digest=payload.get("rule_catalog_digest", DEFAULT_RULE_CATALOG_DIGEST),
     )
 
 
@@ -531,16 +550,20 @@ def _comparison_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) 
         return "targets differ"
     if current.get("version", REPORT_VERSION) != baseline.get("version", REPORT_VERSION):
         return "report versions differ"
-    identity_fields = (
+    required_identity_fields = (
         ("rule_catalog_version", "rule catalog versions differ"),
         ("rule_catalog_digest", "rule catalog digests differ"),
-        ("ruleset", "rulesets differ"),
-        ("rules_version", "rule versions differ"),
         ("score_model_id", "score model IDs differ"),
     )
-    for field_name, message in identity_fields:
+    for field_name, message in required_identity_fields:
+        if field_name not in current or field_name not in baseline:
+            return f"missing comparison identity: {field_name}"
         if current.get(field_name) != baseline.get(field_name):
             return message
+    for field_name, message in (("ruleset", "rulesets differ"), ("rules_version", "rule versions differ")):
+        if field_name in current or field_name in baseline:
+            if current.get(field_name) != baseline.get(field_name):
+                return message
     current_coverage = current.get("coverage", {})
     baseline_coverage = baseline.get("coverage", {})
     if isinstance(current_coverage, Mapping) and isinstance(baseline_coverage, Mapping):
