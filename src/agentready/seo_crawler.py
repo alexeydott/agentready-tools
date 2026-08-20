@@ -189,10 +189,15 @@ def _add_crawl_metrics(evidence: list[Evidence], **metrics: object) -> list[Evid
 
 def check_broken_links(pages: list[CrawledPage], start_url: str) -> SeoCheckResult:
     started = time.perf_counter()
-    broken = [page for page in pages if page.status_code in {None, 0} or page.status_code >= 400]
+    broken = [
+        page
+        for page in pages
+        if (getattr(page, "status_code", getattr(page, "status", None)) in {None, 0})
+        or getattr(page, "status_code", getattr(page, "status", None)) >= 400
+    ]
     ok = not broken
-    detail = f"all {len(pages)} crawled pages are reachable" if ok else f"{len(broken)} broken page(s): " + ", ".join(f"{p.url} (HTTP {p.status_code or 'fetch error'})" for p in broken[:5])
-    evidence = [Evidence(action="crawl same-origin pages", url=p.url, status_code=p.status_code, finding=f"HTTP {p.status_code}") for p in broken[:5]]
+    detail = f"all {len(pages)} crawled pages are reachable" if ok else f"{len(broken)} broken page(s): " + ", ".join(f"{p.url} (HTTP {getattr(p, 'status_code', getattr(p, 'status', None)) or 'fetch error'})" for p in broken[:5])
+    evidence = [Evidence(action="crawl same-origin pages", url=p.url, status_code=getattr(p, "status_code", getattr(p, "status", None)), finding=f"HTTP {getattr(p, 'status_code', getattr(p, 'status', None))}") for p in broken[:5]]
     remediation = Remediation(
         summary="Fix or remove links to pages returning 4xx/5xx so crawlers do not hit dead ends.",
         rerun_command=f"agentready audit {start_url!r} --mode seo --crawl",
@@ -203,10 +208,10 @@ def check_broken_links(pages: list[CrawledPage], start_url: str) -> SeoCheckResu
 
 def check_redirect_chains(pages: list[CrawledPage], start_url: str) -> SeoCheckResult:
     started = time.perf_counter()
-    chained = [page for page in pages if len(page.redirect_records) > 1]
+    chained = [page for page in pages if len(getattr(page, "redirect_records", getattr(page, "redirect_chain", ()))) > 1]
     ok = not chained
     detail = "no multi-hop redirect chains" if ok else f"{len(chained)} page(s) reached via redirect chains: " + ", ".join(p.url for p in chained[:5])
-    evidence = [Evidence(action="follow redirects", url=p.url, finding=f"{len(p.redirect_records)} redirect hop(s)") for p in chained[:5]]
+    evidence = [Evidence(action="follow redirects", url=p.url, finding=f"{len(getattr(p, 'redirect_records', getattr(p, 'redirect_chain', ())))} redirect hop(s)") for p in chained[:5]]
     remediation = Remediation(
         summary="Point links directly at final URLs; multi-hop redirect chains waste crawl budget and dilute signals.",
         rerun_command=f"agentready audit {start_url!r} --mode seo --crawl",
@@ -246,8 +251,7 @@ def check_duplicate_metadata(pages: list[CrawledPage], start_url: str) -> SeoChe
 
 def check_internal_nofollow(pages: list[CrawledPage], start_url: str) -> SeoCheckResult:
     started = time.perf_counter()
-    # v2 parsed pages do not expose rel values in this legacy compatibility path.
-    flagged: list[tuple[str, int]] = []
+    flagged = [(page.url, len(getattr(page, "nofollow_links", ()))) for page in pages if getattr(page, "nofollow_links", ())]
     ok = not flagged
     detail = "no internal nofollow links" if ok else f"{sum(count for _, count in flagged)} internal nofollow link(s) on {len(flagged)} page(s)"
     evidence = [Evidence(action="inspect link rel attributes", url=url, finding=f"{count} nofollow internal link(s)") for url, count in flagged[:5]]
