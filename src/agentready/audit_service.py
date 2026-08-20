@@ -33,7 +33,6 @@ from .report_v2 import (
     FindingStatus,
 )
 from .target import parse_target
-from .structured_data import extract_jsonld_nodes
 from .workflows import (
     InventoryRequest,
     InventoryResponse,
@@ -196,7 +195,7 @@ def _apply_ruleset(document: CustomRuleDocument, fact_views: tuple[FactView, ...
     for view in fact_views:
         facts = view.facts
         body_text = view.body.decode("utf-8", errors="replace") if view.body else ""
-        structured_data = extract_jsonld_nodes(body_text)[0] if body_text else []
+        structured_data = facts.jsonld_nodes if facts else ()
         links = tuple(item.resolved_url or item.raw_href for item in (facts.links if facts else ()))
         resources = tuple(item.resolved_url or item.url for item in (facts.resources if facts else ()))
         css_matches: dict[str, tuple[str, ...]] = {}

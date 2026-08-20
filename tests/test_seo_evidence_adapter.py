@@ -54,3 +54,14 @@ def test_seo_evidence_preserves_case_insensitive_x_robots_values():
         content_type="text/html",
     )
     assert evidence.x_robots == "noindex, nofollow"
+
+
+def test_shared_parser_preserves_jsonld_nodes_and_errors():
+    page = parse_page(
+        b'<script type="application/ld+json">{"@type":"Article"}</script>'
+        b'<script type="application/ld+json">{bad}</script>'
+    )
+    assert page.facts is not None
+    assert page.facts.jsonld_nodes == ({"@type": "Article"},)
+    assert page.facts.jsonld_errors
+    assert page.facts.jsonld_block_count == 2

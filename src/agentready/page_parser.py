@@ -133,6 +133,9 @@ class ParsedFacts:
     resources: tuple[ResourceOccurrence, ...] = ()
     forms: tuple[FormFact, ...] = ()
     jsonld_markers: tuple[StructuredDataMarker, ...] = ()
+    jsonld_nodes: tuple[dict[str, object], ...] = ()
+    jsonld_errors: tuple[str, ...] = ()
+    jsonld_block_count: int = 0
     microdata_markers: tuple[StructuredDataMarker, ...] = ()
     visible_text: str = ""
     raw_text_signature_inputs: tuple[str, ...] = ()
@@ -445,6 +448,16 @@ def parse_page(
     """Parse once and return both the typed facts and the compatibility projection."""
     representation = representation or Representation.from_body(body)
     try:
-        return _parse_with_selectolax(body, representation)
+        page = _parse_with_selectolax(body, representation)
     except ImportError:
-        return _parse_with_fallback(body, representation)
+        page = _parse_with_fallback(body, representation)
+    from .structured_data import extract_jsonld_nodes
+
+    nodes, errors, block_count = extract_jsonld_nodes(body.decode("utf-8", errors="replace"))
+    facts = replace(
+        page.facts,
+        jsonld_nodes=tuple(nodes),
+        jsonld_errors=tuple(errors),
+        jsonld_block_count=block_count,
+    ) if page.facts is not None else None
+    return replace(page, facts=facts)

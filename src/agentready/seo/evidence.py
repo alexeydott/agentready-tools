@@ -8,9 +8,8 @@ from urllib.parse import urljoin
 
 from ..audit_core.collection import FactView
 from ..http import FetchError, HttpClient
-from ..page_parser import ParsedPage
+from ..page_parser import ParsedPage, parse_page
 from ..seo_checks import SeoHtmlParser
-from ..structured_data import extract_jsonld_nodes
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +76,8 @@ def evidence_from_parsed_page(
         hreflangs=hreflangs,
         meta_robots=facts.meta_robots,
         x_robots=x_robots,
-        jsonld_nodes=(),
-        jsonld_errors=(),
+        jsonld_nodes=facts.jsonld_nodes,
+        jsonld_errors=facts.jsonld_errors,
         evidence_ids=(evidence_id or _evidence_id(url, "page"),),
     )
 
@@ -102,10 +101,12 @@ def collect_page_evidence(url: str, client: HttpClient) -> SeoPageEvidence:
     parser = SeoHtmlParser()
     parser.feed(response.text)
     parser.close()
-    nodes, jsonld_errors, _ = extract_jsonld_nodes(response.text)
+    shared_facts = parse_page(response.body).facts
+    if shared_facts is None:
+        raise ValueError("shared parser did not produce facts")
     canonicals = tuple(urljoin(response.url, value) for value in parser.canonicals)
     hreflangs = tuple((code, urljoin(response.url, href)) for code, href in parser.hreflangs)
-    logger.debug("[WP6.2] SEO evidence collected url=%s jsonld=%d", response.url, len(nodes))
+    logger.debug("[WP6.2] SEO evidence collected url=%s jsonld=%d", response.url, len(shared_facts.jsonld_nodes))
     return SeoPageEvidence(
         url=url,
         final_url=response.url,
@@ -120,8 +121,8 @@ def collect_page_evidence(url: str, client: HttpClient) -> SeoPageEvidence:
         hreflangs=hreflangs,
         meta_robots=tuple(parser.meta_robots),
         x_robots=parser.x_robots,
-        jsonld_nodes=tuple(nodes),
-        jsonld_errors=tuple(jsonld_errors),
+        jsonld_nodes=shared_facts.jsonld_nodes,
+        jsonld_errors=shared_facts.jsonld_errors,
         evidence_ids=(evidence_id,),
     )
 
