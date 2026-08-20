@@ -250,6 +250,8 @@ _TEXT = {
         "v2_discovery_sitemap": "Sitemap XML",
         "v2_discovery_robots": "Robots sitemap",
         "v2_discovery_crawl": "All discovered pages (bounded)",
+        "v2_full_discovered": "Audit the full discovered set (up to server cap)",
+        "v2_full_discovered_hint": "Runs until the same-origin discovered frontier is exhausted or the server hard cap of 25,000 pages is reached.",
         "v2_inventory_hint": "Browse bounded server-side inventory for the latest crawl.",
         "v2_inventory_kind_hint": "Select the inventory projection to inspect for the latest completed run.",
         "v2_rows_hint": "Maximum rows shown in one inventory page.",
@@ -274,7 +276,7 @@ _TEXT = {
         "custom_rules_valid": "Rules are valid", "custom_rules_validation_failed": "Validation failed", "custom_rules_preview_complete": "Preview complete; no crawl started", "custom_rules_preview_failed": "Preview failed",
         "link_graph": "Link Graph",
         "link_graph_hint": "Load a bounded graph projection from stored link occurrences. Filters affect only the displayed page and do not start a crawl.",
-        "graph_dead_ends": "Dead ends", "graph_dead_ends_hint": "Show nodes with no outgoing links in the bounded graph projection.", "graph_disconnected": "Disconnected", "graph_disconnected_hint": "Show nodes outside the connected component of the selected graph projection.", "graph_load": "Load graph", "graph_algorithm": "Authority algorithm", "graph_url": "URL", "graph_in": "In", "graph_out": "Out", "graph_authority": "Authority", "graph_loaded": "Loaded {loaded} of {total} nodes", "graph_failed": "Graph failed", "graph_node_inbound": "inbound", "graph_node_outbound": "outbound",
+        "graph_dead_ends": "Dead ends", "graph_dead_ends_hint": "Show nodes with no outgoing links in the bounded graph projection.", "graph_disconnected": "Disconnected", "graph_disconnected_hint": "Show nodes outside the connected component of the selected graph projection.", "graph_load": "Load graph", "graph_algorithm": "Authority algorithm", "graph_url": "URL", "graph_in": "In", "graph_out": "Out", "graph_authority": "Authority", "graph_loaded": "Loaded {loaded} of {total} nodes", "graph_failed": "Graph failed", "graph_node_inbound": "inbound", "graph_node_outbound": "outbound", "graph_node_cap": "Node cap", "graph_node_cap_hint": "Maximum number of nodes requested and rendered; larger graphs stay bounded.", "graph_min_authority": "Minimum authority", "graph_min_authority_hint": "Display only nodes at or above this normalized authority score.", "graph_depth": "Depth", "graph_depth_hint": "Filter the stored graph projection by crawl depth.", "graph_depth_all": "All depths", "graph_depth_root": "Root (0)", "graph_depth_1": "Depth 1", "graph_depth_2": "Depth 2", "graph_depth_3_plus": "Depth 3+", "graph_visual": "Visual projection", "graph_visual_hint": "A bounded offline projection of stored graph nodes. Node size represents authority; colors distinguish dead ends and disconnected pages.", "graph_no_edges": "No stored edges are available for the visual projection.",
         "duplicate_clusters": "Duplicate clusters",
         "duplicate_clusters_hint": "Compare exact and near-duplicate content signatures from the stored run. Loading results does not start a new crawl.",
         "duplicate_all": "All", "duplicate_exact": "Exact", "duplicate_near": "Near", "duplicate_kind_hint": "Filter clusters by exact or near-duplicate similarity.", "duplicate_load": "Load clusters", "duplicates_loaded": "Loaded {loaded} of {total} clusters", "duplicate_failed": "Duplicate query failed",
@@ -310,6 +312,7 @@ _TEXT = {
         "progress_crawl": "Crawl: {fetched} fetched / {discovered} discovered",
         "progress_crawl_phase": "Audit stage: {phase}",
         "progress_done": "Audit complete",
+        "task_status": "Task status", "task_status_hint": "Open the local task monitor to see running, completed, failed, and cancelled audits.", "task_status_empty": "No audit tasks have been submitted.", "task_status_refresh": "Refresh", "task_status_close": "Close", "task_status_cancel": "Cancel", "task_status_age": "age", "task_status_stale": "no progress for {seconds}s",
         "failed": "Audit failed",
         "no_url": "Enter a website URL first.",
         "catalog_error": "Unable to load the check catalog.",
@@ -569,6 +572,8 @@ _TEXT = {
         "v2_discovery_sitemap": "XML sitemap",
         "v2_discovery_robots": "Sitemap из robots",
         "v2_discovery_crawl": "Все обнаруженные страницы (с ограничениями)",
+        "v2_full_discovered": "Проверить полный набор обнаруженных страниц (до лимита сервера)",
+        "v2_full_discovered_hint": "Выполняет обход до исчерпания очереди обнаруженных страниц или жёсткого серверного лимита 25 000 страниц.",
         "v2_inventory_hint": "Просмотр ограниченного серверного инвентаря последнего обхода.",
         "v2_inventory_kind_hint": "Выберите проекцию инвентаря для просмотра в последнем завершённом запуске.",
         "v2_rows_hint": "Максимальное число строк на одной странице инвентаря.",
@@ -593,7 +598,7 @@ _TEXT = {
         "custom_rules_valid": "Правила корректны", "custom_rules_validation_failed": "Ошибка проверки", "custom_rules_preview_complete": "Предпросмотр завершён; обход не запускался", "custom_rules_preview_failed": "Ошибка предпросмотра",
         "link_graph": "Граф ссылок",
         "link_graph_hint": "Загружает ограниченную проекцию графа по сохранённым вхождениям ссылок. Фильтры влияют только на экран и не запускают обход.",
-        "graph_dead_ends": "Тупиковые страницы", "graph_dead_ends_hint": "Показывает узлы без исходящих ссылок в ограниченной проекции графа.", "graph_disconnected": "Изолированные страницы", "graph_disconnected_hint": "Показывает узлы вне связной компоненты выбранной проекции графа.", "graph_load": "Загрузить граф", "graph_algorithm": "Алгоритм авторитетности", "graph_url": "URL", "graph_in": "Входящие", "graph_out": "Исходящие", "graph_authority": "Авторитетность", "graph_loaded": "Загружено узлов: {loaded} из {total}", "graph_failed": "Ошибка графа", "graph_node_inbound": "входящих", "graph_node_outbound": "исходящих",
+        "graph_dead_ends": "Тупиковые страницы", "graph_dead_ends_hint": "Показывает узлы без исходящих ссылок в ограниченной проекции графа.", "graph_disconnected": "Изолированные страницы", "graph_disconnected_hint": "Показывает узлы вне связной компоненты выбранной проекции графа.", "graph_load": "Загрузить граф", "graph_algorithm": "Алгоритм авторитетности", "graph_url": "URL", "graph_in": "Входящие", "graph_out": "Исходящие", "graph_authority": "Авторитетность", "graph_loaded": "Загружено узлов: {loaded} из {total}", "graph_failed": "Ошибка графа", "graph_node_inbound": "входящих", "graph_node_outbound": "исходящих", "graph_node_cap": "Лимит узлов", "graph_node_cap_hint": "Максимальное число запрошенных и отображаемых узлов; большие графы остаются ограниченными.", "graph_min_authority": "Минимальная авторитетность", "graph_min_authority_hint": "Показывает только узлы с нормализованной авторитетностью не ниже указанной.", "graph_depth": "Глубина", "graph_depth_hint": "Фильтрует сохранённую проекцию графа по глубине обхода.", "graph_depth_all": "Все уровни", "graph_depth_root": "Корень (0)", "graph_depth_1": "Уровень 1", "graph_depth_2": "Уровень 2", "graph_depth_3_plus": "Уровень 3+", "graph_visual": "Визуальная проекция", "graph_visual_hint": "Ограниченная offline-проекция сохранённых узлов графа. Размер узла показывает авторитетность, цвет — тупиковые и изолированные страницы.", "graph_no_edges": "Сохранённые связи недоступны для визуальной проекции.",
         "duplicate_clusters": "Кластеры дубликатов",
         "duplicate_clusters_hint": "Сравнивает точные и близкие сигнатуры дубликатов сохранённого запуска. Загрузка результатов не запускает новый обход.",
         "duplicate_all": "Все", "duplicate_exact": "Точные", "duplicate_near": "Близкие", "duplicate_kind_hint": "Фильтрует кластеры по точному или близкому сходству дубликатов.", "duplicate_load": "Загрузить кластеры", "duplicates_loaded": "Загружено кластеров: {loaded} из {total}", "duplicate_failed": "Ошибка запроса дубликатов",
@@ -629,6 +634,7 @@ _TEXT = {
         "progress_crawl": "Обход: загружено {fetched}, найдено {discovered}",
         "progress_crawl_phase": "Этап аудита: {phase}",
         "progress_done": "Аудит завершён",
+        "task_status": "Состояние задач", "task_status_hint": "Откройте монитор локальных задач: выполняются, завершены, завершились ошибкой или отменены.", "task_status_empty": "Задачи аудита ещё не запускались.", "task_status_refresh": "Обновить", "task_status_close": "Закрыть", "task_status_cancel": "Отменить", "task_status_age": "возраст", "task_status_stale": "нет прогресса {seconds} с",
         "failed": "Аудит завершился ошибкой",
         "no_url": "Сначала укажите URL сайта.",
         "catalog_error": "Не удалось загрузить каталог проверок.",
@@ -818,13 +824,14 @@ details summary {{ cursor:pointer; font-weight:700; margin-bottom:16px; }} detai
 #checks {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:14px; }}
 .check {{ border:1px solid #efcdb8; border-radius:10px; padding:12px; display:grid; grid-template-columns:auto 1fr; gap:10px; }}
 .check input {{ width:auto; margin-top:4px; }} .check strong {{ display:inline; }} .check small {{ display:block; line-height:1.4; margin-top:4px; color:#6c554b; }}
-#link-graph-panel input[type=checkbox] {{ width:auto; min-width:20px; min-height:20px; padding:0; margin:0 6px 0 0; vertical-align:middle; }} #link-graph-panel label {{ display:inline-flex; align-items:center; gap:4px; margin:0 14px 10px 0; }}
+#link-graph-panel input[type=checkbox] {{ width:auto; min-width:20px; min-height:20px; padding:0; margin:0 6px 0 0; vertical-align:middle; }} #link-graph-panel label {{ display:inline-flex; align-items:center; gap:4px; margin:0 14px 10px 0; }} .link-graph-visual {{ min-height:300px; overflow:auto; border:1px solid #d7dee7; border-radius:8px; background:#f8fafc; }} .link-graph-visual svg {{ display:block; min-width:520px; }} .link-graph-edge {{ stroke:#94a3b8; stroke-width:1; stroke-opacity:.55; }} .link-graph-node {{ cursor:pointer; outline:none; }} .link-graph-node:focus circle, .link-graph-node:hover circle {{ stroke:#111827; stroke-width:2; }}
 .hint {{ position:relative; display:inline-flex; align-items:center; justify-content:center; width:21px; height:21px; min-width:21px; min-height:21px; margin-left:6px; border:1px solid #ed4308; border-radius:50%; background:#fff8f2; color:#9e2f0b; font-size:.82rem; font-weight:700; line-height:1; cursor:help; vertical-align:middle; }}
 .hint:hover::after,.hint:focus::after {{ content:attr(data-tooltip); position:absolute; z-index:20; left:0; top:26px; width:min(340px,80vw); padding:10px 12px; border-radius:10px; background:#24130d; color:#ffe8d8; font-size:.85rem; font-weight:400; line-height:1.45; white-space:pre-line; text-align:left; box-shadow:0 6px 18px #0005; }}
 #result {{ min-height:80px; background:#fff8f2; color:#441d0c; border:1px solid #efcdb8; border-radius:12px; padding:18px; }}
 #progress {{ border:1px solid #efcdb8; border-radius:12px; padding:14px; margin-bottom:14px; background:#fff8f2; }}
 #progress[hidden] {{ display:none; }} .progress-track {{ height:8px; background:#f1d8c8; border-radius:8px; overflow:hidden; margin:10px 0; }}
 #progress-bar {{ display:block; height:100%; width:8%; background:#ed4308; transition:width .3s ease; }}
+#task-status-dialog {{ width:min(760px,calc(100% - 32px)); border:1px solid #efcdb8; border-radius:12px; padding:20px; }} #task-status-dialog::backdrop {{ background:#1f293766; }} .task-status-list {{ display:grid; gap:8px; max-height:55vh; overflow:auto; }} .task-status-row {{ display:grid; grid-template-columns:minmax(120px,1fr) auto minmax(180px,2fr) auto; gap:10px; align-items:center; border:1px solid #efcdb8; border-radius:8px; padding:9px; }} .task-status-row small {{ color:#765b4d; }}
 #ai-credentials-dialog.provider-busy {{ opacity:.72; }} #ai-credentials-dialog.provider-busy .model-control::after {{ content:""; width:14px; height:14px; border:2px solid #efcdb8; border-top-color:#ed4308; border-radius:50%; animation:provider-spin .8s linear infinite; }} @keyframes provider-spin {{ to {{ transform:rotate(360deg); }} }}
 #progress-steps {{ display:flex; justify-content:space-between; gap:8px; font-size:.85rem; color:#765b4d; }}
 #report-frame {{ width:100%; min-height:720px; border:0; background:#fff; border-radius:8px; }}
@@ -970,18 +977,20 @@ header .help-header-button {{ width:auto; min-width:120px; }}
 <label><input id="verify" type="checkbox" style="width:auto;margin-right:8">{escape(text["verify"])} {_hint(text, "verify_hint")}</label>
 </div><div class="form-grid three" style="margin-top:14px">
 <div><label for="v2-profile">{escape(text["v2_profile"])} {_hint(text, "v2_profile_hint")}</label><select id="v2-profile"><option value="quick">{escape(text["v2_profile_quick"])}</option><option value="standard">{escape(text["v2_profile_standard"])}</option><option value="deep">{escape(text["v2_profile_deep"])}</option></select></div>
-<div><label for="v2-discovery">{escape(text["v2_discovery"])} {_hint(text, "v2_discovery_hint")}</label><select id="v2-discovery"><option value="single">{escape(text["v2_discovery_single"])}</option><option value="list">{escape(text["v2_discovery_list"])}</option><option value="sitemap">{escape(text["v2_discovery_sitemap"])}</option><option value="robots-sitemap">{escape(text["v2_discovery_robots"])}</option><option value="crawl">{escape(text["v2_discovery_crawl"])}</option></select></div>
+<div><label for="v2-discovery">{escape(text["v2_discovery"])} {_hint(text, "v2_discovery_hint")}</label><select id="v2-discovery" onchange="syncFullDiscoveredControl()"><option value="single">{escape(text["v2_discovery_single"])}</option><option value="list">{escape(text["v2_discovery_list"])}</option><option value="sitemap">{escape(text["v2_discovery_sitemap"])}</option><option value="robots-sitemap">{escape(text["v2_discovery_robots"])}</option><option value="crawl">{escape(text["v2_discovery_crawl"])}</option></select></div>
 <div><label for="v2-max-pages">{escape(text["v2_max_pages"])} {_hint(text, "v2_max_pages_hint")}</label><input id="v2-max-pages" type="number" min="0" max="25000" value="3"></div>
 <div><label for="v2-max-depth">{escape(text["v2_max_depth"])} {_hint(text, "v2_max_depth_hint")}</label><input id="v2-max-depth" type="number" min="0" max="32" placeholder="профиль"></div>
 <label><input id="v2-render" type="checkbox" style="width:auto;margin-right:8">{escape(text["v2_render"])} {_hint(text, "v2_render_hint")}</label>
+<label><input id="v2-full-discovered" type="checkbox" style="width:auto;margin-right:8">{escape(text["v2_full_discovered"])} {_hint(text, "v2_full_discovered_hint")}</label>
 </div></details>
-<div class="advanced-links"><div class="advanced-link-row"><a href="#" class="text-link" onclick="loadChecks(); return false;">{escape(text["checks"])}</a>{_hint(text, "refresh_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="runHealth(); return false;">{escape(text["health"])}</a>{_hint(text, "health_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="openAiCredentials(); return false;">{escape(text["ai_credentials"])}</a>{_hint(text, "ai_credentials_hint")}</div><div class="advanced-link-row"><label style="font-weight:700;margin:0"><input id="debug" type="checkbox" style="width:auto;margin-right:6px">{escape(text["debug"])}</label>{_hint(text, "debug_hint")}</div></div>
+<div class="advanced-links"><div class="advanced-link-row"><a href="#" class="text-link" onclick="loadChecks(); return false;">{escape(text["checks"])}</a>{_hint(text, "refresh_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="runHealth(); return false;">{escape(text["health"])}</a>{_hint(text, "health_hint")}</div><div class="advanced-link-row"><a href="#" class="text-link" onclick="openAiCredentials(); return false;">{escape(text["ai_credentials"])}</a>{_hint(text, "ai_credentials_hint")}</div><div class="advanced-link-row"><button type="button" class="text-link" onclick="openTaskStatus()">{escape(text["task_status"])}</button>{_hint(text, "task_status_hint")}</div><div class="advanced-link-row"><label style="font-weight:700;margin:0"><input id="debug" type="checkbox" style="width:auto;margin-right:6px">{escape(text["debug"])}</label>{_hint(text, "debug_hint")}</div></div>
 </section>
 <dialog id="ai-credentials-dialog"><form method="dialog" onsubmit="return false;"><h2>{escape(text["ai_credentials"])}</h2><p>{escape(text["ai_credentials_hint"])}</p><label for="ai-provider">{escape(text["ai_provider"])}</label><select id="ai-provider" onchange="selectAiProvider()"></select><div class="actions"><button type="button" class="secondary" onclick="newAiProvider()">{escape(text["ai_new"])}</button></div><div class="form-grid four" style="margin-top:14px"><div><label for="ai-provider-name">{escape(text["ai_provider_name"])}</label><input id="ai-provider-name" maxlength="100"></div><div><label for="ai-provider-url">{escape(text["ai_provider_url"])} {_hint(text, "ai_provider_url_hint")}</label><input id="ai-provider-url" type="url" maxlength="500"></div><div><label for="ai-provider-model">{escape(text["ai_model"])} {_hint(text, "ai_model_hint")}</label><div class="model-control"><select id="ai-provider-model"></select><button id="ai-provider-model-refresh" type="button" class="secondary" title="{escape(text["model_refresh"])}" aria-label="{escape(text["model_refresh"])}" onclick="refreshAiModels()">↻</button></div></div><div><label for="ai-key">{escape(text["ai_key"])}</label><input id="ai-key" type="password" autocomplete="off" maxlength="1000"></div></div><label style="margin-top:14px"><input id="ai-provider-chat-only" type="checkbox" onchange="toggleChatOnly()" style="width:auto;margin-right:8px">{escape(text["model_chat_only"])} {_hint(text, "model_chat_only_hint")}</label><label style="margin-top:14px"><input id="ai-enable" type="checkbox" style="width:auto;margin-right:8px">{escape(text["ai_enable"])} {_hint(text, "ai_enable_hint")}</label><div class="actions"><button type="button" onclick="saveAiProvider()">{escape(text["ai_save"])}</button><button type="button" class="secondary" onclick="activateAiProvider()">{escape(text["ai_activate"])}</button><button type="button" class="secondary" onclick="clearAiProvider()">{escape(text["ai_clear"])}</button><button type="button" class="secondary" onclick="document.getElementById('ai-credentials-dialog').close()">{escape(text["ai_close"])}</button></div><p id="ai-credentials-result" role="status" aria-live="polite"></p></form></dialog>
 <section class="panel"><details><summary>{escape(text["select_checks"])} <h2 class="sr-only">{escape(text["select_checks"])}</h2></summary><div class="section-hint">{_hint(text, "checks_hint")}</div><div class="checks-toolbar"><div></div><div class="actions"><span><button class="secondary" onclick="selectApplicable(true)">{escape(text["all_checks"])}</button>{_hint(text, "select_all_hint")}</span><span><button class="secondary" onclick="selectApplicable(false)">{escape(text["clear_checks"] )}</button>{_hint(text, "clear_checks_hint")}</span></div></div><div id="checks"></div></details></section>
 <section id="result-panel" class="panel" hidden><h2>{escape(text["result"])}</h2>
-<div id="progress" hidden role="status" aria-live="polite"><strong>{escape(text["progress_title"])}</strong><div id="crawl-progress" class="progress-substatus" hidden><span id="crawl-progress-phase"></span><span id="crawl-progress-count"></span></div><div class="progress-track"><span id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="{escape(text["progress_start"])}"></span></div><div id="progress-steps"><span>{escape(text["progress_start"])}</span><span>{escape(text["progress_fetch"])}</span><span>{escape(text["progress_render"])}</span></div></div>
+<div id="progress" hidden role="status" aria-live="polite"><strong>{escape(text["progress_title"])}</strong><button type="button" class="secondary" onclick="openTaskStatus()" title="{escape(text["task_status_hint"])}">{escape(text["task_status"])}</button><div id="crawl-progress" class="progress-substatus" hidden><span id="crawl-progress-phase"></span><span id="crawl-progress-count"></span></div><div class="progress-track"><span id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="{escape(text["progress_start"])}"></span></div><div id="progress-steps"><span>{escape(text["progress_start"])}</span><span>{escape(text["progress_fetch"])}</span><span>{escape(text["progress_render"])}</span></div></div>
 <div id="result" hidden role="status" aria-live="polite">{escape(text["ready"])}</div></section>
+<dialog id="task-status-dialog" aria-labelledby="task-status-title"><h2 id="task-status-title">{escape(text["task_status"])}</h2><p>{escape(text["task_status_hint"])}</p><div id="task-status-list" class="task-status-list" role="region" aria-live="polite"></div><div class="actions"><button type="button" class="secondary" onclick="refreshTaskStatus()">{escape(text["task_status_refresh"])}</button><button type="button" class="secondary" onclick="document.getElementById('task-status-dialog').close()">{escape(text["task_status_close"])}</button></div></dialog>
 <section id="v2-inventory-panel" class="panel" hidden aria-labelledby="v2-inventory-title">
 <h2 id="v2-inventory-title">{escape(text["v2_inventory"])} {_hint(text, "v2_inventory_hint")}</h2>
 <div class="inventory-toolbar">
@@ -1040,8 +1049,9 @@ rules:
 <section id="link-graph-panel" class="panel" hidden aria-labelledby="link-graph-title">
 <h2 id="link-graph-title">{escape(text["link_graph"])} {_hint(text, "link_graph_hint")}</h2>
 <p class="section-hint">{escape(text["link_graph_hint"])}</p>
-<div><label><input id="link-graph-dead-end" type="checkbox"> {escape(text["graph_dead_ends"])} {_hint(text, "graph_dead_ends_hint")}</label><label><input id="link-graph-disconnected" type="checkbox"> {escape(text["graph_disconnected"])} {_hint(text, "graph_disconnected_hint")}</label><button type="button" class="secondary" onclick="loadLinkGraph()">{escape(text["graph_load"])}</button></div>
-<div id="link-graph-status" role="status" aria-live="polite"></div><div id="link-graph-result" role="region" aria-live="polite"></div>
+<div class="form-grid four"><label for="link-graph-node-cap">{escape(text["graph_node_cap"])} {_hint(text, "graph_node_cap_hint")}</label><select id="link-graph-node-cap"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option></select><label for="link-graph-min-authority">{escape(text["graph_min_authority"])} {_hint(text, "graph_min_authority_hint")}</label><input id="link-graph-min-authority" type="number" min="0" max="1" step="0.01" value="0"></div>
+<div class="form-grid four"><label for="link-graph-depth">{escape(text["graph_depth"])} {_hint(text, "graph_depth_hint")}</label><select id="link-graph-depth"><option value="all">{escape(text["graph_depth_all"])}</option><option value="0">{escape(text["graph_depth_root"])}</option><option value="1">{escape(text["graph_depth_1"])}</option><option value="2">{escape(text["graph_depth_2"])}</option><option value="3+">{escape(text["graph_depth_3_plus"])}</option></select><label><input id="link-graph-dead-end" type="checkbox"> {escape(text["graph_dead_ends"])} {_hint(text, "graph_dead_ends_hint")}</label><label><input id="link-graph-disconnected" type="checkbox"> {escape(text["graph_disconnected"])} {_hint(text, "graph_disconnected_hint")}</label><button type="button" class="secondary" onclick="loadLinkGraph()">{escape(text["graph_load"])}</button></div>
+<div id="link-graph-status" role="status" aria-live="polite"></div><div id="link-graph-result" role="region" aria-live="polite"></div><h3>{escape(text["graph_visual"])} {_hint(text, "graph_visual_hint")}</h3><div id="link-graph-visual" role="img" aria-label="{escape(text["graph_visual"])}" class="link-graph-visual"></div>
 </section>
 <section id="duplicate-clusters-panel" class="panel" hidden aria-labelledby="duplicate-clusters-title">
 <h2 id="duplicate-clusters-title">{escape(text["duplicate_clusters"])} {_hint(text, "duplicate_clusters_hint")}</h2>
@@ -1112,7 +1122,7 @@ helpToggle.onclick = () => {{
 const dashboardStateKey = "agentready.dashboard.state.v2";
 const dashboardStateCacheKey = "/dashboard/state";
 const dashboardReportKey = "agentready.dashboard.report.v2";
-const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-discovery","v2-max-pages","v2-max-depth","v2-render","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only","robots-live","robots-proposed","robots-user-agents","sitemap-reconciliation-origin","sitemap-reconciliation-xml","custom-rules-document","link-graph-dead-end","link-graph-disconnected","duplicate-clusters-kind","project-id","project-name"];
+const dashboardStateIds = ["url","content-url","commerce-url","preset","timeout","workers","threshold","recommendations","check-limit","verify","debug","v2-profile","v2-discovery","v2-max-pages","v2-max-depth","v2-render","v2-full-discovered","ai-mode","ai-chat-provider","ai-model","ai-message","ai-provider","ai-provider-chat-only","robots-live","robots-proposed","robots-user-agents","sitemap-reconciliation-origin","sitemap-reconciliation-xml","custom-rules-document","link-graph-node-cap","link-graph-min-authority","link-graph-depth","link-graph-dead-end","link-graph-disconnected","duplicate-clusters-kind","project-id","project-name"];
 let dashboardStateSaveTimer = null;
 function readDashboardState() {{
   try {{
@@ -1159,7 +1169,8 @@ function restoreDashboardState() {{
     if (id === "robots-live" && typeof state[id] === "string" && state[id].trim()) element.dataset.userEdited = "true";
   }});
   const toolsPanel = document.getElementById("tools-panel");
-  if (toolsPanel && typeof state["tools-open"] === "boolean") toolsPanel.open = state["tools-open"];
+    if (toolsPanel && typeof state["tools-open"] === "boolean") toolsPanel.open = state["tools-open"];
+  syncFullDiscoveredControl();
   return state;
 }}
 async function restoreDashboardStateFromCache() {{
@@ -1178,6 +1189,7 @@ async function restoreDashboardStateFromCache() {{
     }});
     const toolsPanel = document.getElementById("tools-panel");
     if (toolsPanel && local["tools-open"] === undefined && typeof cached["tools-open"] === "boolean") toolsPanel.open = cached["tools-open"];
+    syncFullDiscoveredControl();
     console.info("[FIX:dashboard-state] State restored from cache", {{fields:Object.keys(cached).length}});
   }} catch (error) {{ console.warn("[FIX:dashboard-state] Unable to restore state from cache", {{error:String(error)}}); }}
 }}
@@ -1186,7 +1198,7 @@ restoreDashboardStateFromCache();
 language.onchange = () => {{ saveDashboardState(); location.search = "?language=" + language.value; }};
 dashboardStateIds.forEach(id => {{
   const element = document.getElementById(id);
-  if (element) element.addEventListener(element.type === "checkbox" ? "change" : "input", saveDashboardState);
+  if (element) element.addEventListener(element.type === "checkbox" ? "change" : "input", () => {{ if (id === "v2-full-discovered") syncFullDiscoveredControl(); saveDashboardState(); }});
 }});
 let catalog = [];
 const result = document.getElementById("result");
@@ -1300,7 +1312,7 @@ function scanPayload() {{
   const preset = document.getElementById("preset").value;
   const applicable = catalog.filter(item => item.presets.includes(preset)).map(item => item.id);
   const selected = selectedChecks();
-  const payload = {{url:document.getElementById("url").value, preset, profile:document.getElementById("v2-profile").value, discovery_kind:document.getElementById("v2-discovery").value,
+  const payload = {{url:document.getElementById("url").value, preset, profile:document.getElementById("v2-profile").value, discovery_kind:selectedV2Discovery(),
     max_pages:selectedV2MaxPages(), language:language.value,
     content_url:document.getElementById("content-url").value || null, commerce_url:document.getElementById("commerce-url").value || null,
     include:selected.filter(id => !applicable.includes(id)), exclude:applicable.filter(id => !selected.includes(id)),
@@ -1312,6 +1324,26 @@ function scanPayload() {{
 }}
 function setProgress(percent, message) {{ showResult(); progress.hidden = false; progressBar.style.width = percent + "%"; progressBar.setAttribute("aria-valuenow", String(percent)); progressBar.setAttribute("aria-valuetext", message); result.textContent = message; }}
 function setCrawlProgress(progressData) {{ if (!progressData) return; crawlProgress.hidden = false; crawlProgressPhase.textContent = translations[language.value].progress_crawl_phase.replace("{{phase}}", progressData.phase || "crawl"); crawlProgressCount.textContent = translations[language.value].progress_crawl.replace("{{fetched}}", String(progressData.fetched || 0)).replace("{{discovered}}", String(progressData.discovered || 0)); }}
+let taskStatusTimer = null;
+function taskStatusLabel(status) {{ const labels = {{running:language.value === "ru" ? "выполняется" : "running",pending:language.value === "ru" ? "ожидает" : "pending",completed:language.value === "ru" ? "завершена" : "completed",failed:language.value === "ru" ? "ошибка" : "failed",cancelled:language.value === "ru" ? "отменена" : "cancelled"}}; return labels[status] || status; }}
+async function refreshTaskStatus() {{
+  const host = document.getElementById("task-status-list");
+  if (!host) return;
+  try {{
+    const response = await fetch("/v2/jobs");
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const items = (await response.json()).items || [];
+    const t = translations[language.value];
+    host.innerHTML = items.length ? items.map(item => {{
+      const progress = item.progress || {{}};
+      const stale = item.status === "running" && Number(item.updated_age_seconds || 0) >= 30 ? `<small>${{escapeHtml(t.task_status_stale.replace("{{seconds}}", String(item.updated_age_seconds)))}}</small>` : "";
+      const cancel = ["running", "pending"].includes(item.status) ? `<button type="button" class="secondary" onclick="cancelTaskStatus('${{escapeHtml(item.id)}}')">${{escapeHtml(t.task_status_cancel)}}</button>` : "";
+      return `<div class="task-status-row"><code>${{escapeHtml(item.id.slice(0,12))}}</code><strong>${{escapeHtml(taskStatusLabel(item.status))}}</strong><span>${{escapeHtml(String(progress.phase || "—"))}} · ${{escapeHtml(String(progress.fetched || 0))}}/${{escapeHtml(String(progress.discovered || 0))}} ${{stale}}</span>${{cancel}}</div>`;
+    }}).join("") : `<p>${{escapeHtml(t.task_status_empty)}}</p>`;
+  }} catch (error) {{ host.textContent = translations[language.value].failed + ": " + error.message; }}
+}}
+async function cancelTaskStatus(jobId) {{ try {{ await fetch("/v2/jobs/" + encodeURIComponent(jobId) + "/cancel", {{method:"POST"}}); await refreshTaskStatus(); }} catch (error) {{ console.warn("[FIX:dashboard-progress] Task cancellation failed", {{job_id:jobId, error:String(error)}}); }} }}
+function openTaskStatus() {{ const dialog = document.getElementById("task-status-dialog"); if (!dialog) return; dialog.showModal(); refreshTaskStatus(); clearInterval(taskStatusTimer); taskStatusTimer = setInterval(refreshTaskStatus, 2000); dialog.addEventListener("close", () => {{ clearInterval(taskStatusTimer); taskStatusTimer = null; }}, {{once:true}}); }}
 function safeDashboardTarget(value) {{
   try {{
     const raw = String(value || "").trim();
@@ -1359,8 +1391,18 @@ function createReportActions(reportText, frame) {{
 }}
 const v2ProfileDefaults = {{quick:3, standard:25, deep:100}};
 let v2LastProfile = document.getElementById("v2-profile").value;
-function selectedV2MaxPages() {{ const value = Number(document.getElementById("v2-max-pages").value); return Number.isFinite(value) && value >= 0 ? value : 3; }}
+function selectedV2MaxPages() {{ if (document.getElementById("v2-full-discovered")?.checked) return 25000; const value = Number(document.getElementById("v2-max-pages").value); return Number.isFinite(value) && value >= 0 ? value : 3; }}
+function selectedV2Discovery() {{ return document.getElementById("v2-full-discovered")?.checked ? "crawl" : document.getElementById("v2-discovery").value; }}
+function syncFullDiscoveredControl() {{ const full = document.getElementById("v2-full-discovered"); const limit = document.getElementById("v2-max-pages"); const discovery = document.getElementById("v2-discovery"); if (!full || !limit || !discovery) return; const applicable = discovery.value === "crawl"; if (!applicable) full.checked = false; full.disabled = !applicable; limit.disabled = full.checked; limit.setAttribute("aria-readonly", full.checked ? "true" : "false"); }}
 function selectedV2Limits() {{ const value = document.getElementById("v2-max-depth").value.trim(); return value === "" ? {{check_limit:Number(document.getElementById("check-limit").value) || 0}} : {{check_limit:Number(document.getElementById("check-limit").value) || 0,max_depth:Math.max(0,Math.min(32,Number(value)))}}; }}
+async function cancelActiveV2Job() {{
+  const jobId = activeV2JobId;
+  if (!jobId) return;
+  activeV2JobId = null;
+  localStorage.removeItem("agentready.dashboard.job.v2");
+  try {{ await fetch("/v2/jobs/" + encodeURIComponent(jobId) + "/cancel", {{method:"POST"}}); console.info("[FIX:dashboard-progress] Previous audit job cancelled", {{job_id:jobId}}); }}
+  catch (error) {{ console.warn("[FIX:dashboard-progress] Unable to cancel previous audit job", {{job_id:jobId, error:String(error)}}); }}
+}}
 function inventoryColumnLabel(column) {{ const labels = {{url:"URL",status:translations[language.value].v2_sort_status,depth:translations[language.value].v2_sort_depth,title:translations[language.value].v2_sort_title,anchor:translations[language.value].v2_sort_anchor,type:translations[language.value].v2_sort_type,resource:translations[language.value].v2_sort_resource}}; return labels[column] || column; }}
 function syncV2ProfileBudget() {{
   const profile = document.getElementById("v2-profile").value;
@@ -1549,6 +1591,7 @@ async function request(path, method="GET", body=null, html=false, showOutput=tru
 }}
 async function runScan() {{
   if (!document.getElementById("url").value) {{ showResult(); result.textContent = translations[language.value].no_url; return; }}
+  await cancelActiveV2Job();
   logDashboardAction("audit.start", {{target:safeDashboardTarget(document.getElementById("url").value), preset:document.getElementById("preset").value, profile:document.getElementById("v2-profile").value, max_pages:selectedV2MaxPages()}});
   if (aiConversationHistory.length && !(await startNewChat())) {{
     showResult(); finishProgress(false); result.textContent = translations[language.value].failed;
@@ -1578,9 +1621,9 @@ async function runV2() {{
   }}
 }}
 async function runV2Background() {{
-  const payload = {{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,max_pages:selectedV2MaxPages(),limits:selectedV2Limits(),render:document.getElementById("v2-render").checked,timeout:Number(document.getElementById("timeout").value),language:language.value}};
+  const payload = {{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,discovery_kind:selectedV2Discovery(),max_pages:selectedV2MaxPages(),limits:selectedV2Limits(),render:document.getElementById("v2-render").checked,timeout:Number(document.getElementById("timeout").value),language:language.value}};
   const response = await fetch("/v2/jobs", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify(payload)}});
-  if (!response.ok) throw new Error("HTTP " + response.status);
+  if (!response.ok) {{ let detail = ""; try {{ const errorPayload = await response.json(); detail = errorPayload.detail || ""; }} catch (_) {{}} throw new Error("HTTP " + response.status + (detail ? ": " + detail : "")); }}
   const job = await response.json(); activeV2JobId = job.job_id; localStorage.setItem("agentready.dashboard.job.v2", activeV2JobId); setCrawlProgress({{phase:"queued",fetched:0,discovered:0}});
   while (activeV2JobId) {{
     const jobId = activeV2JobId;
@@ -1653,12 +1696,38 @@ async function validateCustomRules() {{
 async function debugCustomRules() {{
   const status = document.getElementById("custom-rules-status");
   try {{
-    const response = await fetch("/v2/custom-rules/debug", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{rules:document.getElementById("custom-rules-document").value, url:document.getElementById("url").value, text:(window.agentreadyV2Report || {{}}).target || ""}})}});
+    const runId = dashboardRunId();
+    const target = document.getElementById("url").value;
+    const response = await fetch("/v2/custom-rules/debug", {{method:"POST", headers:{{"Content-Type":"application/json"}}, body:JSON.stringify({{rules:document.getElementById("custom-rules-document").value, url:target, url_key:target, run_id:runId}})}});
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "debug failed");
     document.getElementById("custom-rules-result").textContent = JSON.stringify(payload, null, 2);
     status.textContent = translations[language.value].custom_rules_preview_complete;
   }} catch (error) {{ status.textContent = translations[language.value].custom_rules_preview_failed + ": " + error.message; }}
+}}
+
+function renderLinkGraphVisual(payload) {{
+  const host = document.getElementById("link-graph-visual");
+  const t = translations[language.value];
+  const items = (payload.items || []).slice(0, 100);
+  if (!items.length) {{ host.innerHTML = `<p>${{escapeHtml(t.graph_no_edges)}}</p>`; return; }}
+  const width = 760, height = 300, pad = 24;
+  const maxAuthority = Math.max(...items.map(item => Number(item.authority) || 0), 0.0001);
+  const points = items.map((item, index) => {{
+    const columns = Math.max(1, Math.ceil(Math.sqrt(items.length)));
+    const row = Math.floor(index / columns), column = index % columns;
+    const x = pad + (width - 2 * pad) * ((column + 0.5) / columns);
+    const rows = Math.ceil(items.length / columns);
+    const y = pad + (height - 2 * pad) * ((row + 0.5) / rows);
+    const radius = 5 + 12 * Math.sqrt((Number(item.authority) || 0) / maxAuthority);
+    const color = item.disconnected ? "#64748b" : (item.dead_end ? "#d97706" : "#0f766e");
+    return {{...item, x, y, radius, color}};
+  }});
+  const byUrl = new Map(points.map(point => [point.url, point]));
+  const edges = (payload.edges || []).filter(edge => byUrl.has(edge.source) && byUrl.has(edge.target)).slice(0, 500);
+  const lines = edges.map(edge => {{ const source = byUrl.get(edge.source), target = byUrl.get(edge.target); return `<line x1="${{source.x.toFixed(1)}}" y1="${{source.y.toFixed(1)}}" x2="${{target.x.toFixed(1)}}" y2="${{target.y.toFixed(1)}}" class="link-graph-edge" />`; }}).join("");
+  const nodes = points.map(point => `<g class="link-graph-node" tabindex="0" role="button" aria-label="${{escapeHtml(point.url)}}" data-url="${{escapeHtml(point.url)}}" onclick="loadLinkGraphNode(this.dataset.url)" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();loadLinkGraphNode(this.dataset.url)}}"><circle cx="${{point.x.toFixed(1)}}" cy="${{point.y.toFixed(1)}}" r="${{point.radius.toFixed(1)}}" fill="${{point.color}}"><title>${{escapeHtml(point.url)}} — ${{Number(point.authority || 0).toFixed(4)}}</title></circle></g>`).join("");
+  host.innerHTML = `<svg viewBox="0 0 ${{width}} ${{height}}" width="100%" height="300" role="img" aria-label="${{escapeHtml(t.graph_visual)}}">${{lines}}${{nodes}}</svg>`;
 }}
 
 async function loadLinkGraph() {{
@@ -1668,15 +1737,21 @@ async function loadLinkGraph() {{
   if (!runId) {{ status.textContent = translations[language.value].run_audit_first; return; }}
   const deadEnd = document.getElementById("link-graph-dead-end").checked;
   const disconnected = document.getElementById("link-graph-disconnected").checked;
-  const query = new URLSearchParams({{limit:"100", dead_end:String(deadEnd), disconnected:String(disconnected)}});
+  const nodeCap = Math.min(100, Math.max(25, Number(document.getElementById("link-graph-node-cap").value) || 100));
+  const minAuthority = Math.min(1, Math.max(0, Number(document.getElementById("link-graph-min-authority").value) || 0));
+  const depth = document.getElementById("link-graph-depth").value;
+  const query = new URLSearchParams({{limit:String(nodeCap), dead_end:String(deadEnd), disconnected:String(disconnected)}});
+  try {{ query.set("origin", new URL(safeDashboardTarget(document.getElementById("url").value)).origin); }} catch (_) {{ /* server returns a localized validation error */ }}
   console.info("[FIX:link-graph-filters] Loading graph projection", {{run_id:runId, dead_end:deadEnd, disconnected}});
   try {{
     const response = await fetch("/v2/runs/" + encodeURIComponent(runId) + "/graph?" + query.toString());
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "graph request failed");
     document.getElementById("link-graph-panel").hidden = false;
+    payload.items = (payload.items || []).filter(item => (Number(item.authority) || 0) >= minAuthority && (depth === "all" || (depth === "3+" ? Number(item.depth) >= 3 : Number(item.depth) === Number(depth))));
     const t = translations[language.value];
     output.innerHTML = `<p>${{escapeHtml(t.graph_algorithm)}}: ${{escapeHtml(payload.algorithm_version || "")}}</p><table><thead><tr><th>${{escapeHtml(t.graph_url)}}</th><th>${{escapeHtml(t.graph_in)}}</th><th>${{escapeHtml(t.graph_out)}}</th><th>${{escapeHtml(t.graph_authority)}}</th></tr></thead><tbody>${{(payload.items || []).map(item => `<tr><td><button type="button" class="text-link" onclick="loadLinkGraphNode(this.dataset.url)" data-url="${{escapeHtml(item.url)}}">${{escapeHtml(item.url)}}</button></td><td>${{item.inlinks}}</td><td>${{item.outlinks}}</td><td>${{item.authority}}</td></tr>`).join("")}}</tbody></table>`;
+    renderLinkGraphVisual(payload);
     status.textContent = t.graph_loaded.replace("{{loaded}}", String((payload.items || []).length)).replace("{{total}}", String(payload.total || 0));
     logDashboardAction("graph.load", {{run_id:runId, nodes:(payload.items || []).length, fingerprint:payload.fingerprint}});
   }} catch (error) {{ status.textContent = translations[language.value].graph_failed + ": " + error.message; }}
