@@ -114,18 +114,39 @@ class Finding:
             Applicability,
             Effort,
             EvaluationCompleteness,
+            EvaluationOutcome,
             EvidenceRef,
             FindingContract,
             FindingKey,
             FindingStateHash,
             Severity,
             Status,
+            OperationalState,
             UrlIdentity,
         )
 
-        status = Status.ERROR if self.status is FindingStatus.UNAVAILABLE else Status(self.status.value)
-        applicability = Applicability.NOT_APPLICABLE if self.status is FindingStatus.SKIP else Applicability.APPLICABLE
-        completeness = EvaluationCompleteness.PARTIAL if self.status in {FindingStatus.SKIP, FindingStatus.UNAVAILABLE} else EvaluationCompleteness.COMPLETE
+        status = Status.ERROR if self.status is FindingStatus.UNAVAILABLE else (
+            Status.SKIP if self.status is FindingStatus.SKIP else Status(self.status.value)
+        )
+        outcome = {
+            FindingStatus.PASS: EvaluationOutcome.PASS,
+            FindingStatus.FAIL: EvaluationOutcome.FAIL,
+            FindingStatus.WARN: EvaluationOutcome.WARN,
+            FindingStatus.SKIP: EvaluationOutcome.NOT_APPLICABLE,
+            FindingStatus.UNAVAILABLE: EvaluationOutcome.UNKNOWN,
+        }[self.status]
+        applicability = (
+            Applicability.UNKNOWN
+            if self.status is FindingStatus.UNAVAILABLE
+            else Applicability.NOT_APPLICABLE
+            if self.status is FindingStatus.SKIP
+            else Applicability.APPLICABLE
+        )
+        completeness = (
+            EvaluationCompleteness.NOT_EVALUATED
+            if self.status in {FindingStatus.SKIP, FindingStatus.UNAVAILABLE}
+            else EvaluationCompleteness.COMPLETE
+        )
         key = FindingKey(self.id, rule_version, UrlIdentity.parse(target))
         evidence = tuple(EvidenceRef(item.id, item.url or target, item.summary) for item in self.evidence)
         return FindingContract(
@@ -135,11 +156,23 @@ class Finding:
                 status=status,
                 applicability=applicability,
                 completeness=completeness,
+                outcome=outcome,
+                operational_state=(
+                    OperationalState.UNAVAILABLE
+                    if self.status is FindingStatus.UNAVAILABLE
+                    else OperationalState.NONE
+                ),
                 evidence_ids=tuple(item.id for item in self.evidence),
             ),
             status=status,
             applicability=applicability,
             completeness=completeness,
+            outcome=outcome,
+            operational_state=(
+                OperationalState.UNAVAILABLE
+                if self.status is FindingStatus.UNAVAILABLE
+                else OperationalState.NONE
+            ),
             severity=Severity.INFO if status is Status.PASS else Severity.LOW,
             impact="info" if status is Status.PASS else "low",
             effort=Effort.LOW,

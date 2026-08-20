@@ -11,12 +11,14 @@ from ...audit_core import (
     Applicability,
     Effort,
     EvaluationCompleteness,
+    EvaluationOutcome,
     EvidenceRef,
     FindingContract,
     FindingKey,
     FindingStateHash,
     Severity,
     Status,
+    OperationalState,
     UrlIdentity,
 )
 from ...report_v2 import Finding
@@ -63,7 +65,12 @@ class AtomicFinding:
     def to_contract(self) -> FindingContract:
         status = Status.ERROR if self.status == "error" else Status(self.status)
         applicability = Applicability.NOT_APPLICABLE if self.status == "skip" else Applicability.APPLICABLE
-        completeness = EvaluationCompleteness.PARTIAL if self.status in {"error", "skip"} else EvaluationCompleteness.COMPLETE
+        completeness = EvaluationCompleteness.NOT_EVALUATED if self.status in {"error", "skip"} else EvaluationCompleteness.COMPLETE
+        outcome = (
+            EvaluationOutcome.UNKNOWN if self.status == "error"
+            else EvaluationOutcome.NOT_APPLICABLE if self.status == "skip"
+            else EvaluationOutcome(self.status)
+        )
         severity = Severity(self.impact) if self.impact in {item.value for item in Severity} else Severity.LOW
         effort = Effort(self.effort) if self.effort in {item.value for item in Effort} else Effort.LOW
         key = FindingKey(self.rule.id, self.rule.version, UrlIdentity.parse(self.target))
@@ -74,11 +81,15 @@ class AtomicFinding:
                 status=status,
                 applicability=applicability,
                 completeness=completeness,
+                outcome=outcome,
+                operational_state=OperationalState.ERROR if self.status == "error" else OperationalState.NONE,
                 evidence_ids=self.evidence_ids,
             ),
             status=status,
             applicability=applicability,
             completeness=completeness,
+            outcome=outcome,
+            operational_state=OperationalState.ERROR if self.status == "error" else OperationalState.NONE,
             severity=severity,
             impact=self.impact,
             effort=effort,
