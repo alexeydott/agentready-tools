@@ -7,6 +7,7 @@ from typing import Any, Literal
 from . import __version__
 
 Status = Literal["pass", "fail", "warn", "skip", "error"]
+ScoreRole = Literal["eligible", "observation", "guard", "legacy-only"]
 Impact = Literal["high", "medium", "low"]
 Effort = Literal["low", "medium", "high"]
 
@@ -45,6 +46,16 @@ class CheckResult:
     experimental: bool = False
     supplemental: bool = False
     geo_scored: bool = False
+    score_role: ScoreRole = "eligible"
+    score_included: bool | None = None
+
+    @property
+    def is_score_eligible(self) -> bool:
+        return (
+            self.score_included
+            if self.score_included is not None
+            else self.scored and self.score_role == "eligible"
+        )
 
     @property
     def passed(self) -> bool:
@@ -104,6 +115,7 @@ class ScanReport:
     ai_search_applicable: int = 0
     tool_version: str = __version__
     schema: str = "agentready.readiness-engine.v2"
+    score_model_id: str = "readiness-transparent-v2"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

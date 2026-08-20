@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 Effort = Literal["low", "medium", "high"]
+ScoreRole = Literal["eligible", "observation", "guard", "legacy-only"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +19,7 @@ class CheckSpec:
     supplemental: bool = False
     effort: Effort = "medium"
     geo_scored: bool = False
+    score_role: ScoreRole = "eligible"
 
 
 CONTENT = frozenset({"all", "content"})

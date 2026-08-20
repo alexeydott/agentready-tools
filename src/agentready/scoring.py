@@ -14,6 +14,7 @@ LEVEL_NAMES = {
     5: "Agent-Native",
 }
 LEVEL_MODEL = "transparent-tiered-v2; sequential 80% tier threshold inspired by open readiness tooling; not Cloudflare's unpublished formula"
+SCORE_MODEL_ID = "readiness-transparent-v2"
 
 _LEVEL_CRITERIA: dict[int, tuple[str, ...]] = {
     1: ("robots-txt", "sitemap", "link-headers"),
@@ -39,7 +40,7 @@ _REQUIREMENT_LABELS = {
 
 
 def overall_score(results: list[CheckResult]) -> int:
-    applicable = [r for r in results if r.scored and r.status not in {"skip", "error"}]
+    applicable = [r for r in results if r.is_score_eligible and r.status not in {"skip", "error"}]
     if not applicable:
         return 0
     passed = sum(r.status == "pass" for r in applicable)
@@ -52,7 +53,7 @@ def category_scores(results: list[CheckResult]) -> list[CategoryScore]:
         groups[r.category].append(r)
     out: list[CategoryScore] = []
     for category, rows in groups.items():
-        applicable = [r for r in rows if r.scored and r.status not in {"skip", "error"}]
+        applicable = [r for r in rows if r.is_score_eligible and r.status not in {"skip", "error"}]
         passed = sum(r.status == "pass" for r in applicable)
         score = round(100 * passed / len(applicable)) if applicable else None
         out.append(CategoryScore(category=category, passed=passed, applicable=len(applicable), score=score))
@@ -69,7 +70,7 @@ def maturity_level(results: list[CheckResult], threshold: float = 0.8) -> tuple[
     """
     if not 0 < threshold <= 1:
         raise ValueError("level threshold must be in (0, 1]")
-    by_id = {r.id: r for r in results if r.scored and r.status not in {"skip", "error"}}
+    by_id = {r.id: r for r in results if r.is_score_eligible and r.status not in {"skip", "error"}}
     highest = 0
     next_level: NextLevel | None = None
 
