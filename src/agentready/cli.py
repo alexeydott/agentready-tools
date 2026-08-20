@@ -78,6 +78,7 @@ def _audit_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--format", choices=["console", "json", "markdown", "html"], default="json")
     p.add_argument("--preset", choices=["all", "content", "api", "ai-search"], default="all")
     p.add_argument("--profile", choices=["quick", "standard", "deep", "custom"], default="standard")
+    p.add_argument("--ruleset", help="Local rules YAML path or inline versioned rules document")
     p.add_argument("--max-pages", type=int, default=25, help="Maximum pages to fetch; use 0 with --discovery crawl to audit all discovered pages up to the server hard cap")
     p.add_argument("--timeout", type=float, default=5.0)
     p.add_argument("--max-depth", type=int)
@@ -231,6 +232,18 @@ def _workflow_parsers(sub: argparse._SubParsersAction) -> None:
     project_start.add_argument("project_id"); project_start.add_argument("--profile", choices=["quick", "standard", "deep", "custom"]); project_start.add_argument("--max-pages", type=int, default=25); project_start.add_argument("--parent-run-id"); project_start.add_argument("--base-url", default="http://127.0.0.1:8765"); project_start.add_argument("--output", "-o")
     project_baseline = _add_command_parser(project_commands, "baseline", help="Choose a project baseline run")
     project_baseline.add_argument("project_id"); project_baseline.add_argument("run_id"); project_baseline.add_argument("--base-url", default="http://127.0.0.1:8765"); project_baseline.add_argument("--output", "-o")
+    project_schedules = _add_command_parser(project_commands, "schedules", help="List project schedules")
+    project_schedules.add_argument("project_id"); project_schedules.add_argument("--base-url", default="http://127.0.0.1:8765"); project_schedules.add_argument("--output", "-o")
+    project_schedule_create = _add_command_parser(project_commands, "schedule-create", help="Create a project schedule")
+    project_schedule_create.add_argument("project_id"); project_schedule_create.add_argument("schedule_id"); project_schedule_create.add_argument("next_run_at", help="UTC ISO-8601 timestamp"); project_schedule_create.add_argument("--interval-seconds", type=int, required=True); project_schedule_create.add_argument("--disabled", action="store_true"); project_schedule_create.add_argument("--base-url", default="http://127.0.0.1:8765"); project_schedule_create.add_argument("--output", "-o")
+    project_schedule_history = _add_command_parser(project_commands, "schedule-history", help="List schedule execution history")
+    project_schedule_history.add_argument("schedule_id"); project_schedule_history.add_argument("--base-url", default="http://127.0.0.1:8765"); project_schedule_history.add_argument("--output", "-o")
+    project_schedule_update = _add_command_parser(project_commands, "schedule-update", help="Update a schedule")
+    project_schedule_update.add_argument("schedule_id"); project_schedule_update.add_argument("--interval-seconds", type=int); project_schedule_update.add_argument("--next-run-at"); project_schedule_update.add_argument("--enabled", type=lambda value: value.lower() in {"1", "true", "yes"}); project_schedule_update.add_argument("--base-url", default="http://127.0.0.1:8765"); project_schedule_update.add_argument("--output", "-o")
+    project_schedule_delete = _add_command_parser(project_commands, "schedule-delete", help="Delete a schedule")
+    project_schedule_delete.add_argument("schedule_id"); project_schedule_delete.add_argument("--base-url", default="http://127.0.0.1:8765"); project_schedule_delete.add_argument("--output", "-o")
+    project_schedule_worker = _add_command_parser(project_commands, "schedule-worker", help="Control the local schedule worker")
+    project_schedule_worker.add_argument("action", choices=["start", "stop", "run-once", "status"]); project_schedule_worker.add_argument("--worker-id", default="local-worker"); project_schedule_worker.add_argument("--poll-seconds", type=float, default=1.0); project_schedule_worker.add_argument("--base-url", default="http://127.0.0.1:8765"); project_schedule_worker.add_argument("--output", "-o")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -989,6 +1002,19 @@ def _cmd_projects(args: argparse.Namespace) -> int:
         result = _http_json(base, f"/v2/projects/{urllib.parse.quote(args.project_id, safe='')}/runs", method="POST", payload={"profile": args.profile, "max_pages": args.max_pages, "parent_run_id": args.parent_run_id})
     elif args.projects_command == "baseline":
         result = _http_json(base, f"/v2/projects/{urllib.parse.quote(args.project_id, safe='')}/baseline", method="POST", payload={"run_id": args.run_id})
+    elif args.projects_command == "schedules":
+        result = _http_json(base, f"/v2/projects/{urllib.parse.quote(args.project_id, safe='')}/schedules")
+    elif args.projects_command == "schedule-create":
+        result = _http_json(base, f"/v2/projects/{urllib.parse.quote(args.project_id, safe='')}/schedules", method="POST", payload={"schedule_id": args.schedule_id, "interval_seconds": args.interval_seconds, "next_run_at": args.next_run_at, "enabled": not args.disabled})
+    elif args.projects_command == "schedule-history":
+        result = _http_json(base, f"/v2/schedules/{urllib.parse.quote(args.schedule_id, safe='')}/history")
+    elif args.projects_command == "schedule-update":
+        payload = {key: value for key, value in {"interval_seconds": args.interval_seconds, "next_run_at": args.next_run_at, "enabled": args.enabled}.items() if value is not None}
+        result = _http_json(base, f"/v2/schedules/{urllib.parse.quote(args.schedule_id, safe='')}", method="PATCH", payload=payload)
+    elif args.projects_command == "schedule-delete":
+        result = _http_json(base, f"/v2/schedules/{urllib.parse.quote(args.schedule_id, safe='')}", method="DELETE")
+    elif args.projects_command == "schedule-worker":
+        result = _http_json(base, "/v2/schedules/worker" if args.action == "status" else "/v2/schedules/worker", method="GET" if args.action == "status" else "POST", payload=None if args.action == "status" else {"action": args.action, "worker_id": args.worker_id, "poll_seconds": args.poll_seconds})
     else:
         raise ValueError("unsupported projects command")
     _write_cli_output(json.dumps(result, ensure_ascii=False, indent=2), args.output)
@@ -1228,6 +1254,7 @@ def _cmd_audit(args: argparse.Namespace) -> int:
             credential_ref=args.credential_ref,
             credential_headers=trusted_headers,
             security_context=trusted_context,
+            ruleset=args.ruleset,
         )
     )
     output = render_audit_report(result.report, args.format)

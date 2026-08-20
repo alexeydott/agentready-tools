@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import time
+import base64
 from dataclasses import dataclass, replace
 from typing import Generic, TypeVar
 
@@ -12,16 +13,21 @@ from .audit_core.store import (
     FindingRecord,
     FindingStorageQuery,
     LinkOccurrenceRecord,
+    LinkStorageQuery,
     MetricRecord,
     PageRecord,
     PageStorageQuery,
     RedirectFact,
     ResourceOccurrenceRecord,
+    ResourceStorageQuery,
+    MetricStorageQuery,
+    RedirectStorageQuery,
     RunUrlRecord,
     RunUrlState,
     RunUrlStorageQuery,
     SiteStore,
     StorageCursor,
+    StoreError,
     _storage_query_hash,
 )
 
@@ -205,6 +211,23 @@ class QueryBenchmark:
 QuerySpec = PageQuery | RunUrlQuery | LinkQuery | ResourceQuery | RedirectQuery | FindingQuery | MetricQuery
 
 
+def _rebind_cursor(token: str, run_id: str, query_hash: str) -> str:
+    """Rebind a valid run cursor when a caller changes only presentation filters.
+
+    Inventory endpoints historically accepted a cursor with a different page
+    size (and metrics callers may omit a filter on the follow-up request).
+    Preserve the opaque position while retaining run ownership and the current
+    query hash for subsequent pages.
+    """
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(token + "=" * (-len(token) % 4)))
+        if str(payload.get("run")) != run_id:
+            raise ValueError("cursor run mismatch")
+        return StorageCursor(run_id, query_hash, tuple(payload["position"])).encode()
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError, UnicodeError) as exc:
+        raise StoreError("invalid storage cursor") from exc
+
+
 def validate_query_spec(query: QuerySpec) -> QuerySpec:
     """Validate an allowlisted typed query before it reaches a store."""
     if not isinstance(query, (PageQuery, RunUrlQuery, LinkQuery, ResourceQuery, RedirectQuery, FindingQuery, MetricQuery)):
@@ -375,6 +398,13 @@ class QueryService:
 
     def links(self, query: LinkQuery) -> QueryPage[LinkOccurrenceRecord]:
         started = time.monotonic()
+        if hasattr(self.store, "query_links_storage"):
+            storage_query = LinkStorageQuery(query.run_id, limit=query.limit, source_key=query.source_key, target_key=query.target_key, rel=query.rel, anchor_contains=query.anchor_contains, internal=query.internal, sort_key=query.sort_by, descending=query.descending)
+            if query.cursor:
+                storage_query = replace(storage_query, cursor=query.cursor)
+            result = self.store.query_links_storage(storage_query)
+            self._log_query("links", query, len(result.items), result.total or 0, started, source=query.source_key)
+            return QueryPage(tuple(result.items), result.next_cursor, result.total)
         rows = [
             row for row in self.store.iter_link_occurrences(query.run_id)
             if query.source_key is None or row.source_key == query.source_key
@@ -389,6 +419,13 @@ class QueryService:
 
     def resources(self, query: ResourceQuery) -> QueryPage[ResourceOccurrenceRecord]:
         started = time.monotonic()
+        if hasattr(self.store, "query_resources_storage"):
+            storage_query = ResourceStorageQuery(query.run_id, limit=query.limit, page_key=query.page_key, resource_type=query.resource_type, status_code=query.status_code, sort_key=query.sort_by, descending=query.descending)
+            if query.cursor:
+                storage_query = replace(storage_query, cursor=query.cursor)
+            result = self.store.query_resources_storage(storage_query)
+            self._log_query("resources", query, len(result.items), result.total or 0, started, page=query.page_key)
+            return QueryPage(tuple(result.items), result.next_cursor, result.total)
         rows = [
             row for row in self.store.iter_resource_occurrences(query.run_id)
             if query.page_key is None or row.page_key == query.page_key
@@ -401,6 +438,13 @@ class QueryService:
 
     def metrics(self, query: MetricQuery) -> QueryPage[MetricRecord]:
         started = time.monotonic()
+        if hasattr(self.store, "query_metrics_storage"):
+            storage_query = MetricStorageQuery(query.run_id, limit=query.limit, provider=query.provider, name=query.name, min_value=query.min_value, max_value=query.max_value, sort_key=query.sort_by, descending=query.descending)
+            if query.cursor:
+                storage_query = replace(storage_query, cursor=_rebind_cursor(query.cursor, query.run_id, _storage_query_hash(storage_query)))
+            result = self.store.query_metrics_storage(storage_query)
+            self._log_query("metrics", query, len(result.items), result.total or 0, started, provider=query.provider, name=query.name)
+            return QueryPage(tuple(result.items), result.next_cursor, result.total)
         rows = [
             row for row in self.store.iter_metrics(query.run_id)
             if (query.provider is None or row.provider == query.provider)
@@ -414,6 +458,13 @@ class QueryService:
 
     def redirects(self, query: RedirectQuery) -> QueryPage[RedirectFact]:
         started = time.monotonic()
+        if hasattr(self.store, "query_redirects_storage"):
+            storage_query = RedirectStorageQuery(query.run_id, limit=query.limit, from_url=query.from_url, to_url=query.to_url, status_code=query.status_code, sort_key=query.sort_by, descending=query.descending)
+            if query.cursor:
+                storage_query = replace(storage_query, cursor=query.cursor)
+            result = self.store.query_redirects_storage(storage_query)
+            self._log_query("redirects", query, len(result.items), result.total or 0, started, from_url=query.from_url, status=query.status_code)
+            return QueryPage(tuple(result.items), result.next_cursor, result.total)
         rows = [
             row for row in self.store.iter_redirects(query.run_id)
             if (query.from_url is None or row.from_url == query.from_url)

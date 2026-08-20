@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 import logging
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -43,6 +44,8 @@ class AuditJobManager:
         self._executor = ThreadPoolExecutor(max_workers=max_jobs)
         self._jobs: dict[str, tuple[Future[Any], JobStatus, threading.Event]] = {}
         self._progress: dict[str, dict[str, Any]] = {}
+        self._started_at: dict[str, float] = {}
+        self._updated_at: dict[str, float] = {}
         self._lock = threading.Lock()
 
     def submit(self, operation: Callable[[], Any]) -> str:
@@ -58,6 +61,9 @@ class AuditJobManager:
                 future = self._executor.submit(operation)
             self._jobs[job_id] = (future, JobStatus.RUNNING, cancel_event)
             self._progress[job_id] = {"phase": "queued", "fetched": 0, "discovered": 0}
+            now = time.time()
+            self._started_at[job_id] = now
+            self._updated_at[job_id] = now
             logger.info("v2 audit job submitted id=%s", job_id)
             return job_id
 
@@ -69,10 +75,14 @@ class AuditJobManager:
             future, _, cancel_event = item
             cancel_event.set()
             cancelled = future.cancel()
-            if cancelled:
-                self._jobs[job_id] = (future, JobStatus.CANCELLED, cancel_event)
-            else:
-                logger.info("v2 audit job cancellation requested id=%s", job_id)
+            # Drop bookkeeping immediately. A running operation receives the
+            # cooperative event and may finish current I/O, but it no longer
+            # occupies a capacity slot or appears in the task monitor.
+            self._jobs.pop(job_id, None)
+            self._progress.pop(job_id, None)
+            self._started_at.pop(job_id, None)
+            self._updated_at.pop(job_id, None)
+            logger.info("v2 audit job cancelled and removed id=%s running=%s", job_id, not cancelled)
             return cancelled
 
     def get(self, job_id: str) -> JobSnapshot:
@@ -90,13 +100,34 @@ class AuditJobManager:
         try:
             return JobSnapshot(job_id, JobStatus.COMPLETED, future.result(), progress=self._progress.get(job_id))
         except Exception as exc:  # noqa: BLE001 - job boundary must normalize operation failures
-            logger.warning("v2 audit job failed id=%s error_type=%s", job_id, type(exc).__name__)
-            return JobSnapshot(job_id, JobStatus.FAILED, error="audit job failed", progress=self._progress.get(job_id))
+            logger.exception("v2 audit job failed id=%s error_type=%s", job_id, type(exc).__name__)
+            return JobSnapshot(job_id, JobStatus.FAILED, error=f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__, progress=self._progress.get(job_id))
 
     def update_progress(self, job_id: str, **values: Any) -> None:
         with self._lock:
             if job_id in self._progress:
                 self._progress[job_id].update(values)
+                self._updated_at[job_id] = time.time()
+
+    def list(self) -> list[dict[str, Any]]:
+        """Return bounded status-only snapshots for the local task monitor."""
+        now = time.time()
+        with self._lock:
+            items = []
+            for job_id, (future, status, cancel_event) in self._jobs.items():
+                current = status
+                if status in {JobStatus.PENDING, JobStatus.RUNNING} and future.done():
+                    current = JobStatus.FAILED if future.exception() is not None else JobStatus.COMPLETED
+                items.append({
+                    "id": job_id,
+                    "status": current.value,
+                    "error": "audit job failed" if current is JobStatus.FAILED else None,
+                    "progress": dict(self._progress.get(job_id, {})),
+                    "cancel_requested": cancel_event.is_set(),
+                    "age_seconds": max(0, int(now - self._started_at.get(job_id, now))),
+                    "updated_age_seconds": max(0, int(now - self._updated_at.get(job_id, now))),
+                })
+        return sorted(items, key=lambda item: item["age_seconds"], reverse=True)[:50]
 
 
 def _accepts_cancel_event(operation: Callable[..., Any]) -> bool:

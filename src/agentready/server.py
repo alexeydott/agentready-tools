@@ -24,11 +24,12 @@ except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Server dependencies missing. Install: pip install 'agentready-tools[server]'") from exc
 
 from .ai_prompts import ai_skill_catalog
-from .accesslog import analyze_project_ai_bot_log
-from .audit_core.store import MemorySiteStore, ProjectRecord, RunUrlState, SQLiteSiteStore
+from .accesslog import analyze_project_ai_bot_log, project_page_access_metrics
+from .audit_core.store import MemorySiteStore, ProjectRecord, RunUrlState, ScheduleRecord, SQLiteSiteStore
 from .audit_service import AuditRequest, AuditService
 from .compatibility import COMPATIBILITY
-from .custom_rules import apply_rules, compile_rules, validate_rules
+from .custom_rules import apply_rules, compile_rules, css_matches_from_html, validate_rules
+from .structured_data import extract_jsonld_nodes
 from .crawl_profiles import HARD_CAPS
 from .dashboard import render_dashboard
 from .duplicates import DuplicateAnalysis, analyze_signatures, signature
@@ -71,6 +72,7 @@ from .remediation import remediation_for
 from .report_storage import save_report
 from .report_v2 import diff_reports, export_inventory, report_from_dict, semantic_diff
 from .robots import RobotsInterpretation, RobotsSimulationService, parse_robots
+from .schedules import ScheduleService, ScheduleWorker
 from .saved_views import SavedView, SavedViewRegistry
 from .sitemap_reconciliation import build_reconciliation_report
 from .seo_checks import SEO_CHECK_METADATA, SEO_CHECKS_BY_ID
@@ -93,6 +95,7 @@ def default_data_dir() -> Path:
 _SERVER_DATA_DIR = default_data_dir()
 _V2_JOBS = AuditJobManager(max_jobs=8)
 _V2_ROBOTS: dict[str, str] = {}
+_V2_RULE_REPRESENTATIONS: dict[tuple[str, str], dict[str, object]] = {}
 _AUDIT_SERVICE = AuditService()
 _DASHBOARD_STATE_FIELDS = {
     "robots-live", "robots-proposed", "robots-user-agents",
@@ -209,6 +212,7 @@ _V2_SAVED_VIEWS = SavedViewRegistry()
 _V2_GRAPH_CACHE: OrderedDict[tuple[str, str], LinkGraphProjection] = OrderedDict()
 _V2_DUPLICATE_CACHE: OrderedDict[tuple[str, int], DuplicateAnalysis] = OrderedDict()
 _V2_PROJECT_STORE: MemorySiteStore | SQLiteSiteStore | None = None
+_SCHEDULE_WORKER: ScheduleWorker | None = None
 
 
 def _serve_sqlite_store() -> SQLiteSiteStore | None:
@@ -533,6 +537,7 @@ class V2AuditRequest(BaseModel):
     discovery_sitemap_xml: str | None = None
     discovery_sitemap_urls: list[str] = Field(default_factory=list)
     discovery_limit: int = Field(default=1000, ge=1, le=100_000)
+    ruleset: str | None = Field(default=None, max_length=1_000_000)
 
 
 class ProjectCreateRequest(BaseModel):
@@ -559,6 +564,26 @@ class ProjectRunRequest(BaseModel):
     parent_run_id: str | None = Field(default=None, max_length=128)
     trigger: str = Field(default="manual", max_length=40)
     baseline_run_id: str | None = Field(default=None, max_length=128)
+    ruleset: str | None = Field(default=None, max_length=1_000_000)
+
+
+class ScheduleCreateRequest(BaseModel):
+    schedule_id: str = Field(min_length=1, max_length=128)
+    interval_seconds: int = Field(gt=0, le=31_536_000)
+    next_run_at: str = Field(min_length=1, max_length=80)
+    enabled: bool = True
+
+
+class ScheduleUpdateRequest(BaseModel):
+    interval_seconds: int | None = Field(default=None, gt=0, le=31_536_000)
+    next_run_at: str | None = Field(default=None, min_length=1, max_length=80)
+    enabled: bool | None = None
+
+
+class ScheduleWorkerRequest(BaseModel):
+    action: Literal["start", "stop", "run-once"]
+    worker_id: str = Field(default="local-worker", min_length=1, max_length=80)
+    poll_seconds: float = Field(default=1.0, gt=0, le=3600)
 
 
 class RobotsSimulationRequest(BaseModel):
@@ -661,6 +686,7 @@ class PageSpeedRequest(BaseModel):
 
 class ProjectAccessLogRequest(BaseModel):
     lines: list[str] = Field(min_length=1, max_length=100_000)
+    run_id: str | None = Field(default=None, max_length=128)
     start_at: str | None = Field(default=None, max_length=80)
     end_at: str | None = Field(default=None, max_length=80)
     verified_ips: dict[str, set[str]] = Field(default_factory=dict)
@@ -1089,6 +1115,7 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None, p
             discovery_sitemap_xml=request.discovery_sitemap_xml,
             discovery_sitemap_urls=tuple(request.discovery_sitemap_urls),
             discovery_limit=request.discovery_limit,
+            ruleset=request.ruleset,
             store=store,
             progress_callback=progress_callback,
         )
@@ -1103,6 +1130,20 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None, p
         if coverage is not None:
             store.put_coverage(run_id, coverage.to_dict())
         _V2_RUNS.put(run_id, store)
+        for view in getattr(result, "fact_views", ()):
+            facts = view.facts
+            body = view.body.decode("utf-8", errors="replace") if view.body else ""
+            _V2_RULE_REPRESENTATIONS[(run_id, view.url)] = {
+                "url": view.url,
+                "text": facts.visible_text if facts else "",
+                "raw_text": body[:1_000_000],
+                "headers": dict(view.headers),
+                "structured_data": extract_jsonld_nodes(body)[0] if body else [],
+                "links": [item.resolved_url or item.raw_href for item in (facts.links if facts else ())],
+                "resources": [item.resolved_url or item.url for item in (facts.resources if facts else ())],
+            }
+            if len(_V2_RULE_REPRESENTATIONS) > 250_000:
+                _V2_RULE_REPRESENTATIONS.pop(next(iter(_V2_RULE_REPRESENTATIONS)))
         robots_text = getattr(result, "robots_text", None)
         if isinstance(robots_text, str) and robots_text:
             _V2_ROBOTS[run_id] = robots_text
@@ -1110,7 +1151,7 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None, p
                 _V2_ROBOTS.pop(next(iter(_V2_ROBOTS)))
     payload = result.to_dict()
     if effective_parent is not None:
-        payload["rescan"] = {"parent_run_id": effective_parent, "selection_hash": selection_hash, "selected_count": len(selected_urls), "selected_urls": list(selected_urls), "selected_finding_ids": list(selection_meta), "remediation": _rescan_remediation(effective_parent, selection_meta)}
+        payload["rescan"] = {"parent_run_id": effective_parent, "selection_hash": selection_hash, "selected_count": len(selected_urls), "selected_urls": list(selected_urls), "selected_finding_ids": list(selection_meta), "remediation": _rescan_remediation(effective_parent, selection_meta), "confirmation": _remediation_confirmation(effective_parent, str(run_id or ""), selection_meta)}
     return payload
 
 
@@ -1122,6 +1163,57 @@ def _rescan_remediation(parent_run_id: str, finding_ids: tuple[str, ...]) -> lis
     except KeyError:
         return []
     return [{"finding_id": finding_id, "evidence": list(records[finding_id].get("evidence", ())), "agent_prompt": f"Fix finding {finding_id} using only the supplied evidence."} for finding_id in finding_ids if finding_id in records]
+
+
+def _finding_urls(payload: Mapping[str, object]) -> tuple[str, ...]:
+    """Return only URLs explicitly evidenced by a stored finding."""
+    values: list[str] = []
+    for key in ("affected_urls", "urls"):
+        raw = payload.get(key, ())
+        if isinstance(raw, (list, tuple)):
+            values.extend(item for item in raw if isinstance(item, str))
+    raw_evidence = payload.get("evidence", ())
+    if isinstance(raw_evidence, (list, tuple)):
+        values.extend(
+            item["url"] for item in raw_evidence
+            if isinstance(item, Mapping) and isinstance(item.get("url"), str)
+        )
+    return tuple(dict.fromkeys(values))
+
+
+def _remediation_confirmation(parent_run_id: str, child_run_id: str, finding_ids: tuple[str, ...]) -> dict[str, object]:
+    """Compare selected finding states across a parent and bounded child run."""
+    try:
+        parent_records = {item.finding_id: item.payload for item in _V2_RUNS.get(parent_run_id).iter_findings(parent_run_id)}
+        child_records = {item.finding_id: item.payload for item in _V2_RUNS.get(child_run_id).iter_findings(child_run_id)}
+    except KeyError:
+        return {"status": "unavailable", "items": []}
+    items: list[dict[str, object]] = []
+    for finding_id in finding_ids:
+        before = parent_records.get(finding_id)
+        after = child_records.get(finding_id)
+        if not isinstance(before, Mapping):
+            continue
+        before_status = str(before.get("status", "unavailable"))
+        after_status = str(after.get("status", "not_evaluated")) if isinstance(after, Mapping) else "not_evaluated"
+        if before_status in {"fail", "warn", "error", "unavailable"} and after_status == "pass":
+            state = "resolved"
+        elif before_status == "pass" and after_status in {"fail", "warn", "error", "unavailable"}:
+            state = "regressed"
+        elif after_status in {"fail", "warn", "error", "unavailable", "not_evaluated"}:
+            state = "still_failing"
+        else:
+            state = "resolved"
+        items.append({
+            "finding_id": finding_id,
+            "state": state,
+            "before": {"status": before_status, "evidence": list(before.get("evidence", ()))},
+            "after": {"status": after_status, "evidence": list(after.get("evidence", ())) if isinstance(after, Mapping) else []},
+            "affected_urls": list(_finding_urls(before)),
+        })
+    counts = {state: sum(1 for item in items if item["state"] == state) for state in ("resolved", "still_failing", "regressed")}
+    status = "passed" if items and counts["still_failing"] == 0 and counts["regressed"] == 0 else "needs_attention"
+    return {"status": status, "items": items, "counts": counts}
 
 
 def _resolve_rescan_selection(request: V2AuditRequest, parent_run_id: str | None) -> tuple[list[str], str | None, tuple[str, ...]]:
@@ -1259,9 +1351,15 @@ def _render_v2_dashboard(payload: dict) -> str:
     )
 
 
-def _run_and_save_v2_job(request: V2AuditRequest, progress_callback: object) -> dict:
+def _run_and_save_v2_job(request: V2AuditRequest, progress_callback: object, cancel_event: threading.Event | None = None) -> dict:
     """Run a background audit and persist standalone JSON and HTML artifacts."""
-    payload = _run_v2_scan(request, progress_callback=progress_callback)
+    def cancellation_aware_progress(values: dict) -> None:
+        if cancel_event is not None and cancel_event.is_set():
+            raise RuntimeError("audit cancelled")
+        if callable(progress_callback):
+            progress_callback(values)
+
+    payload = _run_v2_scan(request, progress_callback=cancellation_aware_progress)
     json_path = save_report(payload, target=request.url, surface="job-v2", fmt="json")
     html_path = save_report(_render_v2_dashboard(payload), target=request.url, surface="job-v2", fmt="html")
     logger.info("background v2 report saved json=%s html=%s", json_path, html_path)
@@ -1382,9 +1480,34 @@ def custom_rules_validate_endpoint(request: CustomRulesRequest) -> dict[str, obj
 def custom_rules_debug_endpoint(request: CustomRulesRequest) -> dict[str, object]:
     try:
         document = compile_rules(request.rules)
-        return apply_rules(document, url=request.url, text=request.text, headers=request.headers, structured_data=request.structured_data, links=request.links, resources=request.resources, css_matches=request.css_matches)
+        representation = _V2_RULE_REPRESENTATIONS.get((request.run_id, request.url_key or request.url)) if request.run_id else None
+        source = representation or {
+            "url": request.url,
+            "text": request.text,
+            "headers": request.headers,
+            "structured_data": request.structured_data,
+            "links": request.links,
+            "resources": request.resources,
+        }
+        if representation is not None:
+            logger.info("[FIX:custom-rules-debug] using saved representation run_id=%s url=%s", request.run_id, request.url_key or request.url)
+        raw_text = str(source.get("raw_text", ""))
+        css_values = list(request.css_matches)
+        for rule in document.rules:
+            if rule.kind.value == "css":
+                css_values.extend(css_matches_from_html(raw_text, rule.pattern, max_matches=rule.max_matches))
+        return apply_rules(document, url=str(source.get("url", request.url)), text=str(source.get("text", "")), headers=source.get("headers", {}), structured_data=source.get("structured_data", ()), links=source.get("links", ()), resources=source.get("resources", ()), css_matches=css_values)
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/runs/{run_id}/representations/{url_key:path}")
+def custom_rules_representation_endpoint(run_id: str, url_key: str, http_request: Request) -> dict[str, object]:
+    _require_loopback(http_request)
+    representation = _V2_RULE_REPRESENTATIONS.get((run_id, url_key))
+    if representation is None:
+        raise HTTPException(status_code=404, detail="saved representation was not found")
+    return {"run_id": run_id, "representation": representation}
 
 
 @app.post("/v2/custom-rules/apply")
@@ -1464,12 +1587,110 @@ def delete_project_endpoint(project_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail="project not found") from exc
 
 
+def _schedule_to_dict(schedule) -> dict[str, object]:
+    return asdict(schedule)
+
+
+def _schedule_service() -> ScheduleService:
+    return ScheduleService(_project_store())
+
+
+@app.post("/v2/projects/{project_id}/schedules")
+def create_schedule_endpoint(project_id: str, request: ScheduleCreateRequest) -> dict[str, object]:
+    try:
+        service = _schedule_service()
+        ProjectService(service.store).get(project_id)  # validate project before writing
+        row = service.create(ScheduleRecord(request.schedule_id, project_id, request.interval_seconds, request.next_run_at, request.enabled))
+        return _schedule_to_dict(row)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="project not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/v2/projects/{project_id}/schedules")
+def list_project_schedules_endpoint(project_id: str) -> dict[str, object]:
+    try:
+        service = _schedule_service()
+        ProjectService(service.store).get(project_id)
+        items = service.list(project_id)
+        return {"project_id": project_id, "items": [_schedule_to_dict(item) for item in items]}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="project not found") from exc
+
+
+@app.get("/v2/schedules/worker")
+def schedule_worker_status_endpoint() -> dict[str, object]:
+    worker = _SCHEDULE_WORKER
+    return {"running": bool(worker and worker.running), "worker_id": worker.worker_id if worker else None, "poll_seconds": worker.poll_seconds if worker else None}
+
+
+@app.post("/v2/schedules/worker")
+def schedule_worker_control_endpoint(request: ScheduleWorkerRequest) -> dict[str, object]:
+    global _SCHEDULE_WORKER
+    if request.action == "stop":
+        if _SCHEDULE_WORKER:
+            _SCHEDULE_WORKER.stop()
+        _SCHEDULE_WORKER = None
+    elif request.action == "start":
+        if _SCHEDULE_WORKER and _SCHEDULE_WORKER.running:
+            return schedule_worker_status_endpoint()
+        _SCHEDULE_WORKER = ScheduleWorker(_schedule_service(), worker_id=request.worker_id, poll_seconds=request.poll_seconds)
+        _SCHEDULE_WORKER.start()
+    else:
+        _schedule_service().run_once(request.worker_id)
+    return schedule_worker_status_endpoint()
+
+
+@app.get("/v2/schedules/{schedule_id}")
+def get_schedule_endpoint(schedule_id: str) -> dict[str, object]:
+    try:
+        return _schedule_to_dict(_schedule_service().get(schedule_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="schedule not found") from exc
+
+
+@app.patch("/v2/schedules/{schedule_id}")
+def update_schedule_endpoint(schedule_id: str, request: ScheduleUpdateRequest) -> dict[str, object]:
+    try:
+        current = _schedule_service().get(schedule_id)
+        values = asdict(current)
+        values.update({key: value for key, value in request.model_dump().items() if value is not None})
+        updated = _schedule_service().store.update_schedule(ScheduleRecord(**values))
+        return _schedule_to_dict(updated)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="schedule not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/v2/schedules/{schedule_id}")
+def delete_schedule_endpoint(schedule_id: str) -> dict[str, object]:
+    try:
+        service = _schedule_service()
+        service.get(schedule_id)
+        service.store.delete_schedule(schedule_id)
+        return {"schedule_id": schedule_id, "deleted": True}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="schedule not found") from exc
+
+
+@app.get("/v2/schedules/{schedule_id}/history")
+def schedule_history_endpoint(schedule_id: str) -> dict[str, object]:
+    try:
+        service = _schedule_service()
+        service.get(schedule_id)
+        return {"schedule_id": schedule_id, "items": [asdict(item) for item in service.store.iter_schedule_executions(schedule_id)]}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="schedule not found") from exc
+
+
 @app.post("/v2/projects/{project_id}/runs")
 def start_project_run_endpoint(project_id: str, request: ProjectRunRequest) -> dict[str, object]:
     try:
         service = ProjectService(_project_store())
         project = service.get(project_id)
-        audit_request = V2AuditRequest(url=project.target, preset=request.preset, profile=request.profile or project.default_profile, language=request.language, max_pages=request.max_pages, rescan_of=request.parent_run_id)
+        audit_request = V2AuditRequest(url=project.target, preset=request.preset, profile=request.profile or project.default_profile, language=request.language, max_pages=request.max_pages, rescan_of=request.parent_run_id, ruleset=request.ruleset if request.ruleset is not None else project.default_ruleset)
         payload = _run_v2_scan(audit_request, parent_run_id=request.parent_run_id)
         run_id = str(payload.get("run", {}).get("id", ""))
         if not run_id:
@@ -1512,8 +1733,26 @@ def project_baseline_endpoint(project_id: str, payload: dict) -> dict[str, objec
 def project_access_log_endpoint(project_id: str, request: ProjectAccessLogRequest) -> dict[str, object]:
     """Analyze only user-supplied local logs for a project's target origin."""
     try:
-        project = ProjectService(_project_store()).get(project_id)
-        return {"project_id": project_id, **analyze_project_ai_bot_log(request.lines, project_target=project.target, start_at=request.start_at, end_at=request.end_at, verified_ips=request.verified_ips)}
+        project_store = _project_store()
+        project = ProjectService(project_store).get(project_id)
+        summary = analyze_project_ai_bot_log(request.lines, project_target=project.target, start_at=request.start_at, end_at=request.end_at, verified_ips=request.verified_ips)
+        page_projection: dict[str, object] = {"run_id": None, "pages_matched": 0, "metrics_written": 0}
+        if request.run_id:
+            relation = next((item for item in project_store.iter_project_runs(project_id) if item.run_id == request.run_id), None)
+            if relation is None:
+                raise ValueError("run_id is not attached to project")
+            run_store = _V2_RUNS.get(request.run_id)
+            page_projection = project_page_access_metrics(
+                request.lines,
+                project_target=project.target,
+                run_id=request.run_id,
+                pages=run_store.iter_pages(request.run_id),
+                store=run_store,
+                start_at=request.start_at,
+                end_at=request.end_at,
+                verified_ips=request.verified_ips,
+            )
+        return {"project_id": project_id, **summary, "page_metrics": page_projection}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="project not found") from exc
     except ValueError as exc:
@@ -1550,11 +1789,17 @@ def audit_v2_job_endpoint(request: V2AuditRequest) -> dict:
             if job_ref.get("id"):
                 _V2_JOBS.update_progress(job_ref["id"], **values)
 
-        job_id = _V2_JOBS.submit(lambda: _run_and_save_v2_job(request, progress_callback=update_job_progress))
+        job_id = _V2_JOBS.submit(lambda cancel_event: _run_and_save_v2_job(request, progress_callback=update_job_progress, cancel_event=cancel_event))
         job_ref["id"] = job_id
     except (RuntimeError, TargetError, ValueError) as exc:
         raise HTTPException(status_code=429 if isinstance(exc, RuntimeError) else 400, detail=str(exc)) from exc
     return {"job_id": job_id, "status": "running"}
+
+
+@app.get("/v2/jobs")
+def audit_v2_jobs_endpoint() -> dict[str, object]:
+    """Return bounded local task status without exposing job results."""
+    return {"items": _V2_JOBS.list()}
 
 
 @app.get("/v2/jobs/{job_id}")
@@ -1577,7 +1822,7 @@ def audit_v2_job_cancel_endpoint(job_id: str) -> dict:
     if snapshot.status.value in {"completed", "failed", "cancelled"}:
         return snapshot.to_dict()
     _V2_JOBS.cancel(job_id)
-    return _V2_JOBS.get(job_id).to_dict()
+    return {"id": job_id, "status": "cancelled", "result": None, "error": None, "progress": {}}
 
 
 @app.post("/v2/runs/{run_id}/provider-enrichment")
@@ -1698,7 +1943,8 @@ def _inventory_response(run_id: str, query: object) -> dict:
         raise HTTPException(status_code=404, detail="run not found") from exc
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    assert isinstance(page, QueryPage)
+    if not isinstance(page, QueryPage):
+        raise HTTPException(status_code=500, detail="inventory query returned an invalid page")
     return {
         "run_id": run_id,
         "items": [_inventory_item(item) for item in page.items],
@@ -1874,7 +2120,7 @@ def audit_v2_graph_endpoint(
             nodes = tuple(item for item in nodes if item.url > cursor)
         selected = nodes[: limit + 1]
         items = selected[:limit]
-        return {"run_id": run_id, "version": projection.version, "fingerprint": projection.fingerprint, "algorithm_version": projection.graph.algorithm_version, "items": [{"url": item.url, "inlinks": item.inlinks, "outlinks": item.outlinks, "unique_inlinks": item.unique_inlinks, "unique_outlinks": item.unique_outlinks, "depth": item.depth, "dead_end": item.dead_end, "disconnected": item.disconnected, "nofollow_inlinks": item.nofollow_inlinks, "redirect_inlinks": item.redirect_inlinks, "authority": item.authority} for item in items], "next_cursor": items[-1].url if len(selected) > limit else None, "total": len(nodes)}
+        return {"run_id": run_id, "version": projection.version, "fingerprint": projection.fingerprint, "algorithm_version": projection.graph.algorithm_version, "items": [{"url": item.url, "inlinks": item.inlinks, "outlinks": item.outlinks, "unique_inlinks": item.unique_inlinks, "unique_outlinks": item.unique_outlinks, "depth": item.depth, "dead_end": item.dead_end, "disconnected": item.disconnected, "nofollow_inlinks": item.nofollow_inlinks, "redirect_inlinks": item.redirect_inlinks, "authority": item.authority} for item in items], "edges": [{"source": edge.source, "target": edge.target} for edge in projection.graph.edges[:500]], "next_cursor": items[-1].url if len(selected) > limit else None, "total": len(nodes)}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="run not found") from exc
     except ValueError as exc:
@@ -2035,6 +2281,42 @@ def audit_v2_findings_endpoint(
         run_id,
         FindingQuery(run_id, finding_id=finding_id, status=status, cursor=cursor, limit=limit),
     )
+
+
+@app.get("/v2/runs/{run_id}/findings/{finding_id:path}/remediation")
+def audit_v2_finding_remediation_endpoint(
+    run_id: str,
+    finding_id: str,
+    language: Literal["en", "ru"] = "en",
+) -> dict[str, object]:
+    """Open one finding as a bounded, actionable remediation task."""
+    try:
+        record = next(item for item in _V2_RUNS.get(run_id).iter_findings(run_id) if item.finding_id == finding_id)
+    except (KeyError, StopIteration) as exc:
+        raise HTTPException(status_code=404, detail="finding not found") from exc
+    payload = record.payload
+    if not isinstance(payload, Mapping):
+        raise HTTPException(status_code=404, detail="finding not found")
+    urls = _finding_urls(payload)
+    ru = normalize_language(language) == "ru"
+    instructions = (
+        f"Исправьте проверку {finding_id}, используя только подтверждённые данные аудита."
+        if ru
+        else f"Fix finding {finding_id} using only the confirmed audit evidence."
+    )
+    return {
+        "schema": "agentready.remediation-task.v2",
+        "run_id": run_id,
+        "finding_id": finding_id,
+        "status": payload.get("status", "unavailable"),
+        "title": payload.get("title", finding_id),
+        "reason": payload.get("reason", payload.get("summary", "")),
+        "affected_urls": list(urls),
+        "evidence": list(payload.get("evidence", ())) if isinstance(payload.get("evidence", ()), (list, tuple)) else [],
+        "instructions": instructions,
+        "agent_prompt": instructions,
+        "verification": "Run a confirmed selective rescan and inspect remediation.confirmation." if not ru else "Запустите подтверждённую выборочную перепроверку и проверьте remediation.confirmation.",
+    }
 
 
 @app.get("/v2/runs/{run_id}/metrics")

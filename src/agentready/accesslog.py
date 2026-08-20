@@ -8,6 +8,8 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
+from .audit_core.store import MetricRecord, PageRecord, SiteStore
+
 from .crawler_identity import (
     CrawlerIntent,
     IdentityEvidenceSource,
@@ -200,6 +202,89 @@ def analyze_project_ai_bot_log(
         "unmatched": dict(sorted(unmatched.items())),
         "redaction": "query strings and raw log lines are never returned",
     }
+
+
+def project_page_access_metrics(
+    lines: Iterable[str],
+    *,
+    project_target: str,
+    run_id: str,
+    pages: Iterable[PageRecord],
+    store: SiteStore | None = None,
+    start_at: str | None = None,
+    end_at: str | None = None,
+    verified_ips: Mapping[str, set[str] | frozenset[str]] | None = None,
+    max_lines: int = 100_000,
+) -> dict[str, object]:
+    """Project bounded AI-crawler log observations onto pages in a run.
+
+    Only exact, same-origin page URLs already present in ``pages`` are written.
+    Query strings, raw log lines and unknown paths are never persisted.  The
+    resulting metrics are ordinary ``MetricRecord`` rows so priority and other
+    projections can consume them without a second access-log subsystem.
+    """
+    if not run_id:
+        raise ValueError("run_id is required for page metrics")
+    base = urlsplit(project_target)
+    if base.scheme not in {"http", "https"} or not base.netloc or base.username or base.password:
+        raise ValueError("project target must be an HTTP(S) URL without credentials")
+    start = _parse_log_time(start_at) if start_at else None
+    end = _parse_log_time(end_at) if end_at else None
+    if start and end and start > end:
+        raise ValueError("start_at must not exceed end_at")
+    known = {item.url_key for item in pages}
+    counts: dict[str, int] = Counter()
+    bot_counts: dict[str, Counter[str]] = defaultdict(Counter)
+    statuses: dict[str, Counter[str]] = defaultdict(Counter)
+    latest: dict[str, datetime] = {}
+    seen: set[str] = set()
+    for index, line in enumerate(lines):
+        if index >= max_lines:
+            break
+        digest = hashlib.sha256(line.encode("utf-8", "replace")).hexdigest()
+        if digest in seen:
+            continue
+        seen.add(digest)
+        bot = next((token for token in BOT_TOKENS if token.lower() in line.lower()), None)
+        request = _REQUEST.search(line)
+        if not bot or not request:
+            continue
+        timestamp = _line_time(line)
+        if timestamp is None and (start or end):
+            continue
+        if timestamp is not None and ((start and timestamp < start) or (end and timestamp > end)):
+            continue
+        raw = request.group("path")
+        parsed = urlsplit(raw)
+        if parsed.scheme and parsed.netloc and parsed.netloc.lower() != base.netloc.lower():
+            continue
+        path = parsed.path or "/"
+        page_url = urlunsplit((base.scheme.lower(), base.netloc.lower(), path, "", ""))
+        if page_url not in known:
+            continue
+        counts[page_url] += 1
+        bot_counts[page_url][bot] += 1
+        statuses[page_url][request.group("status")] += 1
+        if timestamp is not None and (page_url not in latest or timestamp > latest[page_url]):
+            latest[page_url] = timestamp
+
+    observed = datetime.now().astimezone().isoformat()
+    written = 0
+    for url_key in sorted(counts):
+        values = (
+            ("ai_crawler_visits", counts[url_key], "count"),
+            ("ai_crawler_bots", dict(sorted(bot_counts[url_key].items())), "count"),
+            ("ai_crawler_status", dict(sorted(statuses[url_key].items())), "count"),
+        )
+        for name, value, unit in values:
+            if store is not None:
+                store.put_metric(MetricRecord(run_id, url_key, "access_log", name, value, unit, "access-log", "access-log-page-v1", observed))
+            written += 1
+        if url_key in latest:
+            if store is not None:
+                store.put_metric(MetricRecord(run_id, url_key, "access_log", "ai_crawler_last_visit", latest[url_key].isoformat(), "timestamp", "access-log", "access-log-page-v1", observed))
+            written += 1
+    return {"run_id": run_id, "pages_matched": len(counts), "metrics_written": written, "page_urls": sorted(counts), "redaction": "query strings and raw log lines are never returned"}
 
 
 def _parse_log_time(value: str) -> datetime:

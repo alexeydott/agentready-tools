@@ -137,7 +137,8 @@ def render_mobile_markdown(report: MobileReport, lang: str | None = None) -> str
         lines.append(labels["no_items"])
     for check in actionable:
         remediation = check.remediation
-        assert remediation is not None
+        if remediation is None:
+            continue
         title, _, _ = _localized_check(check.id, check.title, check.category, lang or report.language)
         lines.extend([f"### {title}", "", mobile_summary(check.id, remediation.summary, lang or report.language), "", f"{labels['rerun']}: `{remediation.rerun_command}`"])
         if remediation.references:

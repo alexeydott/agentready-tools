@@ -25,8 +25,8 @@ class AnalyticsError(RuntimeError):
     pass
 
 
-def _credentials(scopes: list[str]):
-    info = load_service_account_info()
+def _credentials(scopes: list[str], credential_ref: str | None = None):
+    info = load_service_account_info(credential_ref)
     if info is None:
         raise AnalyticsError(
             "GA/GSC credentials are not configured. Store a service account with "
@@ -39,28 +39,28 @@ def _credentials(scopes: list[str]):
     return service_account.Credentials.from_service_account_info(info, scopes=scopes)
 
 
-def _ga_client():
+def _ga_client(credential_ref: str | None = None):
     try:
         from google.analytics.data_v1beta import BetaAnalyticsDataClient
     except ImportError as exc:
         raise AnalyticsError("Install analytics extras: pip install 'agentready-tools[analytics]'") from exc
-    return BetaAnalyticsDataClient(credentials=_credentials(GA_SCOPES))
+    return BetaAnalyticsDataClient(credentials=_credentials(GA_SCOPES, credential_ref))
 
 
-def _gsc_client():
+def _gsc_client(credential_ref: str | None = None):
     try:
         from googleapiclient.discovery import build
     except ImportError as exc:
         raise AnalyticsError("Install analytics extras: pip install 'agentready-tools[analytics]'") from exc
-    return build("searchconsole", "v1", credentials=_credentials(GSC_SCOPES), cache_discovery=False)
+    return build("searchconsole", "v1", credentials=_credentials(GSC_SCOPES, credential_ref), cache_discovery=False)
 
 
-def ga_pages_without_traffic(ga_property: str, days: int = DEFAULT_RANGE_DAYS) -> list[dict[str, Any]]:
+def ga_pages_without_traffic(ga_property: str, days: int = DEFAULT_RANGE_DAYS, *, credential_ref: str | None = None) -> list[dict[str, Any]]:
     """GA4: pages with zero sessions in the last ``days`` days window.
 
     Returns rows with zero-session pagePaths derived from the page report.
     """
-    client = _ga_client()
+    client = _ga_client(credential_ref)
     try:
         from google.analytics.data_v1beta.types import (
             DateRange,
@@ -85,9 +85,9 @@ def ga_pages_without_traffic(ga_property: str, days: int = DEFAULT_RANGE_DAYS) -
     ]
 
 
-def ga_bounce_rate(ga_property: str, page: str, days: int = DEFAULT_RANGE_DAYS) -> float | None:
+def ga_bounce_rate(ga_property: str, page: str, days: int = DEFAULT_RANGE_DAYS, *, credential_ref: str | None = None) -> float | None:
     """GA4: bounce rate for one page path, or None when there is no data."""
-    client = _ga_client()
+    client = _ga_client(credential_ref)
     try:
         from google.analytics.data_v1beta.types import (
             DateRange,
@@ -117,14 +117,14 @@ def ga_bounce_rate(ga_property: str, page: str, days: int = DEFAULT_RANGE_DAYS) 
     return value
 
 
-def gsc_pages_without_clicks(site_url: str, days: int = DEFAULT_RANGE_DAYS) -> list[dict[str, Any]]:
+def gsc_pages_without_clicks(site_url: str, days: int = DEFAULT_RANGE_DAYS, *, credential_ref: str | None = None) -> list[dict[str, Any]]:
     """Search Console: pages with impressions but zero clicks."""
-    return _gsc_page_query(site_url, days, require_clicks_zero=True)
+    return _gsc_page_query(site_url, days, require_clicks_zero=True, credential_ref=credential_ref)
 
 
-def gsc_pages_without_impressions(site_url: str, days: int = DEFAULT_RANGE_DAYS) -> list[str]:
+def gsc_pages_without_impressions(site_url: str, days: int = DEFAULT_RANGE_DAYS, *, credential_ref: str | None = None) -> list[str]:
     """Search Console: page report is empty for URLs known to the site (checked per URL upstream)."""
-    service = _gsc_client()
+    service = _gsc_client(credential_ref)
     body = _gsc_body(site_url, days)
     response = service.searchanalytics().query(siteUrl=site_url, body=body).execute()
     logger.info("GSC report fetched: site=%s rows=%d", site_url, len(response.get("rows", [])))
@@ -142,8 +142,8 @@ def _gsc_body(site_url: str, days: int) -> dict[str, Any]:
     }
 
 
-def _gsc_page_query(site_url: str, days: int, *, require_clicks_zero: bool) -> list[dict[str, Any]]:
-    service = _gsc_client()
+def _gsc_page_query(site_url: str, days: int, *, require_clicks_zero: bool, credential_ref: str | None = None) -> list[dict[str, Any]]:
+    service = _gsc_client(credential_ref)
     body = _gsc_body(site_url, days)
     response = service.searchanalytics().query(siteUrl=site_url, body=body).execute()
     rows = response.get("rows", [])

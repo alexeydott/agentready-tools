@@ -21,7 +21,7 @@ _WEIGHTS = {
     "freshness": 0.05,
 }
 _SEVERITY = {"critical": 1.0, "error": 0.9, "high": 0.8, "fail": 0.7, "warn": 0.6, "warning": 0.6, "medium": 0.55, "low": 0.3, "info": 0.15, "pass": 0.0, "skip": 0.0, "unavailable": 0.0}
-_TRAFFIC_NAMES = {"traffic", "visits", "sessions", "clicks", "impressions", "search_clicks", "search_impressions"}
+_TRAFFIC_NAMES = {"traffic", "visits", "sessions", "clicks", "impressions", "search_clicks", "search_impressions", "ai_crawler_visits"}
 
 
 @dataclass(frozen=True, slots=True)

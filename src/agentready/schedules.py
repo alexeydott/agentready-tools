@@ -43,9 +43,13 @@ class ScheduleService:
 
     def _audit_project(self, project: ProjectRecord) -> str | None:
         from .audit_service import AuditRequest, AuditService
+        from .projects import ProjectService
 
-        result = AuditService().run(AuditRequest(target=project.target, profile=project.default_profile, store=self.store))
-        return result.run.context.run_id
+        result = AuditService().run(AuditRequest(target=project.target, profile=project.default_profile, ruleset=project.default_ruleset, store=self.store))
+        run_id = result.run.context.run_id
+        ProjectService(self.store).attach_run(project.project_id, run_id, target=project.target, trigger="scheduled")
+        logger.info("[FIX:schedule-project-history] attached scheduled run project_id=%s run_id=%s", project.project_id, run_id)
+        return run_id
 
     def create(self, schedule: ScheduleRecord) -> ScheduleRecord:
         self.store.get_project(schedule.project_id)

@@ -88,7 +88,8 @@ class InventoryWorkflow:
 
     def execute(self, request: InventoryRequest) -> InventoryResponse:
         page = self._queries.execute(inventory_query(request))
-        assert isinstance(page, QueryPage)
+        if not isinstance(page, QueryPage):
+            raise TypeError("inventory query returned an invalid page")
         return InventoryResponse(request.run_id, request.kind, tuple(page.items), page.next_cursor, page.total)
 
 

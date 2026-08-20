@@ -67,8 +67,25 @@ def store_service_account(path: str) -> None:
     logger.info("Stored GA/GSC service account for %s in the OS credential vault", data.get("client_email"))
 
 
-def load_service_account_info() -> dict | None:
-    """Return service-account info from the vault or GOOGLE_APPLICATION_CREDENTIALS."""
+def load_service_account_info(credential_ref: str | None = None) -> dict | None:
+    """Return service-account info from the vault or environment.
+
+    ``credential_ref`` is accepted only by trusted local callers.  The
+    default legacy lookup remains available for the CLI analytics checks,
+    while explicitly referenced credentials are resolved through the local
+    credential vault and are never serialized into API/MCP payloads.
+    """
+    if credential_ref:
+        referenced = load_secret(credential_ref)
+        if not referenced:
+            raise CredentialsError("referenced credential was not found in the OS credential vault")
+        try:
+            data = json.loads(referenced)
+        except json.JSONDecodeError as exc:
+            raise CredentialsError("referenced credential is not valid JSON") from exc
+        if data.get("type") != "service_account" or not data.get("client_email"):
+            raise CredentialsError("referenced credential is not a valid Google service-account JSON")
+        return data
     try:
         stored = _keyring().get_password(SERVICE_NAME, ACCOUNT_KEY)
     except CredentialsError:

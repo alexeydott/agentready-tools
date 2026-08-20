@@ -32,6 +32,8 @@ class AuditRunContext:
     tool_version: str
     rule_catalog_version: str
     created_at: str
+    ruleset_version: str | None = None
+    ruleset_hash: str | None = None
 
     @classmethod
     def create(
@@ -42,6 +44,8 @@ class AuditRunContext:
         tool_version: str,
         rule_catalog_version: str,
         run_id: str | None = None,
+        ruleset_version: str | None = None,
+        ruleset_hash: str | None = None,
     ) -> AuditRunContext:
         encoded = json.dumps(configuration, sort_keys=True, separators=(",", ":"), default=str)
         config_hash = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -52,6 +56,8 @@ class AuditRunContext:
             tool_version=tool_version,
             rule_catalog_version=rule_catalog_version,
             created_at=datetime.now(UTC).isoformat(),
+            ruleset_version=ruleset_version,
+            ruleset_hash=ruleset_hash,
         )
         logger.info("audit run created run_id=%s config_hash=%s", context.run_id, config_hash[:12])
         return context

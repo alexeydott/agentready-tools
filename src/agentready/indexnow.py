@@ -109,7 +109,8 @@ def _normalize_urls(urls: list[str]) -> tuple[str, list[str]]:
         raise IndexNowError("no URLs to submit")
     if len(clean) > MAX_URLS:
         raise IndexNowError(f"IndexNow allows at most {MAX_URLS} URLs per request")
-    assert host is not None
+    if host is None:
+        raise ValueError("URL host is required")
     logger.debug("Normalized IndexNow URLs: host=%s url_count=%d", host, len(clean))
     return host, clean
 

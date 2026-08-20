@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+from pathlib import Path
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -12,6 +13,7 @@ from typing import Any
 from . import __version__
 from .audit_core import AuditRunContext, CollectedPage, FactView, RunSnapshot, RunState
 from .crawl_profiles import HARD_CAPS, resolve_profile
+from .custom_rules import CustomRuleDocument, apply_rules, compile_rules, css_matches_from_html
 from .crawler import AsyncCrawler, CrawlResult, CrawlScope
 from .discovery import (
     RobotsSitemapSource,
@@ -31,6 +33,7 @@ from .report_v2 import (
     FindingStatus,
 )
 from .target import parse_target
+from .structured_data import extract_jsonld_nodes
 from .workflows import (
     InventoryRequest,
     InventoryResponse,
@@ -80,6 +83,7 @@ class AuditRequest:
     credential_ref: str | None = None
     credential_headers: Mapping[str, str] = field(default_factory=dict, compare=False, repr=False)
     security_context: TrustedLocalCredentialContext | None = field(default=None, compare=False, repr=False)
+    ruleset: str | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         if not self.target.strip():
@@ -146,7 +150,65 @@ class AuditRequest:
             "trusted_origin": self.trusted_origin,
             "credential_ref": self.credential_ref,
             "trusted_auth": bool(self.security_context),
+            # Keep run identity deterministic without persisting inline rule text.
+            "ruleset": (
+                "<inline>"
+                if self.ruleset and (
+                    "\n" in self.ruleset
+                    or self.ruleset.lstrip().startswith(("{", "version:"))
+                )
+                else self.ruleset
+            ),
         }
+
+
+def _resolve_ruleset(value: str | None) -> CustomRuleDocument | None:
+    """Compile inline rules or a bounded local project ruleset reference."""
+    if not value:
+        return None
+    source = value
+    if "\n" not in value and not value.lstrip().startswith(("{", "version:")):
+        candidate = Path(value)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            raise ValueError("ruleset references must be relative and local")
+        source_path = (Path.cwd() / candidate).resolve()
+        if not source_path.is_file() or source_path.stat().st_size > 1_000_000:
+            raise ValueError(f"ruleset reference is unavailable: {value}")
+        source = source_path.read_text(encoding="utf-8")
+    return compile_rules(source)
+
+
+def _apply_ruleset(document: CustomRuleDocument, fact_views: tuple[FactView, ...]) -> tuple[dict[str, object], ...]:
+    results: list[dict[str, object]] = []
+    for view in fact_views:
+        facts = view.facts
+        body_text = view.body.decode("utf-8", errors="replace") if view.body else ""
+        structured_data = extract_jsonld_nodes(body_text)[0] if body_text else []
+        links = tuple(item.resolved_url or item.raw_href for item in (facts.links if facts else ()))
+        resources = tuple(item.resolved_url or item.url for item in (facts.resources if facts else ()))
+        css_matches: dict[str, tuple[str, ...]] = {}
+        for rule in document.rules:
+            if rule.kind.value == "css":
+                css_matches[rule.id] = css_matches_from_html(body_text, rule.pattern, max_matches=rule.max_matches)
+        payload = apply_rules(
+            document,
+            url=view.url,
+            text=facts.visible_text if facts else "",
+            headers=dict(view.headers),
+            structured_data=structured_data,
+            links=links,
+            resources=resources,
+            css_matches=tuple(value for rule in document.rules for value in css_matches.get(rule.id, ())),
+        )
+        # apply_rules receives a shared CSS list; restore per-rule selector
+        # matches so a selector cannot inherit another rule's values.
+        for item in payload["matches"]:
+            if item["rule_id"] in css_matches:
+                item["matches"] = list(css_matches[item["rule_id"]])
+                item["count"] = len(item["matches"])
+        results.append({"url": view.url, "matches": payload["matches"], "version": document.version, "rule_hash": document.rule_hash})
+    logger.info("[FIX:custom-rules-audit] applied ruleset version=%s hash=%s pages=%d", document.version, document.rule_hash[:16], len(results))
+    return tuple(results)
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,6 +248,9 @@ class AuditResult:
             "language": self.request.language,
             "run_rules": self.request.run_rules,
         }
+        if self.run.context.ruleset_hash:
+            payload["run"].update({"ruleset_version": self.run.context.ruleset_version, "ruleset_hash": self.run.context.ruleset_hash})
+            payload["request"].update({"ruleset_version": self.run.context.ruleset_version, "ruleset_hash": self.run.context.ruleset_hash})
         if self.request.mode != "readiness":
             payload["request"]["mode"] = self.request.mode
         if self.request.crawl:
@@ -280,15 +345,20 @@ class AuditService:
         from .registry import BY_ID
 
         target = parse_target(request.target).url
+        ruleset_document = _resolve_ruleset(request.ruleset)
         execution_plan = PlanCompiler().compile(request)
         configuration = request.configuration()
         configuration["target"] = target
+        configuration["ruleset_version"] = ruleset_document.version if ruleset_document else None
+        configuration["ruleset_hash"] = ruleset_document.rule_hash if ruleset_document else None
         context = AuditRunContext.create(
             target,
             configuration,
             tool_version=__version__,
             rule_catalog_version="v2",
             run_id=None,
+            ruleset_version=ruleset_document.version if ruleset_document else None,
+            ruleset_hash=ruleset_document.rule_hash if ruleset_document else None,
         )
         logger.info(
             "audit request accepted run_id=%s config_hash=%s profile=%s max_pages=%d render=%s provider=%s",
@@ -396,6 +466,21 @@ class AuditService:
                 ).crawl()
             )
             fact_views = self._fact_views(crawl)
+            custom_rule_results = _apply_ruleset(ruleset_document, fact_views) if ruleset_document else ()
+            if ruleset_document and request.store is not None:
+                for page_result in custom_rule_results:
+                    for item in page_result["matches"]:
+                        finding_id = f"custom-rule:{item['rule_id']}:{page_result['url']}"
+                        request.store.put_finding(context.run_id, finding_id, {
+                            "id": finding_id,
+                            "status": "fail" if item["count"] else "pass",
+                            "title": item["title"],
+                            "rule_version": ruleset_document.version,
+                            "rule_hash": ruleset_document.rule_hash,
+                            "match_count": item["count"],
+                            "matches": item["matches"],
+                            "affected_urls": [page_result["url"]] if item["count"] else [],
+                        })
             if rule_client is not None:
                 from .report_v2 import report_from_checks
                 from .scanner import scan
@@ -425,7 +510,18 @@ class AuditService:
         finally:
             if rule_client is not None:
                 rule_client.close()
-        report = self._report(target, crawl, run_id=context.run_id, check_report=check_report)
+        custom_findings = tuple(
+            Finding(
+                f"custom-rule:{item['rule_id']}:{page['url']}",
+                item["title"] or item["rule_id"],
+                FindingStatus.FAIL if item["count"] else FindingStatus.PASS,
+                f"{item['count']} match(es) for custom rule {item['rule_id']}",
+                (FindingEvidence(f"custom-rule:{item['rule_id']}", str(item["matches"]), page["url"]),),
+            )
+            for page in custom_rule_results
+            for item in page["matches"]
+        )
+        report = self._report(target, crawl, run_id=context.run_id, check_report=check_report, custom_findings=custom_findings)
         state = (
             RunState.PARTIAL
             if crawl.coverage.classification.value != "complete_within_scope"
@@ -458,6 +554,7 @@ class AuditService:
         from .models import utc_now_iso
 
         target = parse_target(request.target).url
+        ruleset_document = _resolve_ruleset(request.ruleset)
         configuration = request.configuration()
         configuration["target"] = target
         context = AuditRunContext.create(
@@ -466,6 +563,8 @@ class AuditService:
             tool_version=__version__,
             rule_catalog_version="mobile-v2",
             run_id=None,
+            ruleset_version=ruleset_document.version if ruleset_document else None,
+            ruleset_hash=ruleset_document.rule_hash if ruleset_document else None,
         )
         profile = resolve_profile(
             request.profile,
@@ -581,15 +680,20 @@ class AuditService:
         from .seo_scoring import score_checks
 
         target = parse_target(request.target).url
+        ruleset_document = _resolve_ruleset(request.ruleset)
         execution_plan = PlanCompiler().compile(request)
         configuration = request.configuration()
         configuration["target"] = target
+        configuration["ruleset_version"] = ruleset_document.version if ruleset_document else None
+        configuration["ruleset_hash"] = ruleset_document.rule_hash if ruleset_document else None
         context = AuditRunContext.create(
             target,
             configuration,
             tool_version=__version__,
             rule_catalog_version="seo-v2-atomic",
             run_id=None,
+            ruleset_version=ruleset_document.version if ruleset_document else None,
+            ruleset_hash=ruleset_document.rule_hash if ruleset_document else None,
         )
         profile_overrides = {key: value for key, value in request.limits.items() if key != "check_limit"}
         profile_overrides["max_pages"] = request.max_pages if request.crawl else 1
@@ -801,6 +905,7 @@ class AuditService:
         *,
         run_id: str | None = None,
         check_report: AuditReport | None = None,
+        custom_findings: tuple[Finding, ...] = (),
     ) -> AuditReport:
         coverage = Coverage(
             total_rules=1,
@@ -831,7 +936,7 @@ class AuditService:
                 ),
             ),
         )
-        findings = ((check_report.findings if check_report else ()) + (finding,))
+        findings = ((check_report.findings if check_report else ()) + custom_findings + (finding,))
         if check_report:
             coverage = Coverage(
                 total_rules=check_report.coverage.total_rules + 1,

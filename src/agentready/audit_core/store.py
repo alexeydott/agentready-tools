@@ -115,6 +115,15 @@ class FindingStorageQuery(StorageQuery):
 class LinkStorageQuery(StorageQuery):
     source_key: str | None = None
     target_key: str | None = None
+    rel: str | None = None
+    anchor_contains: str | None = None
+    internal: bool | None = None
+    sort_key: str = "source"
+
+    def __post_init__(self) -> None:
+        StorageQuery.__post_init__(self)
+        if self.sort_key not in {"source", "target", "anchor", "ordinal"}:
+            raise ValueError("unsupported link storage sort field")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +131,39 @@ class ResourceStorageQuery(StorageQuery):
     page_key: str | None = None
     resource_type: str | None = None
     status_code: int | None = None
+    sort_key: str = "page"
+
+    def __post_init__(self) -> None:
+        StorageQuery.__post_init__(self)
+        if self.sort_key not in {"page", "resource", "type", "status"}:
+            raise ValueError("unsupported resource storage sort field")
+
+
+@dataclass(frozen=True, slots=True)
+class MetricStorageQuery(StorageQuery):
+    provider: str | None = None
+    name: str | None = None
+    min_value: float | None = None
+    max_value: float | None = None
+    sort_key: str = "url"
+
+    def __post_init__(self) -> None:
+        StorageQuery.__post_init__(self)
+        if self.sort_key not in {"url", "provider", "name", "value"}:
+            raise ValueError("unsupported metric storage sort field")
+
+
+@dataclass(frozen=True, slots=True)
+class RedirectStorageQuery(StorageQuery):
+    from_url: str | None = None
+    to_url: str | None = None
+    status_code: int | None = None
+    sort_key: str = "from_url"
+
+    def __post_init__(self) -> None:
+        StorageQuery.__post_init__(self)
+        if self.sort_key not in {"from_url", "to_url", "status"}:
+            raise ValueError("unsupported redirect storage sort field")
 
 
 @dataclass(frozen=True, slots=True)
@@ -383,6 +425,10 @@ class SiteStore(Protocol):
     def query_pages(self, run_id: str, *, status_code: int | None = None) -> list[PageRecord]: ...
     def query_pages_storage(self, query: PageStorageQuery) -> StoragePage: ...
     def query_run_urls_storage(self, query: RunUrlStorageQuery) -> StoragePage: ...
+    def query_links_storage(self, query: LinkStorageQuery) -> StoragePage: ...
+    def query_resources_storage(self, query: ResourceStorageQuery) -> StoragePage: ...
+    def query_metrics_storage(self, query: MetricStorageQuery) -> StoragePage: ...
+    def query_redirects_storage(self, query: RedirectStorageQuery) -> StoragePage: ...
     def iter_link_occurrences(self, run_id: str) -> Iterator[LinkOccurrenceRecord]: ...
     def iter_resource_occurrences(self, run_id: str) -> Iterator[ResourceOccurrenceRecord]: ...
     def iter_metrics(self, run_id: str) -> Iterator[MetricRecord]: ...
@@ -1264,6 +1310,118 @@ class SQLiteSiteStore:
         total = int(self._connection.execute(f"SELECT COUNT(*) FROM run_urls WHERE {predicate}", tuple(params)).fetchone()[0])
         return StoragePage(items, next_cursor, total)
 
+    def query_links_storage(self, query: LinkStorageQuery) -> StoragePage:
+        columns = {
+            "source": ("source_key", "source_key", "ordinal", "raw_href"),
+            "target": ("COALESCE(target_key, '')", "source_key", "ordinal", "raw_href"),
+            "anchor": ("LOWER(COALESCE(anchor_text, ''))", "source_key", "ordinal", "raw_href"),
+            "ordinal": ("ordinal", "source_key", "raw_href"),
+        }[query.sort_key]
+        where = ["run_id=?"]
+        params: list[Any] = [query.run_id]
+        if query.source_key is not None:
+            where.append("source_key=?"); params.append(query.source_key)
+        if query.target_key is not None:
+            where.append("target_key=?"); params.append(query.target_key)
+        if query.rel is not None:
+            where.append("rel=?"); params.append(query.rel)
+        if query.anchor_contains is not None:
+            where.append("LOWER(COALESCE(anchor_text, '')) LIKE ?"); params.append(f"%{query.anchor_contains.lower()}%")
+        if query.internal is not None:
+            where.append("(target_key IS NOT NULL)=?"); params.append(int(query.internal))
+        predicate = " AND ".join(where)
+        order = ", ".join(f"{column} {'DESC' if query.descending else 'ASC'}" for column in columns)
+        params_page = list(params)
+        if query.cursor:
+            cursor = StorageCursor.decode(query.cursor, run_id=query.run_id, query_hash=_storage_query_hash(query))
+            values = cursor.position
+            op = "<" if query.descending else ">"
+            clauses = []
+            for index, column in enumerate(columns):
+                prefix = " AND ".join(f"{columns[i]}=?" for i in range(index))
+                clause = f"({prefix + ' AND ' if prefix else ''}{column} {op} ?)"
+                clauses.append(clause); params_page.extend(values[:index]); params_page.append(values[index])
+            where_page = f"({ ' OR '.join(clauses) })"
+            predicate_page = f"{predicate} AND {where_page}"
+        else:
+            predicate_page = predicate
+        rows = list(self._connection.execute(f"SELECT * FROM link_occurrences WHERE {predicate_page} ORDER BY {order} LIMIT ?", (*params_page, query.limit + 1)))
+        items = tuple(_link_occurrence_from_row(row) for row in rows[:query.limit])
+        next_cursor = None
+        if len(rows) > query.limit and items:
+            last = items[-1]
+            position = _link_storage_position(last, query.sort_key)
+            next_cursor = StorageCursor(query.run_id, _storage_query_hash(query), position).encode()
+        total = int(self._connection.execute(f"SELECT COUNT(*) FROM link_occurrences WHERE {predicate}", tuple(params)).fetchone()[0])
+        return StoragePage(items, next_cursor, total)
+
+    def query_resources_storage(self, query: ResourceStorageQuery) -> StoragePage:
+        columns = {
+            "page": ("page_key", "ordinal", "resource_url"),
+            "resource": ("resource_url", "page_key", "ordinal"),
+            "type": ("resource_type", "page_key", "ordinal", "resource_url"),
+            "status": ("COALESCE(status_code, 0)", "page_key", "ordinal", "resource_url"),
+        }[query.sort_key]
+        where = ["run_id=?"]; params: list[Any] = [query.run_id]
+        if query.page_key is not None: where.append("page_key=?"); params.append(query.page_key)
+        if query.resource_type is not None: where.append("resource_type=?"); params.append(query.resource_type)
+        if query.status_code is not None: where.append("status_code=?"); params.append(query.status_code)
+        predicate = " AND ".join(where); params_page = list(params)
+        if query.cursor:
+            cursor = StorageCursor.decode(query.cursor, run_id=query.run_id, query_hash=_storage_query_hash(query)); values = cursor.position; op = "<" if query.descending else ">"
+            clauses = []
+            for index, column in enumerate(columns):
+                prefix = " AND ".join(f"{columns[i]}=?" for i in range(index)); clauses.append(f"({prefix + ' AND ' if prefix else ''}{column} {op} ?)"); params_page.extend(values[:index]); params_page.append(values[index])
+            predicate_page = f"{predicate} AND ({' OR '.join(clauses)})"
+        else: predicate_page = predicate
+        order = ", ".join(f"{column} {'DESC' if query.descending else 'ASC'}" for column in columns)
+        rows = list(self._connection.execute(f"SELECT * FROM resource_occurrences WHERE {predicate_page} ORDER BY {order} LIMIT ?", (*params_page, query.limit + 1)))
+        items = tuple(_resource_occurrence_from_row(row) for row in rows[:query.limit]); next_cursor = None
+        if len(rows) > query.limit and items: next_cursor = StorageCursor(query.run_id, _storage_query_hash(query), _resource_storage_position(items[-1], query.sort_key)).encode()
+        total = int(self._connection.execute(f"SELECT COUNT(*) FROM resource_occurrences WHERE {predicate}", tuple(params)).fetchone()[0])
+        return StoragePage(items, next_cursor, total)
+
+    def query_metrics_storage(self, query: MetricStorageQuery) -> StoragePage:
+        columns = {"url": ("COALESCE(url_key, '')", "provider", "name"), "provider": ("provider", "COALESCE(url_key, '')", "name"), "name": ("name", "COALESCE(url_key, '')", "provider"), "value": ("CAST(value AS REAL)", "COALESCE(url_key, '')", "provider", "name")}[query.sort_key]
+        where = ["run_id=?"]; params: list[Any] = [query.run_id]
+        if query.provider is not None: where.append("provider=?"); params.append(query.provider)
+        if query.name is not None: where.append("name=?"); params.append(query.name)
+        if query.min_value is not None: where.append("CAST(value AS REAL)>=?"); params.append(query.min_value)
+        if query.max_value is not None: where.append("CAST(value AS REAL)<=?"); params.append(query.max_value)
+        predicate = " AND ".join(where); params_page = list(params)
+        if query.cursor:
+            cursor = StorageCursor.decode(query.cursor, run_id=query.run_id, query_hash=_storage_query_hash(query)); values = cursor.position; op = "<" if query.descending else ">"; clauses = []
+            for index, column in enumerate(columns):
+                prefix = " AND ".join(f"{columns[i]}=?" for i in range(index)); clauses.append(f"({prefix + ' AND ' if prefix else ''}{column} {op} ?)"); params_page.extend(values[:index]); params_page.append(values[index])
+            predicate_page = f"{predicate} AND ({' OR '.join(clauses)})"
+        else: predicate_page = predicate
+        order = ", ".join(f"{column} {'DESC' if query.descending else 'ASC'}" for column in columns)
+        rows = list(self._connection.execute(f"SELECT * FROM metrics WHERE {predicate_page} ORDER BY {order} LIMIT ?", (*params_page, query.limit + 1)))
+        items = tuple(_metric_from_row(row) for row in rows[:query.limit]); next_cursor = None
+        if len(rows) > query.limit and items: next_cursor = StorageCursor(query.run_id, _storage_query_hash(query), _metric_storage_position(items[-1], query.sort_key)).encode()
+        total = int(self._connection.execute(f"SELECT COUNT(*) FROM metrics WHERE {predicate}", tuple(params)).fetchone()[0])
+        return StoragePage(items, next_cursor, total)
+
+    def query_redirects_storage(self, query: RedirectStorageQuery) -> StoragePage:
+        columns = {"from_url": ("from_url", "status_code", "COALESCE(to_url, '')", "location_raw"), "to_url": ("COALESCE(to_url, '')", "from_url", "status_code", "location_raw"), "status": ("status_code", "from_url", "COALESCE(to_url, '')", "location_raw")}[query.sort_key]
+        where = ["run_id=?"]; params: list[Any] = [query.run_id]
+        if query.from_url is not None: where.append("from_url=?"); params.append(query.from_url)
+        if query.to_url is not None: where.append("to_url=?"); params.append(query.to_url)
+        if query.status_code is not None: where.append("status_code=?"); params.append(query.status_code)
+        predicate = " AND ".join(where); params_page = list(params)
+        if query.cursor:
+            cursor = StorageCursor.decode(query.cursor, run_id=query.run_id, query_hash=_storage_query_hash(query)); values = cursor.position; op = "<" if query.descending else ">"; clauses = []
+            for index, column in enumerate(columns):
+                prefix = " AND ".join(f"{columns[i]}=?" for i in range(index)); clauses.append(f"({prefix + ' AND ' if prefix else ''}{column} {op} ?)"); params_page.extend(values[:index]); params_page.append(values[index])
+            predicate_page = f"{predicate} AND ({' OR '.join(clauses)})"
+        else: predicate_page = predicate
+        order = ", ".join(f"{column} {'DESC' if query.descending else 'ASC'}" for column in columns)
+        rows = list(self._connection.execute(f"SELECT * FROM redirects WHERE {predicate_page} ORDER BY {order} LIMIT ?", (*params_page, query.limit + 1)))
+        items = tuple(_redirect_from_row(row) for row in rows[:query.limit]); next_cursor = None
+        if len(rows) > query.limit and items: next_cursor = StorageCursor(query.run_id, _storage_query_hash(query), _redirect_storage_position(items[-1], query.sort_key)).encode()
+        total = int(self._connection.execute(f"SELECT COUNT(*) FROM redirects WHERE {predicate}", tuple(params)).fetchone()[0])
+        return StoragePage(items, next_cursor, total)
+
     def query_findings_storage(self, query: FindingStorageQuery) -> StoragePage:
         query_hash = _storage_query_hash(query)
         where = ["run_id=?"]
@@ -1317,6 +1475,10 @@ def _now() -> str:
 def _storage_query_hash(query: StorageQuery) -> str:
     payload = asdict(query)
     payload.pop("cursor", None)
+    # Page size is a presentation concern; clients commonly follow a cursor
+    # with the endpoint default limit. Keep the cursor bound to filters/order,
+    # but allow a different bounded page size on the next request.
+    payload.pop("limit", None)
     payload["state"] = getattr(query, "state", None)
     if hasattr(payload["state"], "value"):
         payload["state"] = payload["state"].value
@@ -1372,6 +1534,38 @@ def _page_from_row(row: sqlite3.Row) -> PageRecord:
         locally_indexable=None if row["locally_indexable"] is None else bool(row["locally_indexable"]),
         content_hash=row["content_hash"], content=row["content"],
     )
+
+
+def _link_occurrence_from_row(row: sqlite3.Row) -> LinkOccurrenceRecord:
+    return LinkOccurrenceRecord(run_id=row["run_id"], source_key=row["source_key"], ordinal=row["ordinal"], raw_href=row["raw_href"], target_key=row["target_key"], resolved_url=row["resolved_url"], rel_flags=row["rel_flags"], anchor_text=row["anchor_text"], discovery_method=row["discovery_method"], representation_id=row["representation_id"] or None, rel=row["rel"], element=row["element"], dom_path=row["dom_path"])
+
+
+def _resource_occurrence_from_row(row: sqlite3.Row) -> ResourceOccurrenceRecord:
+    return ResourceOccurrenceRecord(run_id=row["run_id"], page_key=row["page_key"], ordinal=row["ordinal"], resource_url=row["resource_url"], resource_type=row["resource_type"], status_code=row["status_code"], resolved_url=row["resolved_url"], representation_id=row["representation_id"] or None, element=row["element"], dom_path=row["dom_path"])
+
+
+def _metric_from_row(row: sqlite3.Row) -> MetricRecord:
+    return MetricRecord(run_id=row["run_id"], url_key=row["url_key"], provider=row["provider"], name=row["name"], value=json.loads(row["value"]) if row["value"] is not None else None, unit=row["unit"], source=row["source"], version=row["version"], observed_at=row["observed_at"], kind=row["kind"])
+
+
+def _redirect_from_row(row: sqlite3.Row) -> RedirectFact:
+    return RedirectFact(run_id=row["run_id"], from_url=row["from_url"], to_url=row["to_url"], status_code=row["status_code"], location_raw=row["location_raw"])
+
+
+def _link_storage_position(row: LinkOccurrenceRecord, sort_key: str) -> tuple[Any, ...]:
+    return {"source": (row.source_key, row.source_key, row.ordinal, row.raw_href), "target": (row.target_key or "", row.source_key, row.ordinal, row.raw_href), "anchor": ((row.anchor_text or "").lower(), row.source_key, row.ordinal, row.raw_href), "ordinal": (row.ordinal, row.source_key, row.raw_href)}[sort_key]
+
+
+def _resource_storage_position(row: ResourceOccurrenceRecord, sort_key: str) -> tuple[Any, ...]:
+    return {"page": (row.page_key, row.ordinal, row.resource_url), "resource": (row.resource_url, row.page_key, row.ordinal), "type": (row.resource_type, row.page_key, row.ordinal, row.resource_url), "status": (row.status_code or 0, row.page_key, row.ordinal, row.resource_url)}[sort_key]
+
+
+def _metric_storage_position(row: MetricRecord, sort_key: str) -> tuple[Any, ...]:
+    return {"url": (row.url_key or "", row.provider, row.name), "provider": (row.provider, row.url_key or "", row.name), "name": (row.name, row.url_key or "", row.provider), "value": (float(row.value) if isinstance(row.value, (int, float)) else 0.0, row.url_key or "", row.provider, row.name)}[sort_key]
+
+
+def _redirect_storage_position(row: RedirectFact, sort_key: str) -> tuple[Any, ...]:
+    return {"from_url": (row.from_url, row.status_code, row.to_url or "", row.location_raw), "to_url": (row.to_url or "", row.from_url, row.status_code, row.location_raw), "status": (row.status_code, row.from_url, row.to_url or "", row.location_raw)}[sort_key]
 
 
 _INITIAL_SCHEMA = """

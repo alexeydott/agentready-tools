@@ -17,11 +17,12 @@ except ImportError as exc:  # pragma: no cover
 
 import logging
 import hashlib
+from dataclasses import asdict
 
 from .agentfindings import build_findings, build_remediation_plan
 from .audit_service import AuditRequest, AuditService
 from .exports import export_query
-from .metrics import ExternalMetric, ProviderStatus, cached_result
+from .metrics import ExternalMetric, ProviderConfig, ProviderStatus
 from .provider_service import ProviderService
 from .mobile_scanner import audit_mobile
 from .query_service import QueryService
@@ -227,10 +228,141 @@ def provider_enrichment_v2(
             "metrics": [],
             "from_cache": False,
         }
-    result = cached_result(provider, metrics).to_dict()
+    # Route fixture normalization through the same service used by the trusted
+    # local CLI/API.  The temporary in-memory run keeps MCP read-only and does
+    # not expose credentials or write project data.
+    from .audit_core.store import MemorySiteStore, RunRecord
+    fixture_run = "mcp-provider-" + hashlib.sha256(
+        (provider + (normalized_scope or "")).encode("utf-8")
+    ).hexdigest()[:24]
+    store = MemorySiteStore()
+    store.begin_run(RunRecord(fixture_run, "mcp-provider", "mcp", "provider-fixture"))
+    service_result = ProviderService(store).enrich(
+        fixture_run,
+        provider,
+        config=ProviderConfig(enabled=False, explicit_operation=True),
+        cached=metrics,
+        scope=normalized_scope,
+    )
+    result = service_result.to_dict()
     if normalized_scope:
         result["scope"] = normalized_scope
     logger.info("MCP provider fixture normalized provider=%s metrics=%d", provider, len(metrics))
+    return result
+
+
+@mcp.tool()
+def sitemap_reconcile_v2(
+    run_id: str,
+    documents: list[str],
+    origin: str,
+    category: str = "sitemap_only",
+    cursor: str | None = None,
+    limit: int = 100,
+    export_format: str | None = None,
+) -> dict:
+    """Reconcile caller-supplied sitemap XML with a stored run, without fetching."""
+    from . import server as server_module
+    request = server_module.SitemapReconciliationRequest(
+        documents=documents[:32], origin=origin, category=category,
+        cursor=cursor, limit=limit, format=export_format or "json",
+    )
+    return server_module.sitemap_reconcile_endpoint(run_id, request)
+
+
+@mcp.tool()
+def custom_rules_debug_v2(
+    run_id: str,
+    rules: str | dict,
+    url: str = "",
+    url_key: str | None = None,
+) -> dict:
+    """Debug declarative rules against a saved representation; never refetches a page."""
+    from . import server as server_module
+    request = server_module.CustomRulesRequest(
+        rules=rules, url=url, url_key=url_key or url, run_id=run_id,
+    )
+    return server_module.custom_rules_debug_endpoint(request)
+
+
+@mcp.tool()
+def link_graph_v2(
+    run_id: str,
+    origin: str | None = None,
+    limit: int = 100,
+    cursor: str | None = None,
+    dead_end: bool | None = None,
+    disconnected: bool | None = None,
+) -> dict:
+    """Read a bounded link-graph projection from an existing v2 run."""
+    from . import server as server_module
+    return server_module.audit_v2_graph_endpoint(
+        run_id, origin=origin, cursor=cursor, limit=max(1, min(limit, 1000)),
+        dead_end=dead_end, disconnected=disconnected,
+    )
+
+
+@mcp.tool()
+def duplicate_clusters_v2(
+    run_id: str,
+    kind: str = "all",
+    limit: int = 100,
+    cursor: str | None = None,
+    threshold: int = 3,
+) -> dict:
+    """Read bounded exact/near duplicate clusters from an existing v2 run."""
+    from . import server as server_module
+    if kind not in {"all", "exact", "near"}:
+        raise ValueError("kind must be all, exact, or near")
+    return server_module.audit_v2_duplicates_endpoint(
+        run_id, cursor=cursor, limit=max(1, min(limit, 1000)),
+        kind=kind, threshold=max(0, min(threshold, 64)),
+    )
+
+
+@mcp.tool()
+def priority_v2(
+    run_id: str,
+    origin: str | None = None,
+    limit: int = 100,
+    cursor: str | None = None,
+) -> dict:
+    """Read bounded page priorities and factor breakdown from an existing run."""
+    from . import server as server_module
+    return server_module.audit_v2_priority_endpoint(
+        run_id, cursor=cursor, limit=max(1, min(limit, 1000)), origin=origin,
+    )
+
+
+@mcp.tool()
+def projects_v2(project_id: str | None = None, include_history: bool = False, limit: int = 100) -> dict:
+    """Read local project metadata and optional bounded run history; no mutations."""
+    from . import server as server_module
+    from .projects import ProjectService, project_run_to_dict, project_to_dict
+    service = ProjectService(server_module._project_store())
+    projects = [service.get(project_id)] if project_id else list(service.list())
+    result = {"items": []}
+    for project in projects[: max(1, min(limit, 1000))]:
+        item = project_to_dict(project)
+        if include_history:
+            item["runs"] = [project_run_to_dict(run) for run in service.history(project.project_id, limit=max(1, min(limit, 1000)))]
+        result["items"].append(item)
+    return result
+
+
+@mcp.tool()
+def schedules_v2(project_id: str | None = None, schedule_id: str | None = None, include_executions: bool = False, limit: int = 100) -> dict:
+    """Read local schedules, leases and execution history without starting the worker."""
+    from . import server as server_module
+    from .schedules import ScheduleService
+    service = ScheduleService(server_module._project_store())
+    schedules = [service.get(schedule_id)] if schedule_id else list(service.list(project_id))
+    result = {"items": []}
+    for schedule in schedules[: max(1, min(limit, 1000))]:
+        item = asdict(schedule)
+        if include_executions:
+            item["executions"] = [asdict(execution) for execution in list(server_module._project_store().iter_schedule_executions(schedule.schedule_id))[: max(1, min(limit, 1000))]]
+        result["items"].append(item)
     return result
 
 

@@ -8,6 +8,7 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from html.parser import HTMLParser
 
 import yaml
 
@@ -29,6 +30,75 @@ logger = logging.getLogger(__name__)
 CUSTOM_RULE_VERSION = "1"
 MAX_RULES = 100
 MAX_INPUT_BYTES = 1_000_000
+
+
+class _CssMatchParser(HTMLParser):
+    """Small bounded selector matcher shared by debugger and audit rules.
+
+    It intentionally supports the safe selector subset useful for extraction:
+    element, ``#id``, ``.class``, presence/equality attributes, and descendant
+    combinations. It never executes script or performs network access.
+    """
+
+    def __init__(self, selector: str, max_matches: int) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts = tuple(part for part in selector.strip().split() if part)
+        self.max_matches = max_matches
+        self.stack: list[dict[str, str]] = []
+        self.matches: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        normalized = {key.lower(): value or "" for key, value in attrs}
+        node = {"tag": tag.lower(), **normalized}
+        self.stack.append(node)
+        if len(self.matches) < self.max_matches and self._matches(node):
+            self.matches.append(f"<{tag.lower()}{(' ' + ' '.join(f'{k}=\\\"{v}\\\"' for k, v in normalized.items())) if normalized else ''}>")
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.handle_starttag(tag, attrs)
+        if self.stack:
+            self.stack.pop()
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.stack:
+            self.stack.pop()
+
+    def _matches(self, node: dict[str, str]) -> bool:
+        if not self.parts or not _matches_simple_selector(node, self.parts[-1]):
+            return False
+        ancestor_index = len(self.stack) - 2
+        for part in reversed(self.parts[:-1]):
+            while ancestor_index >= 0 and not _matches_simple_selector(self.stack[ancestor_index], part):
+                ancestor_index -= 1
+            if ancestor_index < 0:
+                return False
+            ancestor_index -= 1
+        return True
+
+
+def _matches_simple_selector(node: Mapping[str, str], selector: str) -> bool:
+    tag_match = re.match(r"^[a-zA-Z][\w-]*|^\*", selector)
+    if tag_match and tag_match.group(0) not in {"*", node.get("tag", "")}:  # pragma: no cover - tiny parser branch
+        return False
+    for element_id in re.findall(r"#([\w-]+)", selector):
+        if node.get("id") != element_id:
+            return False
+    classes = set(node.get("class", "").split())
+    if any(value not in classes for value in re.findall(r"\.([\w-]+)", selector)):
+        return False
+    for attribute, expected in re.findall(r"\[([\w:-]+)(?:\s*=\s*['\"]?([^'\"]*)['\"]?)?\]", selector):
+        if attribute not in node or (expected and node.get(attribute) != expected):
+            return False
+    return True
+
+
+def css_matches_from_html(html: str, selector: str, *, max_matches: int = 100) -> tuple[str, ...]:
+    if not selector.strip() or max_matches <= 0:
+        return ()
+    parser = _CssMatchParser(selector, max_matches)
+    parser.feed(html[:MAX_INPUT_BYTES])
+    parser.close()
+    return tuple(parser.matches)
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,8 +261,8 @@ def apply_rule(
     css_matches: Iterable[str] = (),
 ) -> tuple[str, ...]:
     if rule.kind is CustomRuleKind.CSS:
-        # CSS is deliberately not a substring search.  Callers must provide
-        # matches from the shared parsed representation (bounded externally).
+        # Callers may provide precomputed matches, while the shared HTML
+        # representation path computes selector matches before reaching here.
         return tuple(css_matches)[:rule.max_matches]
     if rule.kind is CustomRuleKind.TEXT:
         return (rule.pattern,) if rule.pattern in text else ()
