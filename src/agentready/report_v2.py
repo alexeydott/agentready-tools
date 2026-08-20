@@ -111,7 +111,7 @@ class Finding:
     evidence: tuple[FindingEvidence, ...] = ()
     rule_version: str = "1.0.0"
 
-    def to_contract(self, *, target: str, rule_version: str = "1.0.0") -> Any:
+    def to_contract(self, *, target: str, rule_version: str | None = None) -> Any:
         """Return the canonical machine identity behind this v2 DTO."""
         from .audit_core import (
             Applicability,
@@ -150,7 +150,7 @@ class Finding:
             if self.status in {FindingStatus.SKIP, FindingStatus.UNAVAILABLE}
             else EvaluationCompleteness.COMPLETE
         )
-        key = FindingKey(self.id, self.rule_version or rule_version, UrlIdentity.parse(target))
+        key = FindingKey(self.id, rule_version or self.rule_version or "1.0.0", UrlIdentity.parse(target))
         evidence = tuple(EvidenceRef(item.id, item.url or target, item.summary) for item in self.evidence)
         return FindingContract(
             key=key,
