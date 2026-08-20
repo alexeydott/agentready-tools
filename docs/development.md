@@ -115,6 +115,22 @@ a deterministic bounded context instead of failing collection.
 L4 must use bounded targets and explicit operator consent. It is not a
 replacement for deterministic fixture coverage.
 
+### Temporary local merge gate
+
+Automatic `push` and `pull_request` workflow triggers are temporarily disabled
+while the GitHub Actions quota is exhausted; `workflow_dispatch` remains
+available. Run the canonical local gate from a clean exact HEAD with
+`.\scripts\verify-local.ps1` on Windows or
+`./scripts/verify-local.sh` on Linux/WSL. The scripts run the minimal, MCP,
+browser, and full non-scale profiles, build and inspect wheel/sdist/source
+artifacts, record SHA-256 values, and write a machine-readable report under
+`dist/local-verification`. Use `-AllowDirty` or `--allow-dirty` only for
+development diagnostics; dirty runs are not merge-gate evidence.
+
+When Actions quota is restored, re-enable `push`/`pull_request`, run the
+unchanged workflows against the reviewed HEAD, compare results, and retain
+these wrappers for local and release verification.
+
 ## Portable Windows Build
 
 Build the standalone executable with:
