@@ -12,7 +12,7 @@ from typing import Any
 
 from . import __version__
 from .audit_core import AuditRunContext, CollectedPage, FactView, RunSnapshot, RunState
-from .crawl_profiles import HARD_CAPS, resolve_profile
+from .crawl_profiles import HARD_CAPS, resolve_profile, resolve_request_profile
 from .custom_rules import CustomRuleDocument, apply_rules, compile_rules, css_matches_from_html
 from .crawler import AsyncCrawler, CrawlResult, CrawlScope
 from .discovery import (
@@ -97,6 +97,8 @@ class AuditRequest:
             raise ValueError("timeout must be positive")
         if self.mode not in {"readiness", "seo", "mobile"}:
             raise ValueError("mode must be readiness, seo, or mobile")
+        if self.mode == "seo" and self.full_discovered and not self.crawl:
+            raise ValueError("SEO full_discovered requires crawl=True")
         if self.recommendation_limit < 0:
             raise ValueError("recommendation_limit must not be negative")
         if self.max_redirects < 0:
@@ -378,14 +380,13 @@ class AuditService:
             ",".join(execution_plan.capabilities),
         )
 
-        profile_overrides = {key: value for key, value in request.limits.items() if key != "check_limit"}
-        profile_overrides["max_pages"] = request.max_pages
-        profile_overrides["timeout"] = request.timeout
-        if request.full_discovered:
-            profile_overrides["max_pages"] = HARD_CAPS.max_pages
-            profile_overrides["max_depth"] = HARD_CAPS.max_depth
-            profile_overrides["max_duration"] = HARD_CAPS.max_duration
-        profile = resolve_profile(request.profile, overrides=profile_overrides, hard_caps=HARD_CAPS)
+        profile = resolve_request_profile(
+            request.profile,
+            max_pages=request.max_pages,
+            timeout=request.timeout,
+            limits=dict(request.limits),
+            full_discovered=request.full_discovered,
+        )
         config = profile.config
         origin = parse_target(target).origin
         if request.security_context is not None:
@@ -702,10 +703,13 @@ class AuditService:
             ruleset_version=ruleset_document.version if ruleset_document else None,
             ruleset_hash=ruleset_document.rule_hash if ruleset_document else None,
         )
-        profile_overrides = {key: value for key, value in request.limits.items() if key != "check_limit"}
-        profile_overrides["max_pages"] = request.max_pages if request.crawl else 1
-        profile_overrides["timeout"] = request.timeout
-        profile = resolve_profile(request.profile, overrides=profile_overrides, hard_caps=HARD_CAPS)
+        profile = resolve_request_profile(
+            request.profile,
+            max_pages=request.max_pages if request.crawl else 1,
+            timeout=request.timeout,
+            limits=dict(request.limits),
+            full_discovered=request.full_discovered,
+        )
         origin = parse_target(target).origin
         policy = EgressPolicy(
             block_private=not request.allow_private,
