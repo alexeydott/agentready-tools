@@ -811,6 +811,11 @@ class AuditService:
                 robots_policy=request.limits.get("robots_policy"),
             )
         )
+        from .seo_crawler import CRAWL_CHECKS_BY_ID
+
+        for check_id in ("broken-links", "redirect-chains", "internal-nofollow"):
+            if check_id in requested_ids:
+                checks.append(CRAWL_CHECKS_BY_ID[check_id](list(crawl.pages), target))
         if ruleset_document is not None:
             for item in _apply_ruleset(ruleset_document, fact_views):
                 for match in item["matches"]:

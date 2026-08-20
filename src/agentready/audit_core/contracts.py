@@ -46,6 +46,8 @@ class FactEnvelope:
     value: Any
     observed_at: str
     representation_id: str | None = None
+    schema_family: str | None = None
+    schema_version: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -55,6 +57,8 @@ class FactEnvelope:
             "value": self.value,
             "observed_at": self.observed_at,
             "representation_id": self.representation_id,
+            "schema_family": self.schema_family,
+            "schema_version": self.schema_version,
         }
 
 

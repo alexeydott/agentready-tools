@@ -23,14 +23,17 @@ def test_legacy_seo_selection_mappings_are_explicit_and_deterministic():
 
 
 def test_non_equivalent_legacy_ids_are_not_substituted_by_broader_rules():
-    for legacy_id in ("broken-links", "internal-nofollow", "link-counts", "insecure-links-pages"):
+    for legacy_id in ("link-counts", "insecure-links-pages"):
         with pytest.raises(ValueError, match=legacy_id):
             resolve_selection_ids((legacy_id,))
 
 
-def test_redirect_chain_mapping_rejects_absent_evaluator():
-    with pytest.raises(ValueError, match="redirect-chains"):
-        resolve_selection_ids(("redirect-chains",))
+def test_compatibility_crawl_ids_remain_selectable():
+    assert resolve_selection_ids(("broken-links", "redirect-chains", "internal-nofollow")) == {
+        "broken-links",
+        "redirect-chains",
+        "internal-nofollow",
+    }
 
 
 def test_unknown_and_absent_current_ids_are_rejected():
