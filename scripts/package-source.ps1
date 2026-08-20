@@ -70,7 +70,7 @@ try {
             $destination = Join-Path $stageRoot ($relative -replace '/', '\\')
             New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null
             Copy-Item -LiteralPath $source -Destination $destination
-            Write-Host "[FIX:source-package] Included repository-only file: $relative"
+            Write-Verbose "Included repository-only file: $relative"
         }
     }
     foreach ($relative in $excludedDocumentationDirectories) {

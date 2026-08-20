@@ -42,6 +42,8 @@ def test_ci_profiles_install_explicit_dependency_sets_and_isolate_mcp_collection
     assert '"MANIFEST.in"' in source_package
     assert 'pyproject.toml' in source_package
     assert 'Select-String' in source_package
+    assert 'Write-Verbose "Included repository-only file: $relative"' in source_package
+    assert '[FIX:source-package]' not in source_package
     assert "!tests/fixtures/site_lab/manifest.json" in (ROOT / ".gitignore").read_text(encoding="utf-8")
 
 
