@@ -1,4 +1,9 @@
+import shutil
+import subprocess
 from pathlib import Path
+from zipfile import ZipFile
+
+import pytest
 
 ROOT = Path(__file__).parents[1]
 
@@ -44,3 +49,22 @@ def test_mcp_acceptance_module_does_not_import_optional_package_at_collection():
     source = (ROOT / "tests" / "test_acceptance_mcp.py").read_text(encoding="utf-8")
     assert "\nfrom agentready.mcp_server import" not in source
     assert 'pytest.importorskip("mcp")' in source
+
+
+def test_source_archive_contains_allowlisted_ci_workflows(tmp_path):
+    pwsh = shutil.which("pwsh")
+    if pwsh is None:
+        pytest.skip("PowerShell is required to execute the source packaging script")
+
+    output = tmp_path / "source.zip"
+    subprocess.run(
+        [pwsh, "-File", str(ROOT / "scripts" / "package-source.ps1"), "-Output", str(output)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    with ZipFile(output) as archive:
+        names = set(archive.namelist())
+    assert ".github/workflows/ci.yml" in names
+    assert ".github/workflows/release-validation.yml" in names
+    assert not any(name.startswith(".github/skills/") for name in names)

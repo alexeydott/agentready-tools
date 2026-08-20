@@ -29,6 +29,12 @@ try {
         "MANIFEST.in", "README.md", "pyproject.toml", "requirements.txt", "requirements-dev.txt"
     )
     $directories = @("docs", "packaging", "schemas", "scripts", "src", "tests")
+    # CI workflow definitions are repository-only release metadata. Keep this
+    # explicit allowlist narrow so local .github skills/context never ship.
+    $repositoryOnlyFiles = @(
+        ".github/workflows/ci.yml",
+        ".github/workflows/release-validation.yml"
+    )
     $excludedDocumentationDirectories = @("presentations", "vNext")
     $requiredSchemaFiles = @(
         "agentready.ai-assistant.v2.schema.json",
@@ -58,6 +64,15 @@ try {
         Where-Object { $_.Name.StartsWith(".") } |
         Sort-Object FullName -Descending |
         Remove-Item -Recurse -Force
+    foreach ($relative in $repositoryOnlyFiles) {
+        $source = Join-Path $projectRoot ($relative -replace '/', '\\')
+        if (Test-Path -LiteralPath $source -PathType Leaf) {
+            $destination = Join-Path $stageRoot ($relative -replace '/', '\\')
+            New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null
+            Copy-Item -LiteralPath $source -Destination $destination
+            Write-Host "[FIX:source-package] Included repository-only file: $relative"
+        }
+    }
     foreach ($relative in $excludedDocumentationDirectories) {
         $excludedPath = Join-Path $stageRoot "docs\$relative"
         if (Test-Path -LiteralPath $excludedPath) {
