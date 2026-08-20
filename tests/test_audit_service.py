@@ -42,6 +42,12 @@ def test_audit_request_exposes_bounded_discovery_sources_and_provenance():
     assert request.configuration()["discovery_kind"] == "list"
 
 
+def test_audit_request_records_full_discovered_mode():
+    request = AuditRequest(target="https://example.test/", profile="quick", full_discovered=True)
+    assert request.full_discovered is True
+    assert request.configuration()["full_discovered"] is True
+
+
 def test_audit_request_sitemap_rejects_external_urls_and_missing_xml():
     with pytest.raises(ValueError, match="discovery_sitemap_xml"):
         AuditRequest(target="https://example.test/", discovery_kind="sitemap")

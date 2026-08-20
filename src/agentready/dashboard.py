@@ -1405,6 +1405,7 @@ const v2ProfileDefaults = {{quick:3, standard:25, deep:100}};
 let v2LastProfile = document.getElementById("v2-profile").value;
 function selectedV2MaxPages() {{ if (document.getElementById("v2-full-discovered")?.checked) return 25000; const value = Number(document.getElementById("v2-max-pages").value); return Number.isFinite(value) && value >= 0 ? value : 3; }}
 function selectedV2Discovery() {{ return document.getElementById("v2-full-discovered")?.checked ? "crawl" : document.getElementById("v2-discovery").value; }}
+function selectedV2FullDiscovered() {{ return Boolean(document.getElementById("v2-full-discovered")?.checked); }}
 function syncFullDiscoveredControl() {{ const full = document.getElementById("v2-full-discovered"); const limit = document.getElementById("v2-max-pages"); const depth = document.getElementById("v2-max-depth"); const discovery = document.getElementById("v2-discovery"); if (!full || !limit || !depth || !discovery) return; const applicable = discovery.value === "crawl"; if (!applicable) full.checked = false; full.disabled = !applicable; limit.disabled = full.checked; limit.setAttribute("aria-readonly", full.checked ? "true" : "false"); depth.disabled = full.checked; depth.setAttribute("aria-readonly", full.checked ? "true" : "false"); }}
 function selectedV2Limits() {{ const value = document.getElementById("v2-max-depth").value.trim(); const full = document.getElementById("v2-full-discovered")?.checked; if (full) return {{check_limit:Number(document.getElementById("check-limit").value) || 0,max_depth:32}}; return value === "" ? {{check_limit:Number(document.getElementById("check-limit").value) || 0}} : {{check_limit:Number(document.getElementById("check-limit").value) || 0,max_depth:Math.max(0,Math.min(32,Number(value)))}}; }}
 async function cancelActiveV2Job() {{
@@ -1637,7 +1638,7 @@ async function runV2() {{
   }}
 }}
 async function runV2Background() {{
-  const payload = {{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,discovery_kind:selectedV2Discovery(),max_pages:selectedV2MaxPages(),limits:selectedV2Limits(),render:document.getElementById("v2-render").checked,timeout:Number(document.getElementById("timeout").value),language:language.value}};
+  const payload = {{url:document.getElementById("url").value,preset:"all",profile:document.getElementById("v2-profile").value,discovery_kind:selectedV2Discovery(),full_discovered:selectedV2FullDiscovered(),max_pages:selectedV2MaxPages(),limits:selectedV2Limits(),render:document.getElementById("v2-render").checked,timeout:Number(document.getElementById("timeout").value),language:language.value}};
   const response = await fetch("/v2/jobs", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify(payload)}});
   if (!response.ok) {{ let detail = ""; try {{ const errorPayload = await response.json(); detail = errorPayload.detail || ""; }} catch (_) {{}} throw new Error("HTTP " + response.status + (detail ? ": " + detail : "")); }}
   const job = await response.json(); activeV2JobId = job.job_id; localStorage.setItem("agentready.dashboard.job.v2", activeV2JobId); setCrawlProgress({{phase:"queued",fetched:0,discovered:0}});
@@ -1954,7 +1955,7 @@ async function runAll() {{
   window.agentreadyV2Report = null;
   try {{
     const geoText = await runV2Background();
-    const seoFrame = await request("/v2/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,profile:document.getElementById("v2-profile").value,crawl:true,max_pages:selectedV2MaxPages(),language:language.value,checks:null,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value),limits:selectedV2Limits()}},true);
+    const seoFrame = await request("/v2/seo/audit/dashboard","POST",{{url:document.getElementById("url").value,profile:document.getElementById("v2-profile").value,crawl:true,full_discovered:selectedV2FullDiscovered(),max_pages:selectedV2MaxPages(),language:language.value,checks:null,timeout:Number(document.getElementById("timeout").value),recommendation_limit:Number(document.getElementById("recommendations").value),limits:selectedV2Limits()}},true);
     const combined = combinedReportDocument(geoText, seoFrame.srcdoc);
     renderReport(combined); setAiAvailability(true);
   }} catch (error) {{ setAiAvailability(false); finishProgress(false); result.textContent = translations[language.value].failed + ": " + error.message; }}

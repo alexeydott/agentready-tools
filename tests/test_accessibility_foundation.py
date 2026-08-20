@@ -230,6 +230,8 @@ def test_dashboard_exposes_full_discovered_page_crawl_mode():
     assert "v2_discovery_hint" in html
     assert "When enabled, the depth field is ignored" in html
     assert "if (full) return {check_limit:Number(document.getElementById(\"check-limit\").value) || 0,max_depth:32}" in html
+    assert "function selectedV2FullDiscovered()" in html
+    assert "full_discovered:selectedV2FullDiscovered()" in html
 
 
 def test_dashboard_resets_inventory_cursor_when_query_shape_changes():

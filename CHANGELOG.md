@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.7
+
+### Full discovered crawl and report completeness
+
+- Let the full-discovered dashboard mode use the server crawl duration and
+  depth budget even when the visible crawl profile is `quick`.
+- Added explicit `full_discovered` parity to v2 and SEO request surfaces.
+- Restored conclusions and prioritized recommendations to canonical v2 HTML
+  reports, including localized empty and fallback states.
+- Added regression coverage across dashboard, v2, SEO, and report contracts.
+
 ## 0.13.6
 
 ### AI context reliability and release documentation

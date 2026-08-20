@@ -537,6 +537,7 @@ class V2AuditRequest(BaseModel):
     discovery_sitemap_xml: str | None = None
     discovery_sitemap_urls: list[str] = Field(default_factory=list)
     discovery_limit: int = Field(default=1000, ge=1, le=100_000)
+    full_discovered: bool = Field(default=False, description="Use the server crawl duration/depth budget while following the full discovered same-origin frontier.")
     ruleset: str | None = Field(default=None, max_length=1_000_000)
 
 
@@ -630,6 +631,7 @@ class SeoRequest(BaseModel):
     limits: dict[str, int | float] = Field(default_factory=dict)
     crawl: bool = False
     max_pages: int = Field(default=25, ge=0, le=25_000)
+    full_discovered: bool = Field(default=False, description="Use the server crawl duration/depth budget while following the full discovered same-origin frontier.")
     render: bool = False
     ga_property: str | None = None
     gsc_site: str | None = None
@@ -1122,6 +1124,7 @@ def _run_v2_scan(request: V2AuditRequest, *, parent_run_id: str | None = None, p
             discovery_sitemap_xml=request.discovery_sitemap_xml,
             discovery_sitemap_urls=tuple(request.discovery_sitemap_urls),
             discovery_limit=request.discovery_limit,
+            full_discovered=request.full_discovered,
             ruleset=request.ruleset,
             store=store,
             progress_callback=progress_callback,
@@ -1316,6 +1319,39 @@ def _render_v2_dashboard(payload: dict) -> str:
         if language == "ru"
         else f"Errors: {status_counts['fail'] + status_counts['error']} · warnings: {status_counts['warn']} · passed: {status_counts['pass']}"
     )
+    conclusion_label = "Выводы" if language == "ru" else "Conclusions"
+    recommendations_label = "Приоритетные рекомендации" if language == "ru" else "Prioritized recommendations"
+    conclusion_text = (
+        f"Аудит проверил {len(findings)} правил: ошибок {status_counts['fail'] + status_counts['error']}, "
+        f"предупреждений {status_counts['warn']}, пройдено {status_counts['pass']}. "
+        f"Загружено {coverage.get('urls_fetched', 0)} URL из {coverage.get('urls_discovered', coverage.get('discovered', coverage.get('urls_fetched', 0)))} обнаруженных."
+        if language == "ru"
+        else f"The audit evaluated {len(findings)} checks: {status_counts['fail'] + status_counts['error']} errors, "
+        f"{status_counts['warn']} warnings, and {status_counts['pass']} passes. "
+        f"Fetched {coverage.get('urls_fetched', 0)} URLs from {coverage.get('urls_discovered', coverage.get('discovered', coverage.get('urls_fetched', 0)))} discovered."
+    )
+    recommendations = payload.get("recommendations", [])
+    if not isinstance(recommendations, list) or not recommendations:
+        recommendations = [
+            {
+                "title": check_title(str(item.get("id", "")), str(item.get("title", item.get("id", ""))), language),
+                "action": (
+                    crawl_classification_label(item.get("summary"), language)
+                    if str(item.get("summary", "")) in {"complete_within_scope", "partial_limit", "partial_error"}
+                    else detail_text(str(item.get("id", "")), str(item.get("summary", item.get("reason", item.get("title", "")))), language)
+                ),
+                "priority": "high" if item.get("status") in {"fail", "error"} else "medium",
+            }
+            for item in findings
+            if isinstance(item, dict) and item.get("status") in {"fail", "warn", "error"}
+        ]
+    recommendation_items = "".join(
+        "<li><strong>" + html.escape(str(item.get("title", item.get("check_id", "")))) + "</strong><br>" + html.escape(str(item.get("action", item.get("reason", item.get("summary", ""))))) + "</li>"
+        for item in recommendations[:10]
+        if isinstance(item, dict)
+    )
+    if not recommendation_items:
+        recommendation_items = "<li>" + html.escape("Рекомендаций, требующих действий, нет." if language == "ru" else "No actionable recommendations.") + "</li>"
     return (
         "<!doctype html><html lang='"
         + html.escape(language)
@@ -1344,7 +1380,15 @@ def _render_v2_dashboard(payload: dict) -> str:
         + html.escape(summary_label)
         + "</strong><br>"
         + html.escape(summary_text)
-        + "</section><table><thead><tr><th>"
+        + "</section><section class='report-conclusions'><h2>"
+        + html.escape(conclusion_label)
+        + "</h2><p>"
+        + html.escape(conclusion_text)
+        + "</p></section><section class='report-recommendations'><h2>"
+        + html.escape(recommendations_label)
+        + "</h2><ol>"
+        + recommendation_items
+        + "</ol></section><table><thead><tr><th>"
         + html.escape(labels["finding"])
         + "</th><th>"
         + html.escape(labels["status"])
@@ -2537,6 +2581,7 @@ def _run_seo(request: SeoRequest):
         language=request.language,
         crawl=request.crawl or bool(selected),
         max_pages=request.max_pages,
+        full_discovered=request.full_discovered,
         render=request.render,
         checks=tuple(SEO_CHECKS_BY_ID[check_id] for check_id in selected if check_id in SEO_CHECKS_BY_ID),
         crawl_checks=tuple(CRAWL_CHECKS_BY_ID[check_id] for check_id in selected if check_id in CRAWL_CHECKS_BY_ID),

@@ -95,6 +95,8 @@ def test_v2_dashboard_print_projection_is_summary_oriented():
         ],
     })
     assert "Сводка для печати" in html
+    assert "Выводы" in html
+    assert "Приоритетные рекомендации" in html
     assert "Ошибки: 1" in html
     assert "@media print" in html
 
@@ -103,6 +105,7 @@ def test_v2_api_describes_all_discovered_page_mode():
     schema = server_module.V2AuditRequest.model_json_schema()
     assert "all discovered same-origin pages" in schema["properties"]["max_pages"]["description"]
     assert "all discovered same-origin pages" in schema["properties"]["discovery_kind"]["description"]
+    assert "full_discovered" in schema["properties"]
 
 
 def test_v2_dashboard_print_table_localizes_finding_title_and_description():

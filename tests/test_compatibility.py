@@ -5,7 +5,7 @@ from agentready.compatibility import COMPATIBILITY
 
 def test_release_compatibility_manifest_exposes_only_v2_surfaces():
     payload = COMPATIBILITY.to_dict()
-    assert payload["release"] == "0.13.6"
+    assert payload["release"] == "0.13.7"
     assert "agentready.ai-assistant.v2" in payload["schemas"]
     assert "agentready.protocol-findings.v2" in payload["schemas"]
     assert "mcp.seo_audit_v2" in payload["surfaces"]

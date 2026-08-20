@@ -62,6 +62,7 @@ class AuditRequest:
     discovery_sitemap_xml: str | None = None
     discovery_sitemap_urls: tuple[str, ...] = ()
     discovery_limit: int = 1000
+    full_discovered: bool = False
     render: bool = False
     provider: str | None = None
     ga_property: str | None = None
@@ -135,6 +136,7 @@ class AuditRequest:
             "discovery_sitemap_hash": hashlib.sha256(self.discovery_sitemap_xml.encode("utf-8")).hexdigest() if self.discovery_sitemap_xml else None,
             "discovery_sitemap_urls": list(self.discovery_sitemap_urls),
             "discovery_limit": self.discovery_limit,
+            "full_discovered": self.full_discovered,
             "render": self.render,
             "provider": self.provider,
             "ga_property": self.ga_property,
@@ -379,6 +381,10 @@ class AuditService:
         profile_overrides = {key: value for key, value in request.limits.items() if key != "check_limit"}
         profile_overrides["max_pages"] = request.max_pages
         profile_overrides["timeout"] = request.timeout
+        if request.full_discovered:
+            profile_overrides["max_pages"] = HARD_CAPS.max_pages
+            profile_overrides["max_depth"] = HARD_CAPS.max_depth
+            profile_overrides["max_duration"] = HARD_CAPS.max_duration
         profile = resolve_profile(request.profile, overrides=profile_overrides, hard_caps=HARD_CAPS)
         config = profile.config
         origin = parse_target(target).origin

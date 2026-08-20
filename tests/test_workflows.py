@@ -36,7 +36,7 @@ def test_inventory_request_rejects_unbounded_or_unknown_transport_input() -> Non
 
 
 def test_workflow_capability_version_contract_is_stable() -> None:
-    capabilities = workflow_capabilities("0.13.6")
+    capabilities = workflow_capabilities("0.13.7")
     assert capabilities["contract"] == "agentready.workflow.v2"
-    assert capabilities["version"] == "0.13.6"
+    assert capabilities["version"] == "0.13.7"
     assert capabilities["workflows"]["inventory"]["max_limit"] == 1000
