@@ -59,6 +59,7 @@ def evidence_from_parsed_page(
     h1 = tuple(item.text for item in facts.headings if item.level == 1)
     canonicals = tuple(urljoin(final_url, item) for item in facts.canonicals)
     hreflangs = tuple((item.lang, urljoin(final_url, item.href)) for item in facts.hreflang)
+    x_robots = ", ".join(page.header_values("x-robots-tag")) if isinstance(page, FactView) else ""
     return SeoPageEvidence(
         url=url,
         final_url=final_url,
@@ -75,7 +76,7 @@ def evidence_from_parsed_page(
         canonicals=canonicals,
         hreflangs=hreflangs,
         meta_robots=facts.meta_robots,
-        x_robots="",
+        x_robots=x_robots,
         jsonld_nodes=(),
         jsonld_errors=(),
         evidence_ids=(evidence_id or _evidence_id(url, "page"),),

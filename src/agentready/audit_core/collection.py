@@ -49,6 +49,15 @@ class FactView:
     def headers(self) -> Mapping[str, str]:
         return dict(self.page.headers)
 
+    def header_values(self, name: str) -> tuple[str, ...]:
+        """Return all values for a response header using case-insensitive names."""
+        wanted = name.casefold()
+        return tuple(value for key, value in self.page.headers if key.casefold() == wanted)
+
+    @property
+    def x_robots(self) -> str:
+        return ", ".join(self.header_values("x-robots-tag"))
+
     @property
     def body(self) -> bytes | None:
         return self.page.body
