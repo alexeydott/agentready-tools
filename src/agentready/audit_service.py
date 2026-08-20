@@ -680,7 +680,7 @@ class AuditService:
         from .plan_compiler import PlanCompiler
         from .seo.engine import run_atomic_rules
         from .seo.evidence import evidence_from_parsed_page
-        from .seo.compatibility import resolve_selection_ids
+        from .seo.compatibility import normalize_selection
         from .seo.site_rules import evaluate_site_rules
         from .seo_models import SeoCheckResult, SeoReport
         from .seo_recommendations import rank_recommendations
@@ -743,10 +743,8 @@ class AuditService:
             ).crawl()
         )
         checks: list[SeoCheckResult] = []
-        requested_ids = resolve_selection_ids(request.include)
-        atomic_catalog = {"page-available", "metadata", "indexability", "canonical", "hreflang", "jsonld", "title-length"}
-        atomic_ids = {value for value in requested_ids if value in atomic_catalog}
-        excluded_ids = resolve_selection_ids(request.exclude)
+        selection = normalize_selection(request.include, request.exclude)
+        requested_ids = selection.include
         fact_views = self._fact_views(crawl)
         for view in fact_views:
             if view.facts is None:
@@ -763,9 +761,9 @@ class AuditService:
                 content_type=content_type,
             )
             for finding in run_atomic_rules(evidence):
-                if atomic_ids and finding.rule.id not in atomic_ids:
+                if requested_ids and finding.rule.id not in requested_ids:
                     continue
-                if finding.rule.id in excluded_ids:
+                if finding.rule.id in selection.exclude:
                     continue
                 checks.append(
                     SeoCheckResult(
@@ -805,9 +803,6 @@ class AuditService:
                         title=check.__name__.replace("check_", "").replace("_", " ").title(),
                         category="analytics", status="error", scored=True, details=str(exc),
                     ))
-        if requested_ids:
-            checks = [item for item in checks if item.id in requested_ids or item.category == "analytics"]
-        checks = self._apply_check_limit(checks, request.limits)
         coverage_status = "pass" if crawl.coverage.classification.value == "complete_within_scope" else "warn"
         checks.append(
             SeoCheckResult(
@@ -827,6 +822,10 @@ class AuditService:
                 )],
             )
         )
+        if requested_ids:
+            checks = [item for item in checks if item.id in requested_ids]
+        checks = [item for item in checks if item.id not in selection.exclude]
+        checks = self._apply_check_limit(checks, request.limits)
         # Keep SEO reports actionable: atomic/site rules share the canonical
         # check model, but their remediation is produced at this boundary so
         # every fail/warn/error can feed both recommendations and instructions.

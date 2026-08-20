@@ -3,6 +3,7 @@ import pytest
 from agentready.seo.compatibility import (
     CompatibilityRelation,
     compatibility_manifest,
+    normalize_selection,
     resolve_selection_ids,
 )
 
@@ -38,3 +39,10 @@ def test_unknown_and_absent_current_ids_are_rejected():
 
     with pytest.raises(ValueError, match="unknown SEO check ID"):
         resolve_selection_ids(("redirect-inventory-site",))
+
+
+def test_include_and_exclude_share_namespace_and_exclusion_wins():
+    selection = normalize_selection(("page-metadata", "duplicate-metadata"), ("metadata",))
+    assert selection.include == {"metadata", "duplicate-metadata-site"}
+    assert selection.exclude == {"metadata"}
+    assert selection.selected == {"duplicate-metadata-site"}

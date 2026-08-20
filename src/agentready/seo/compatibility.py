@@ -20,6 +20,18 @@ class SeoCompatibilityMapping:
     relation: CompatibilityRelation
 
 
+@dataclass(frozen=True)
+class SeoSelection:
+    """Canonical include/exclude sets; exclusions take precedence on conflicts."""
+
+    include: frozenset[str]
+    exclude: frozenset[str]
+
+    @property
+    def selected(self) -> frozenset[str]:
+        return self.include - self.exclude if self.include else frozenset()
+
+
 CURRENT_SEO_EVALUATOR_IDS = frozenset({
     "page-available",
     "metadata",
@@ -96,3 +108,11 @@ def resolve_selection_ids(values: tuple[str, ...] | list[str] | set[str]) -> fro
             )
         resolved.update(mapping.evaluator_ids)
     return frozenset(resolved)
+
+
+def normalize_selection(
+    include: tuple[str, ...] | list[str] | set[str],
+    exclude: tuple[str, ...] | list[str] | set[str],
+) -> SeoSelection:
+    """Normalize both filters into one canonical namespace."""
+    return SeoSelection(resolve_selection_ids(include), resolve_selection_ids(exclude))
