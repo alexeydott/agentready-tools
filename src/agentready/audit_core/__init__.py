@@ -1,6 +1,6 @@
 """Versioned, transport-independent contracts for the vNext audit core."""
 
-from .collection import CollectedPage, FactView
+from .collection import CollectedPage, FactView, RepresentationObservation
 from .contracts import (
     Effort,
     EvidenceRef,
@@ -70,6 +70,7 @@ __all__ = [
     "EvidenceRef",
     "FactEnvelope",
     "FactView",
+    "RepresentationObservation",
     "FetchFact",
     "FetchRecord",
     "FindingContract",

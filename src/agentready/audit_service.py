@@ -63,6 +63,7 @@ class AuditRequest:
     discovery_limit: int = 1000
     full_discovered: bool = False
     render: bool = False
+    pair_rendered: bool = False
     provider: str | None = None
     ga_property: str | None = None
     gsc_site: str | None = None
@@ -123,7 +124,7 @@ class AuditRequest:
             raise ValueError("trusted_origin and security_context must be provided together")
         if self.security_context and not self.credential_headers:
             raise ValueError("trusted authenticated audits require resolved credential headers")
-        if self.security_context and self.render:
+        if self.security_context and (self.render or self.pair_rendered):
             raise ValueError("trusted authenticated audits cannot enable rendered browser collection")
         if self.security_context and self.mode != "readiness":
             raise ValueError("trusted authenticated audits are limited to readiness mode")
@@ -148,6 +149,7 @@ class AuditRequest:
             "discovery_limit": self.discovery_limit,
             "full_discovered": self.full_discovered,
             "render": self.render,
+            "pair_rendered": self.pair_rendered,
             "provider": self.provider,
             "ga_property": self.ga_property,
             "gsc_site": self.gsc_site,
@@ -326,6 +328,8 @@ class AuditService:
                     page.requested_url,
                     page.fetch_error_kind.value if page.fetch_error_kind is not None else None,
                     page.redirect_records,
+                    page.rendered,
+                    page.parsed,
                 )
             )
             for page in crawl.pages
@@ -471,6 +475,8 @@ class AuditService:
                 "render": request.render,
                 "verify": request.verify,
             }
+            if request.pair_rendered:
+                crawler_kwargs["pair_rendered"] = True
             if request.security_context is not None:
                 crawler_kwargs["request_headers"] = dict(request.credential_headers)
                 crawler_kwargs["security_context"] = request.security_context
@@ -748,6 +754,8 @@ class AuditService:
             "render": request.render,
             "verify": request.verify,
         }
+        if request.pair_rendered:
+            crawler_kwargs["pair_rendered"] = True
         if request.progress_callback is not None:
             crawler_kwargs["progress_callback"] = request.progress_callback
         crawl = asyncio.run(

@@ -5,7 +5,19 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from ..page_parser import ParsedFacts, Representation
+from ..page_parser import ParsedFacts, ParsedPage, Representation
+
+
+@dataclass(frozen=True, slots=True)
+class RepresentationObservation:
+    source: str
+    parsed: ParsedPage | None
+    body: bytes | None = None
+    error: str | None = None
+
+    @property
+    def representation(self) -> Representation | None:
+        return self.parsed.representation if self.parsed is not None else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +35,8 @@ class CollectedPage:
     requested_url: str | None = None
     fetch_error_kind: str | None = None
     redirect_records: tuple[object, ...] = ()
+    rendered: RepresentationObservation | None = None
+    parsed: ParsedPage | None = None
 
     @property
     def available(self) -> bool:
@@ -69,6 +83,15 @@ class FactView:
             "error_kind": self.page.fetch_error_kind,
             "redirects": self.page.redirect_records,
         }
+
+    @property
+    def representations(self) -> tuple[RepresentationObservation, ...]:
+        static = RepresentationObservation(
+            self.page.representation.source if self.page.representation is not None else "static-html",
+            self.page.parsed,
+            self.page.body,
+        )
+        return (static, self.page.rendered) if self.page.rendered is not None else (static,)
 
     @property
     def body(self) -> bytes | None:
