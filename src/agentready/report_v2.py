@@ -248,6 +248,7 @@ class AuditReport:
     version: str = REPORT_VERSION
     evidence: tuple[FindingEvidence, ...] = ()
     run_id: str | None = None
+    score_model_id: str = "readiness-transparent-v2"
 
     @property
     def score(self) -> int:
@@ -273,6 +274,7 @@ class AuditReport:
         }
         if self.run_id is not None:
             result["run_id"] = self.run_id
+        result["score_model_id"] = self.score_model_id
         return result
 
 
@@ -363,7 +365,14 @@ def report_from_dict(payload: Mapping[str, Any]) -> AuditReport:
         max_pages_hit=(coverage_payload.get("limit") or {}).get("max_pages_hit"),
         classification=coverage_payload.get("classification"),
     )
-    return AuditReport(payload["target"], findings, coverage, payload.get("version", REPORT_VERSION))
+    return AuditReport(
+        payload["target"],
+        findings,
+        coverage,
+        payload.get("version", REPORT_VERSION),
+        run_id=payload.get("run_id"),
+        score_model_id=payload.get("score_model_id", "readiness-transparent-v2"),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -522,6 +531,24 @@ def _comparison_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) 
         return "targets differ"
     if current.get("version", REPORT_VERSION) != baseline.get("version", REPORT_VERSION):
         return "report versions differ"
+    identity_fields = (
+        ("rule_catalog_version", "rule catalog versions differ"),
+        ("rule_catalog_digest", "rule catalog digests differ"),
+        ("ruleset", "rulesets differ"),
+        ("rules_version", "rule versions differ"),
+        ("score_model_id", "score model IDs differ"),
+    )
+    for field_name, message in identity_fields:
+        if current.get(field_name) != baseline.get(field_name):
+            return message
+    current_coverage = current.get("coverage", {})
+    baseline_coverage = baseline.get("coverage", {})
+    if isinstance(current_coverage, Mapping) and isinstance(baseline_coverage, Mapping):
+        for field_name in ("evaluated_rules", "applicable_rules", "complete_rules", "urls_fetched"):
+            before = baseline_coverage.get(field_name)
+            after = current_coverage.get(field_name)
+            if isinstance(before, int) and isinstance(after, int) and after < before:
+                return f"coverage decreased for {field_name}"
     return None
 
 

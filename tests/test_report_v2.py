@@ -218,11 +218,8 @@ def test_semantic_diff_categorizes_findings_coverage_inventory_and_rules():
     baseline["coverage"]["urls_fetched"] = 0
     baseline["inventory"] = {"pages": [{"url": "https://example.com/a", "state_hash": "old"}, {"url": "https://example.com/deleted", "state_hash": "old"}]}
     result = semantic_diff(current, baseline)
-    assert result.comparable
-    assert result.coverage["urls_fetched"] == {"before": 0, "after": None}
-    assert result.inventory["pages"]["changed"] == ("https://example.com/a",)
-    assert result.inventory["pages"]["removed"] == ("https://example.com/deleted",)
-    assert result.rule_versions["changed"]
+    assert not result.comparable
+    assert result.reason == "rule catalog versions differ"
 
 
 def test_semantic_diff_ignores_localized_text_and_input_order_but_rejects_incomparable_runs():
