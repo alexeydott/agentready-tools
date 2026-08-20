@@ -37,6 +37,19 @@ def test_ci_profiles_install_explicit_dependency_sets_and_isolate_mcp_collection
     assert 'name: Run full suite and report intentional skips' in release
     assert 'python -m pytest -q -ra -m "not scale"' in release
     assert "Unexpected skipped tests in full-release run" not in release
+    assert "push:" not in ci and "pull_request:" not in ci
+    assert "push:" not in release and "pull_request:" not in release
+    assert "workflow_dispatch:" in ci and "workflow_dispatch:" in release
+
+    powershell = (ROOT / "scripts" / "verify-local.ps1").read_text(encoding="utf-8")
+    shell = (ROOT / "scripts" / "verify-local.sh").read_text(encoding="utf-8")
+    for wrapper in (powershell, shell):
+        assert "minimal" in wrapper
+        assert "mcp" in wrapper
+        assert "browser" in wrapper
+        assert "full-nonscale" in wrapper
+        assert "sha256" in wrapper.lower()
+        assert "clean" in wrapper.lower()
 
     source_package = (ROOT / "scripts" / "package-source.ps1").read_text(encoding="utf-8")
     assert '"MANIFEST.in"' in source_package

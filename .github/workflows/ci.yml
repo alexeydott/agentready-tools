@@ -1,9 +1,8 @@
 name: Dependency profile validation
 
 on:
-  push:
-    branches: ["main", "master"]
-  pull_request:
+  # Temporary while Actions quota is exhausted; restore push/pull_request
+  # after the local exact-HEAD gate has been retired.
   workflow_dispatch:
 
 permissions:
