@@ -21,6 +21,8 @@ class CollectedPage:
     headers: tuple[tuple[str, str], ...] = ()
     body: bytes | None = None
     requested_url: str | None = None
+    fetch_error_kind: str | None = None
+    redirect_records: tuple[object, ...] = ()
 
     @property
     def available(self) -> bool:
@@ -57,6 +59,16 @@ class FactView:
     @property
     def x_robots(self) -> str:
         return ", ".join(self.header_values("x-robots-tag"))
+
+    @property
+    def transport(self) -> dict[str, object]:
+        return {
+            "requested_url": self.page.requested_url or self.page.url,
+            "final_url": self.page.url,
+            "status_code": self.page.status_code,
+            "error_kind": self.page.fetch_error_kind,
+            "redirects": self.page.redirect_records,
+        }
 
     @property
     def body(self) -> bytes | None:

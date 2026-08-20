@@ -178,6 +178,8 @@ class CrawledPage:
     headers: tuple[tuple[str, str], ...] = ()
     body: bytes | None = None
     requested_url: str | None = None
+    fetch_error_kind: FetchErrorKind | None = None
+    redirect_records: tuple[object, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -419,7 +421,14 @@ class AsyncCrawler:
                             failed += 1
                             frontier.set_state(item.url, CrawlItemState.FAILED)
                             record_url(item.url, RunUrlState.FAILED, item.depth, error_kind=exc.kind.value)
-                            pages[item.url] = CrawledPage(item.url, item.depth, None, None, str(exc))
+                            pages[item.url] = CrawledPage(
+                                item.url,
+                                item.depth,
+                                None,
+                                None,
+                                str(exc),
+                                fetch_error_kind=getattr(exc, "kind", None),
+                            )
                             continue
                     if time.monotonic() >= deadline:
                         deadline_hit = True
@@ -530,6 +539,7 @@ class AsyncCrawler:
                         headers=tuple(sorted(response.headers.items())),
                         body=response.body,
                         requested_url=item.url,
+                        redirect_records=tuple(response.redirect_records),
                     )
                     completed_items += 1
                     if self.store is not None:
@@ -578,7 +588,14 @@ class AsyncCrawler:
                     failed += 1
                     frontier.set_state(item.url, CrawlItemState.FAILED)
                     record_url(item.url, RunUrlState.FAILED, item.depth, error_kind=type(exc).__name__)
-                    pages[item.url] = CrawledPage(item.url, item.depth, None, None, str(exc))
+                    pages[item.url] = CrawledPage(
+                        item.url,
+                        item.depth,
+                        None,
+                        None,
+                        str(exc),
+                        fetch_error_kind=getattr(exc, "kind", None),
+                    )
                     logger.exception(
                         "[FIX:crawler-worker] page isolated run_id=%s url=%s error_type=%s",
                         run_id,

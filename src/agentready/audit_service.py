@@ -324,6 +324,8 @@ class AuditService:
                     page.headers,
                     page.body,
                     page.requested_url,
+                    page.fetch_error_kind.value if page.fetch_error_kind is not None else None,
+                    page.redirect_records,
                 )
             )
             for page in crawl.pages
