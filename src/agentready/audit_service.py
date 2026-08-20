@@ -99,6 +99,15 @@ class AuditRequest:
             raise ValueError("mode must be readiness, seo, or mobile")
         if self.mode == "seo" and self.full_discovered and not self.crawl:
             raise ValueError("SEO full_discovered requires crawl=True")
+        if self.mode == "seo" and self.provider is not None:
+            raise ValueError("provider is not supported in SEO mode")
+        if self.mode == "seo" and (
+            self.discovery_kind != "single"
+            or self.discovery_urls
+            or self.discovery_sitemap_xml
+            or self.discovery_sitemap_urls
+        ):
+            raise ValueError("discovery sources other than the SEO target are not supported in SEO mode")
         if self.recommendation_limit < 0:
             raise ValueError("recommendation_limit must not be negative")
         if self.max_redirects < 0:
@@ -793,6 +802,26 @@ class AuditService:
                 robots_policy=request.limits.get("robots_policy"),
             )
         )
+        if ruleset_document is not None:
+            for item in _apply_ruleset(ruleset_document, fact_views):
+                for match in item["matches"]:
+                    check_id = f"custom-rule:{match['rule_id']}"
+                    count = int(match["count"])
+                    checks.append(
+                        SeoCheckResult(
+                            id=check_id,
+                            title=str(match["title"] or match["rule_id"]),
+                            category="custom",
+                            status="fail" if count else "pass",
+                            scored=False,
+                            details=f"{count} match(es) for custom rule {match['rule_id']}",
+                            evidence=[Evidence(
+                                action=f"evaluate custom rule {match['rule_id']}",
+                                url=str(item["url"]),
+                                finding=str(match["matches"]),
+                            )],
+                        )
+                    )
         if request.ga_property or request.gsc_site:
             from .seo_analytics import ANALYTICS_CHECKS, AnalyticsContext
 
