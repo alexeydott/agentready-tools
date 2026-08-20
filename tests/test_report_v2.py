@@ -1,3 +1,4 @@
+import threading
 import time
 
 import pytest
@@ -244,3 +245,40 @@ def test_job_manager_completes_work():
     while manager.get(job_id).status is JobStatus.RUNNING:
         time.sleep(0.001)
     assert manager.get(job_id).result == {"ok": True}
+
+
+def test_job_manager_lists_bounded_status_without_result_payload():
+    manager = AuditJobManager(max_jobs=1)
+    job_id = manager.submit(lambda: {"large": "result"})
+    items = manager.list()
+    assert items[0]["id"] == job_id
+    assert items[0]["status"] in {"running", "completed"}
+    assert "result" not in items[0]
+
+
+def test_job_manager_cancel_removes_task_and_releases_capacity():
+    manager = AuditJobManager(max_jobs=1)
+    started = threading.Event()
+    release = threading.Event()
+
+    def operation(cancel_event):
+        started.set()
+        while not release.is_set():
+            if cancel_event.is_set():
+                return None
+            time.sleep(0.005)
+
+    job_id = manager.submit(operation)
+    assert started.wait(1)
+    manager.cancel(job_id)
+    assert manager.list() == []
+    with pytest.raises(KeyError):
+        manager.get(job_id)
+    replacement = manager.submit(lambda: None)
+    release.set()
+    for _ in range(20):
+        if manager.get(replacement).status is JobStatus.COMPLETED:
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("replacement job did not complete")

@@ -9,6 +9,7 @@ from agentready.custom_rules import (
     apply_rules,
     compile_rules,
     validate_rules,
+    css_matches_from_html,
 )
 
 
@@ -76,3 +77,9 @@ def test_custom_rules_reject_expensive_regex_and_unknown_dsl_shape():
         compile_rules({"version": 2, "rules": []})
     with pytest.raises(ValueError):
         compile_rules({"version": 1, "rules": [{"id": "x", "when": {"eval": "1"}, "assert": {"kind": "text", "pattern": "x"}}]})
+
+
+def test_css_selector_is_evaluated_against_saved_html():
+    matches = css_matches_from_html('<main><p class="notice">Known</p><p>Other</p></main>', "main p.notice")
+    assert len(matches) == 1
+    assert "notice" in matches[0]

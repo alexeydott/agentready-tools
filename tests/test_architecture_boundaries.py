@@ -74,7 +74,15 @@ COLLECTION_MIGRATION_ALLOWLIST = {
 }
 
 COLLECTION_MIGRATION_METADATA = {
-    key: {"rationale": "Legacy compatibility edge pending canonical collection migration.", "expiry_task": "Task 12"}
+    key: {
+        "rationale": (
+            "Legacy compatibility adapter retained for the v1 CLI/check APIs; the public v2 "
+            "AuditService path owns collection. Revalidate before the next collection migration wave."
+        ),
+        # Task 12 is complete. Keep the exception explicit and time-bounded rather
+        # than silently treating the old adapters as canonical architecture.
+        "expiry_task": "Task 40",
+    }
     for key in COLLECTION_MIGRATION_ALLOWLIST
 }
 

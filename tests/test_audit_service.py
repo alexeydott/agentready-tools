@@ -8,6 +8,7 @@ import pytest
 
 from agentready.audit_service import AuditRequest, AuditService
 from agentready.crawler import CrawlCoverage, CrawlResult
+from agentready.audit_core.store import MemorySiteStore
 from tests.fixtures.site_lab import SiteLabServer
 
 
@@ -97,6 +98,24 @@ def test_audit_service_applies_exact_max_pages_and_reports_partial_coverage():
     assert result.report.run_id == result.run.context.run_id
     assert result.run.state.value == "partial"
     assert result.run.completed_at is not None
+
+
+def test_audit_service_applies_ruleset_to_saved_facts_without_extra_fetches():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        return httpx.Response(200, headers={"content-type": "text/html"}, content=b'<p class="known">agent marker</p>')
+
+    rules = "version: 1\nrules:\n  - id: marker\n    title: Marker\n    assert:\n      kind: text\n      pattern: agent\n  - id: css\n    assert:\n      kind: css\n      pattern: p.known\n"
+    store = MemorySiteStore()
+    result = AuditService().run(AuditRequest(target="https://example.test/", max_pages=1, allow_private=True, transport=httpx.MockTransport(handler), store=store, ruleset=rules))
+    assert len(calls) == 1
+    assert result.run.context.ruleset_version == "1"
+    assert result.run.context.ruleset_hash
+    assert any(item.id.startswith("custom-rule:marker:") and item.status.value == "fail" for item in result.report.findings)
+    assert any(item.id.startswith("custom-rule:css:") and item.status.value == "fail" for item in result.report.findings)
+    assert list(store.iter_findings(result.run.context.run_id))
 
 
 def test_audit_service_ignores_non_http_links_without_aborting_crawl():

@@ -159,7 +159,11 @@ def test_mcp_server_registers_agent_tools_and_rejects_bad_mode(monkeypatch):
         return await mcp_module.mcp.list_tools()
 
     names = {tool.name for tool in asyncio.run(_tools())}
-    assert {"audit_v2", "seo_audit_v2", "audit_findings", "remediation_plan"} <= names
+    assert {
+        "audit_v2", "seo_audit_v2", "audit_findings", "remediation_plan",
+        "sitemap_reconcile_v2", "custom_rules_debug_v2", "link_graph_v2",
+        "duplicate_clusters_v2", "priority_v2", "projects_v2", "schedules_v2",
+    } <= names
 
     monkeypatch.setattr(
         mcp_module,
@@ -180,6 +184,23 @@ def test_mcp_server_registers_agent_tools_and_rejects_bad_mode(monkeypatch):
 
     with pytest.raises(ValueError, match="unsupported mode"):
         mcp_module.audit_findings("https://example.com", mode="bogus")
+
+
+def test_mcp_provider_fixture_uses_unified_service_without_credentials():
+    pytest.importorskip("mcp")
+    import agentready.mcp_server as mcp_module
+
+    payload = mcp_module.provider_enrichment_v2(
+        "gsc",
+        cached_metrics=[{
+            "name": "clicks", "value": 3, "unit": "count", "source": "fixture",
+            "version": "gsc-v1", "observed_at": "2026-01-01T00:00:00+00:00",
+        }],
+        scope="https://example.test/",
+    )
+    assert payload["status"] == "available"
+    assert payload["provenance"]["provider"] == "gsc"
+    assert "credential" not in str(payload).lower()
 
 
 def test_mcp_seo_audit_exposes_crawl_option(monkeypatch):

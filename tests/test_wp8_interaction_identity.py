@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from agentready.accesslog import analyze_ai_bot_log, analyze_project_ai_bot_log
+from agentready.accesslog import analyze_ai_bot_log, analyze_project_ai_bot_log, project_page_access_metrics
+from agentready.audit_core.store import MemorySiteStore, PageRecord
 from agentready.crawler_identity import (
     CrawlerIntent,
     IdentityConfidence,
@@ -90,3 +91,24 @@ def test_project_access_log_matches_origin_windows_and_unmatched_buckets() -> No
     assert result["unmatched"]["out_of_window"] == 1
     assert result["bots"]["GPTBot"]["verified_requests"] == 1
     assert all("secret" not in str(result).lower() for _ in [0])
+
+
+def test_project_access_log_persists_bounded_page_metrics_without_query_values() -> None:
+    store = MemorySiteStore()
+    pages = (
+        PageRecord("run-1", "https://example.test/docs", "https://example.test/docs"),
+        PageRecord("run-1", "https://example.test/", "https://example.test/"),
+    )
+    lines = [
+        '[18/Aug/2026:10:00:00 +0000] 192.0.2.10 - - "GET /docs?token=secret HTTP/1.1" 200 - "GPTBot/1.0"',
+        '[18/Aug/2026:11:00:00 +0000] 192.0.2.10 - - "GET /docs HTTP/1.1" 304 - "GPTBot/1.0"',
+        '[18/Aug/2026:11:30:00 +0000] 192.0.2.10 - - "GET /unknown HTTP/1.1" 200 - "GPTBot/1.0"',
+    ]
+    result = project_page_access_metrics(lines, project_target="https://example.test", run_id="run-1", pages=pages, store=store)
+    assert result["pages_matched"] == 1
+    assert result["metrics_written"] == 4
+    metrics = {item.name: item for item in store.iter_metrics("run-1")}
+    assert metrics["ai_crawler_visits"].value == 2
+    assert metrics["ai_crawler_status"].value == {"200": 1, "304": 1}
+    assert metrics["ai_crawler_last_visit"].value == "2026-08-18T11:00:00+00:00"
+    assert "secret" not in str(metrics)

@@ -15,7 +15,7 @@ from agentready.audit_core.store import (
     RunUrlRecord,
     RunUrlState,
 )
-from agentready.server import _V2_ROBOTS, _V2_RUNS, _render_v2_dashboard, _run_and_save_v2_job, _resolve_rescan_selection, app
+from agentready.server import _V2_ROBOTS, _V2_RUNS, _remediation_confirmation, _render_v2_dashboard, _run_and_save_v2_job, _resolve_rescan_selection, app
 
 
 def test_v2_dashboard_localizes_coverage_and_status_values():
@@ -28,6 +28,45 @@ def test_v2_dashboard_localizes_coverage_and_status_values():
     assert "Частичное — достигнут лимит страниц" in html
     assert "предупреждение" in html
     assert "partial_limit" not in html.split("<script", 1)[0]
+
+
+def test_finding_remediation_opens_evidence_and_confirmation_states():
+    parent_id, child_id = "remediation-parent", "remediation-child"
+    parent = MemorySiteStore()
+    parent.put_finding(parent_id, "title", {
+        "id": "title", "title": "Title", "status": "fail", "reason": "missing",
+        "affected_urls": ["https://example.test/page"],
+        "evidence": [{"id": "title", "summary": "missing", "url": "https://example.test/page"}],
+    })
+    child = MemorySiteStore()
+    child.put_finding(child_id, "title", {
+        "id": "title", "title": "Title", "status": "pass", "reason": "fixed",
+        "evidence": [{"id": "title", "summary": "present", "url": "https://example.test/page"}],
+    })
+    _V2_RUNS.put(parent_id, parent)
+    _V2_RUNS.put(child_id, child)
+    client = TestClient(app)
+    task = client.get(f"/v2/runs/{parent_id}/findings/title/remediation", params={"language": "ru"})
+    assert task.status_code == 200
+    assert task.json()["affected_urls"] == ["https://example.test/page"]
+    assert "Исправьте" in task.json()["instructions"]
+    confirmation = _remediation_confirmation(parent_id, child_id, ("title",))
+    assert confirmation["status"] == "passed"
+    assert confirmation["items"][0]["state"] == "resolved"
+
+
+def test_schedule_crud_history_and_worker_status():
+    server_module._V2_PROJECT_STORE = MemorySiteStore()
+    client = TestClient(app)
+    assert client.post("/v2/projects", json={"project_id": "sched-project", "name": "Schedule", "target": "https://example.test/"}).status_code == 200
+    created = client.post("/v2/projects/sched-project/schedules", json={"schedule_id": "daily", "interval_seconds": 86400, "next_run_at": "2099-01-01T00:00:00+00:00"})
+    assert created.status_code == 200 and created.json()["enabled"] is True
+    assert client.get("/v2/projects/sched-project/schedules").json()["items"][0]["schedule_id"] == "daily"
+    updated = client.patch("/v2/schedules/daily", json={"enabled": False})
+    assert updated.status_code == 200 and updated.json()["enabled"] is False
+    assert client.get("/v2/schedules/daily/history").json()["items"] == []
+    assert client.get("/v2/schedules/worker").json()["running"] is False
+    assert client.delete("/v2/schedules/daily").json()["deleted"] is True
 
 
 def test_selected_rescan_maps_findings_and_rejects_stale_selection():
@@ -128,6 +167,39 @@ def test_custom_rules_endpoints_validate_and_debug_without_crawl():
     assert debugged.status_code == 200
     assert debugged.json()["matches"][0]["count"] == 1
     assert "/v2/custom-rules/apply" in {route.path for route in app.routes}
+
+
+def test_custom_rules_debug_uses_saved_representation_when_run_is_selected():
+    from agentready import server as server_module
+
+    run_id = "debug-saved-run"
+    url = "https://example.test/"
+    server_module._V2_RULE_REPRESENTATIONS[(run_id, url)] = {
+        "url": url,
+        "text": "saved marker",
+        "raw_text": '<p class="known">saved marker</p>',
+        "headers": {},
+        "structured_data": [],
+        "links": [],
+        "resources": [],
+    }
+    rules = "version: 1\nrules:\n  - id: marker\n    assert:\n      kind: text\n      pattern: saved\n  - id: css\n    assert:\n      kind: css\n      pattern: p.known\n"
+    response = TestClient(app).post("/v2/custom-rules/debug", json={"rules": rules, "run_id": run_id, "url_key": url, "url": url, "text": url})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["matches"][0]["count"] == 1
+    assert payload["matches"][1]["count"] == 1
+
+
+def test_saved_representation_endpoint_is_loopback_only():
+    from agentready import server as server_module
+
+    run_id = "representation-boundary-run"
+    url = "https://example.test/"
+    server_module._V2_RULE_REPRESENTATIONS[(run_id, url)] = {"url": url, "text": "private"}
+    remote = TestClient(app, client=("203.0.113.10", 41000))
+    response = remote.get(f"/v2/runs/{run_id}/representations/{url}")
+    assert response.status_code == 403
 
 
 def test_link_graph_endpoints_project_cached_occurrences_and_node_detail():
@@ -340,6 +412,13 @@ def test_v2_job_exposes_crawl_progress_and_rendered_report(monkeypatch):
         time.sleep(0.01)
     else:
         raise AssertionError("job did not complete")
+
+
+def test_v2_job_status_list_is_bounded_and_does_not_expose_results():
+    response = TestClient(app).get("/v2/jobs")
+    assert response.status_code == 200
+    assert isinstance(response.json()["items"], list)
+    assert all("result" not in item for item in response.json()["items"])
 
 
 def test_v2_inventory_endpoints_paginate_typed_store_records():

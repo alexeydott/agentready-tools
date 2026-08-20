@@ -58,6 +58,10 @@ def test_dashboard_v2_preset_has_hint_and_configurable_crawl_budget():
         assert 'id="v2-max-pages"' in html
         assert 'id="crawl-progress"' in html
         assert 'runV2Background' in html
+        assert 'discovery_kind:selectedV2Discovery()' in html
+        assert 'id="v2-full-discovered"' in html
+        assert 'function selectedV2Discovery()' in html
+        assert 'cancelActiveV2Job' in html
         assert 'function captureV2Report' in html
         assert 'captureV2Report(html)' in html
         assert 'ai.full_report.open' in html
@@ -473,3 +477,17 @@ def test_link_graph_filters_use_compact_checkboxes_and_have_hints():
     panel = html.split('id="link-graph-panel"', 1)[1].split('</section>', 1)[0]
     assert 'id="link-graph-dead-end"' in panel and "Show nodes with no outgoing links" in panel
     assert 'id="link-graph-disconnected"' in panel and "Show nodes outside the connected component" in panel
+
+
+def test_link_graph_has_bounded_local_visual_projection_and_localized_controls():
+    english = render_dashboard("en")
+    russian = render_dashboard("ru")
+    for html, labels in ((english, ("Node cap", "Minimum authority", "Depth", "Visual projection", "renderLinkGraphVisual", "link-graph-visual")), (russian, ("Лимит узлов", "Минимальная авторитетность", "Глубина", "Визуальная проекция"))):
+        for label in labels:
+            assert label in html
+    assert 'id="link-graph-node-cap"' in english
+    assert 'id="link-graph-min-authority"' in english
+    assert 'id="link-graph-depth"' in english
+    assert 'payload.items = (payload.items || []).filter' in english
+    assert 'slice(0, 100)' in english
+    assert 'payload.edges || []' in english
