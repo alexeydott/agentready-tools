@@ -213,9 +213,13 @@ def build_stage_e_reconciliation_matrix(
     rows: list[dict[str, object]] = []
     for reference in STAGE_E_PLAN_REFERENCES:
         entry = by_id.get(reference.planned_rule_id)
-        planned_semantics = _MISSING_RULE_SEMANTICS.get(
-            reference.planned_rule_id,
-            reference.planned_semantics,
+        planned_semantics = (
+            reference.planned_semantics
+            if entry is not None
+            else _MISSING_RULE_SEMANTICS.get(
+                reference.planned_rule_id,
+                reference.planned_semantics,
+            )
         )
         if entry is not None:
             resolution_status = "resolved_catalog_authoritative"
@@ -303,4 +307,6 @@ def stage_e_binding_is_blocked(
         for item in dispositions
     ):
         return True
+    if issue is not None or rule_id is not None:
+        return False
     return matrix.get("binding_allowed") is not True

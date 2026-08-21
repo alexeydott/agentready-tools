@@ -80,6 +80,33 @@ def test_binding_gate_cannot_be_bypassed_by_setting_binding_allowed_true():
     assert not stage_e_binding_is_blocked(matrix, issue=22, rule_id="CORE-COVERAGE-001")
 
 
+def test_binding_gate_is_target_scoped_but_rejects_unresolved_target():
+    matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
+    matrix["binding_allowed"] = True
+
+    assert not stage_e_binding_is_blocked(
+        matrix, issue=22, rule_id="CORE-COVERAGE-001"
+    )
+    assert stage_e_binding_is_blocked(
+        matrix, issue=23, rule_id="CORE-ROBOTS-001"
+    )
+    assert stage_e_binding_is_blocked(matrix, issue=34)
+
+
+def test_existing_catalog_rows_preserve_authored_planned_semantics():
+    matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
+    rows = {
+        (row["issue"], row["planned_rule_id"]): row
+        for row in matrix["rows"]
+    }
+    assert rows[(31, "GOOGLE-DESC-001")]["planned_semantics"] == (
+        "catalog-authoritative exact per-rule contract"
+    )
+    assert rows[(32, "GOOGLE-TITLE-001")]["planned_semantics"] == (
+        "catalog-authoritative exact per-rule contract"
+    )
+
+
 def test_binding_gate_rejects_semantic_and_version_mismatches():
     matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
     matrix["binding_allowed"] = True
