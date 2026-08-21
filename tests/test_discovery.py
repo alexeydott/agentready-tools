@@ -157,6 +157,74 @@ def test_discovery_limits_are_validated():
         SingleUrlSource("https://example.test").discover(limit=0)
 
 
+def test_robots_sitemap_source_persists_5xx_robots_observation_without_raising():
+    class FakeResponse:
+        def __init__(self, status_code: int):
+            self.status_code = status_code
+            self.headers = {}
+            self.body = b""
+            self.url = "https://example.test/robots.txt"
+
+    class FakeFetcher:
+        async def get(self, request, *, use_cache=True):
+            return FakeResponse(503)
+
+    async def collect():
+        return await RobotsSitemapSource("https://example.test/").collect_from_fetcher(FakeFetcher(), limit=5)
+
+    result = asyncio.run(collect())
+    assert result.robots.fetch_state == "unreachable"
+    assert result.robots.status_code == 503
+    assert result.sitemap_documents == ()
+    assert result.urls == ()
+
+
+def test_robots_sitemap_source_discover_from_fetcher_raises_for_5xx_robots():
+    class FakeResponse:
+        def __init__(self, status_code: int):
+            self.status_code = status_code
+            self.headers = {}
+            self.body = b""
+            self.url = "https://example.test/robots.txt"
+
+    class FakeFetcher:
+        async def get(self, request, *, use_cache=True):
+            return FakeResponse(503)
+
+    async def collect():
+        return await RobotsSitemapSource("https://example.test/").discover_from_fetcher(FakeFetcher(), limit=5)
+
+    with pytest.raises(ValueError, match="robots fetch failed"):
+        asyncio.run(collect())
+
+
+def test_collect_sitemap_tree_marks_gzip_bodies_as_compressed():
+    class FakeResponse:
+        def __init__(self, body: bytes, headers: dict[str, str]):
+            self.status_code = 200
+            self.headers = headers
+            self.body = body
+            self.url = "https://example.test/sitemap.xml.gz"
+
+    class FakeFetcher:
+        async def get(self, request, *, use_cache=True):
+            return FakeResponse(
+                gzip.compress(b"<urlset><url><loc>/page</loc></url></urlset>"),
+                {"content-encoding": "gzip"},
+            )
+
+    async def collect():
+        return await RobotsSitemapSource(
+            "https://example.test/",
+            sitemap_urls=("/sitemap.xml.gz",),
+        ).collect_from_fetcher(FakeFetcher(), limit=5)
+
+    result = asyncio.run(collect())
+    assert result.urls == ("https://example.test/page",)
+    assert len(result.sitemap_documents) == 1
+    assert result.sitemap_documents[0].compressed is True
+
+
 def test_discovery_plan_hash_is_deterministic_and_source_specific():
     first = discovery_plan_hash(UrlListSource(("https://example.test/a",)), limit=10)
     second = discovery_plan_hash(UrlListSource(("https://example.test/a",)), limit=10)

@@ -267,6 +267,10 @@ class RobotsSitemapSource:
         limit: int = 1000,
     ) -> tuple[str, ...]:
         collected = await self.collect_from_fetcher(fetcher, limit=limit)
+        if collected.robots.fetch_state not in {"available", "supplied"}:
+            robots = collected.robots
+            detail = f"HTTP {robots.status_code}" if robots.status_code is not None else robots.error_kind or robots.fetch_state
+            raise ValueError(f"robots fetch failed with {detail}")
         errors = [document for document in collected.sitemap_documents if document.fetch_state not in {"available", "supplied"}]
         if errors:
             first = errors[0]
@@ -310,7 +314,19 @@ class RobotsSitemapSource:
             )
             return RobotsSitemapDiscoveryResult(robots_observation, (), ())
         if response.status_code >= 400 and response.status_code != 404:
-            raise ValueError(f"robots fetch failed with HTTP {response.status_code}")
+            robots_observation = RobotsDocumentObservation(
+                source_url=robots_url,
+                final_url=getattr(response, "url", robots_url),
+                status_code=response.status_code,
+                fetch_state=_fetch_state(response.status_code),
+                body=None,
+            )
+            logger.info(
+                "robots fetch unavailable source=robots-sitemap status=%s state=%s",
+                response.status_code,
+                robots_observation.fetch_state,
+            )
+            return RobotsSitemapDiscoveryResult(robots_observation, (), ())
         discovered_roots = [
             urljoin(robots_url, line.split(":", 1)[1].strip())
             for line in response.body.decode("utf-8", errors="replace").splitlines()
@@ -368,6 +384,7 @@ class SitemapDocumentObservation:
     final_url: str | None = None
     status_code: int | None = None
     error_kind: str | None = None
+    compressed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -406,6 +423,7 @@ async def _collect_sitemap_tree(
             continue
         visited.add(url)
         fetch_state = _fetch_state(response.status_code)
+        compressed = "gzip" in response.headers.get("content-encoding", "").lower() or url.lower().endswith(".gz")
         documents.append(
             SitemapDocumentObservation(
                 url,
@@ -414,11 +432,11 @@ async def _collect_sitemap_tree(
                 body=response.body if fetch_state == "available" else None,
                 final_url=getattr(response, "url", url),
                 status_code=response.status_code,
+                compressed=compressed if fetch_state == "available" else False,
             )
         )
         if fetch_state != "available":
             continue
-        compressed = "gzip" in response.headers.get("content-encoding", "").lower() or url.lower().endswith(".gz")
         source = SitemapSource.from_bytes(
             response.body,
             url,

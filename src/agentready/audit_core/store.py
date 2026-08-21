@@ -176,6 +176,19 @@ class StoragePage:
 
 
 class ContentRetention(StrEnum):
+    """Controls retention of raw representation body/content bytes.
+
+    This setting governs only the raw `body`/`content` payloads captured from
+    a fetch (the bytes actually returned by the origin). It does NOT gate
+    `RepresentationRecord.facts` or persisted `RunFactRecord` payloads: those
+    are derived, already-parsed structured facts (titles, headings, links,
+    counts, etc.) that are the durable evidence layer replay depends on, and
+    they are always persisted regardless of retention level. `METADATA_ONLY`
+    means "do not retain the raw body/content bytes"; it does not mean
+    "do not retain derived facts about the content" -- replay of parsed
+    facts must work identically under every retention level.
+    """
+
     METADATA_ONLY = "metadata-only"
     SAMPLES = "samples"
     FULL_CONTENT = "full-content"

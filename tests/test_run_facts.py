@@ -2,14 +2,19 @@ import httpx
 from types import SimpleNamespace
 
 from agentready.audit_core import (
+    ContentRetention,
     MemorySiteStore,
     RunRecord,
+    SQLiteSiteStore,
+    persist_robots_observation_run_facts,
     persist_robots_run_facts,
     persist_sitemap_run_facts,
     robots_policy_from_run_facts,
     sitemap_reconciliation_from_run_facts,
 )
 from agentready.audit_service import AuditRequest, AuditService
+from agentready.discovery import RobotsDocumentObservation, SitemapDocumentObservation
+from agentready.robots import RobotsFetchStatus
 
 
 def test_robots_run_facts_preserve_fetch_parse_and_policy_states() -> None:
@@ -213,3 +218,149 @@ def test_audit_service_persists_real_robots_sitemap_discovery_run_facts() -> Non
     versions = dict(store.get_run(result.run.context.run_id).fact_schema_versions)
     assert versions["robots.fetch"] == "1"
     assert versions["sitemap.fetch"] == "1"
+
+
+def test_robots_observation_run_facts_preserve_5xx_and_error_kind_and_final_url() -> None:
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("run-robots-5xx", "config", "tool", "rules"))
+
+    persist_robots_observation_run_facts(
+        store,
+        "run-robots-5xx",
+        origin="https://example.test",
+        observation=RobotsDocumentObservation(
+            source_url="https://example.test/robots.txt",
+            final_url="https://example.test/robots.txt",
+            status_code=503,
+            fetch_state="unreachable",
+            body=None,
+        ),
+    )
+
+    fetch = next(fact for fact in store.iter_run_facts("run-robots-5xx", "robots.fetch") if fact.subject == "https://example.test")
+    assert fetch.payload["state"] == "unreachable"
+    assert fetch.payload["http_status"] == 503
+    assert fetch.payload["final_url"] == "https://example.test/robots.txt"
+
+
+def test_robots_observation_run_facts_preserve_transport_error_kind() -> None:
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("run-robots-error", "config", "tool", "rules"))
+
+    persist_robots_observation_run_facts(
+        store,
+        "run-robots-error",
+        origin="https://example.test",
+        observation=RobotsDocumentObservation(
+            source_url="https://example.test/robots.txt",
+            fetch_state="unreachable",
+            error_kind="timeout",
+        ),
+    )
+
+    fetch = next(fact for fact in store.iter_run_facts("run-robots-error", "robots.fetch") if fact.subject == "https://example.test")
+    assert fetch.payload["state"] == "unreachable"
+    assert fetch.payload["error_kind"] == "timeout"
+    assert fetch.payload["http_status"] is None
+
+
+def test_sitemap_run_facts_reparse_gzip_bodies_using_compressed_flag() -> None:
+    import gzip
+
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("run-sitemap-gzip", "config", "tool", "rules"))
+    compressed_body = gzip.compress(b"<urlset><url><loc>https://example.test/page</loc></url></urlset>")
+
+    persist_sitemap_run_facts(
+        store,
+        "run-sitemap-gzip",
+        origin="https://example.test",
+        documents=(
+            SitemapDocumentObservation(
+                source_url="https://example.test/sitemap.xml.gz",
+                source_kind="robots_declared",
+                fetch_state="available",
+                body=compressed_body,
+                final_url="https://example.test/sitemap.xml.gz",
+                status_code=200,
+                compressed=True,
+            ),
+        ),
+    )
+
+    parsed = next(
+        fact
+        for fact in store.iter_run_facts("run-sitemap-gzip", "sitemap.parsed")
+        if fact.subject == "https://example.test/sitemap.xml.gz"
+    )
+    assert parsed.payload["state"] == "present"
+    assert parsed.payload["url_count"] == 1
+    urls = next(fact for fact in store.iter_run_facts("run-sitemap-gzip", "sitemap.urls") if fact.subject == "https://example.test")
+    assert urls.payload["same_origin"] == ["https://example.test/page"]
+
+
+def test_sitemap_run_facts_classify_relative_loc_as_relative_or_invalid() -> None:
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("run-sitemap-relative", "config", "tool", "rules"))
+
+    persist_sitemap_run_facts(
+        store,
+        "run-sitemap-relative",
+        origin="https://example.test",
+        documents=("<urlset><url><loc>/relative</loc></url><url><loc>https://example.test/a</loc></url></urlset>",),
+        source_urls=("https://example.test/sitemap.xml",),
+    )
+
+    urls = next(fact for fact in store.iter_run_facts("run-sitemap-relative", "sitemap.urls") if fact.subject == "https://example.test")
+    assert urls.payload["relative_or_invalid_loc"] == ["/relative"]
+    parsed = next(
+        fact
+        for fact in store.iter_run_facts("run-sitemap-relative", "sitemap.parsed")
+        if fact.subject == "https://example.test/sitemap.xml"
+    )
+    assert parsed.payload["relative_loc_count"] == 1
+
+
+def test_robots_policy_from_run_facts_restores_fetch_state_for_offline_replay() -> None:
+    store = MemorySiteStore()
+    store.begin_run(RunRecord("run-robots-fetchstate", "config", "tool", "rules"))
+
+    persist_robots_run_facts(
+        store,
+        "run-robots-fetchstate",
+        origin="https://example.test",
+        robots_text="User-agent: *\nDisallow: /private\n",
+        status_code=200,
+    )
+
+    replayed = robots_policy_from_run_facts(store, "run-robots-fetchstate", origin="https://example.test")
+    assert replayed.fetch is not None
+    assert replayed.fetch.fetch_status == RobotsFetchStatus.AVAILABLE
+    assert replayed.fetch.http_status == 200
+
+
+def test_representation_facts_persist_under_metadata_only_retention(tmp_path) -> None:
+    from agentready.audit_core.store import RepresentationRecord
+
+    store = SQLiteSiteStore(tmp_path / "metadata-only.sqlite", retention=ContentRetention.METADATA_ONLY)
+    try:
+        store.begin_run(RunRecord("run-metadata-only", "config", "tool", "rules"))
+        store.put_representation(
+            RepresentationRecord(
+                run_id="run-metadata-only",
+                url_key="https://example.test/",
+                representation_id="rep-1",
+                source="static-html",
+                content_type="text/html",
+                body_hash="hash",
+                byte_size=42,
+                observed_at="2026-01-01T00:00:00Z",
+                body=b"<title>Full body</title>",
+                facts={"titles": ["Full body"]},
+            )
+        )
+        representation = next(store.iter_representations("run-metadata-only", "https://example.test/"))
+        assert representation.body is None
+        assert representation.facts == {"titles": ["Full body"]}
+    finally:
+        store.close()
