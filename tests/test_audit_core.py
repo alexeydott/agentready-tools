@@ -99,6 +99,61 @@ def test_canonical_audit_payload_validates_against_published_schema():
     jsonschema.Draft202012Validator(schema).validate(payload)
 
 
+def test_canonical_finding_metadata_validates_against_published_schema():
+    jsonschema = pytest.importorskip("jsonschema")
+    from agentready.audit_core import (
+        Applicability,
+        Effort,
+        EvaluationCompleteness,
+        EvaluationOutcome,
+        FindingContract,
+        FindingKey,
+        FindingStateHash,
+        Severity,
+        Status,
+    )
+    from agentready.report_v2 import AuditReport, Coverage
+
+    schema_path = Path(__file__).parents[1] / "schemas" / "agentready.audit.v2.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    key = FindingKey("uncertain", "1", UrlIdentity.parse("https://example.test/"))
+    finding = FindingContract(
+        key=key,
+        state_hash=FindingStateHash("hash"),
+        status=Status.WARN,
+        applicability=Applicability.UNKNOWN,
+        completeness=EvaluationCompleteness.PARTIAL,
+        outcome=EvaluationOutcome.UNKNOWN,
+        severity=Severity.MEDIUM,
+        impact="medium",
+        effort=Effort.MEDIUM,
+        priority=50,
+    ).to_report_finding(title="Uncertain", reason="insufficient evidence", public_id="uncertain")
+    payload = AuditReport("https://example.test", (finding,), Coverage(1, 1, 1, 0)).to_dict()
+
+    jsonschema.Draft202012Validator(schema).validate(payload)
+
+
+def test_audit_schema_keeps_legacy_payload_valid_but_rejects_bad_canonical_enums():
+    jsonschema = pytest.importorskip("jsonschema")
+    from agentready.report_v2 import AuditReport, Coverage, Finding, FindingStatus
+
+    schema_path = Path(__file__).parents[1] / "schemas" / "agentready.audit.v2.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    validator = jsonschema.Draft202012Validator(schema)
+    payload = AuditReport(
+        "https://example.test",
+        (Finding("optional", "Optional", FindingStatus.SKIP, "not applicable"),),
+        Coverage(1, 1, 0, 0),
+    ).to_dict()
+
+    validator.validate(payload)
+    invalid = json.loads(json.dumps(payload))
+    invalid["findings"][0]["outcome"] = "maybe"
+    with pytest.raises(jsonschema.ValidationError):
+        validator.validate(invalid)
+
+
 def test_published_seo_and_mobile_schemas_validate_current_serializers():
     jsonschema = pytest.importorskip("jsonschema")
     from agentready.mobile_models import MobileReport
