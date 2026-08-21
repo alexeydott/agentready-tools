@@ -62,6 +62,7 @@ def test_run_identity_and_version_manifest_round_trip(tmp_path: Path, store_kind
             "tool",
             "catalog-v2",
             rule_catalog_digest="digest-123",
+            rule_catalog_digest_kind="content",
             score_model_id="score-v1",
             fact_schema_versions=(("page", "2"), ("transport", "1")),
         )
@@ -70,6 +71,7 @@ def test_run_identity_and_version_manifest_round_trip(tmp_path: Path, store_kind
             "run-identity",
             {
                 "rule_catalog_digest": run.rule_catalog_digest,
+                "rule_catalog_digest_kind": run.rule_catalog_digest_kind,
                 "score_model_id": run.score_model_id,
                 "fact_schema_versions": dict(run.fact_schema_versions),
             },
@@ -77,10 +79,12 @@ def test_run_identity_and_version_manifest_round_trip(tmp_path: Path, store_kind
 
         restored = store.get_run("run-identity")
         assert restored.rule_catalog_digest == "digest-123"
+        assert restored.rule_catalog_digest_kind == "content"
         assert restored.score_model_id == "score-v1"
         assert restored.fact_schema_versions == (("page", "2"), ("transport", "1"))
         assert store.get_version_manifest("run-identity") == {
             "rule_catalog_digest": "digest-123",
+            "rule_catalog_digest_kind": "content",
             "score_model_id": "score-v1",
             "fact_schema_versions": {"page": "2", "transport": "1"},
         }
@@ -350,6 +354,7 @@ def test_sqlite_v8_run_identity_migration_is_durable(tmp_path: Path):
     try:
         restored = reopened.get_run("run-v8")
         assert restored.rule_catalog_digest
+        assert restored.rule_catalog_digest_kind == "synthetic"
         assert restored.score_model_id == "readiness-transparent-v2"
         assert restored.fact_schema_versions == ()
         assert reopened._connection.execute("PRAGMA user_version").fetchone()[0] == 9

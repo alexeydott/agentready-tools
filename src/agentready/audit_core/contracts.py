@@ -150,8 +150,6 @@ class FindingContract:
             and self.outcome in {EvaluationOutcome.PASS, EvaluationOutcome.FAIL}
         ):
             raise ValueError("strict failure policy rejects incomplete pass/fail outcomes")
-        if self.outcome is EvaluationOutcome.UNKNOWN and self.operational_state is OperationalState.NONE:
-            raise ValueError("unknown findings require an operational state")
 
     def to_report_finding(
         self,

@@ -16,6 +16,7 @@ from agentready.audit_core import (
     AuthorityLevel,
     RequirementLevel,
     ScoreParticipation,
+    ScoreRole,
 )
 import pytest
 
@@ -90,7 +91,27 @@ def test_finding_contract_rejects_incomplete_pass_fail_under_failure_policy():
         )
 
 
-def test_rule_spec_binds_score_participation_to_score_model_policy():
+def test_finding_contract_allows_evidence_unknown_without_operational_failure():
+    key = FindingKey("metadata", "1", UrlIdentity.parse("https://example.test/"))
+    contract = FindingContract(
+        key=key,
+        state_hash=FindingStateHash("hash"),
+        status=Status.WARN,
+        applicability=Applicability.UNKNOWN,
+        completeness=EvaluationCompleteness.PARTIAL,
+        severity=Severity.MEDIUM,
+        impact="medium",
+        effort=Effort.MEDIUM,
+        priority=50,
+        outcome=EvaluationOutcome.UNKNOWN,
+    )
+
+    assert contract.outcome is EvaluationOutcome.UNKNOWN
+    assert contract.operational_state.value == "none"
+    assert contract.to_report_finding(title="Metadata", reason="insufficient evidence").status.value == "skip"
+
+
+def test_rule_spec_exposes_score_role_without_score_model_policy():
     rule = RuleSpec(
         "robots",
         "Robots",
@@ -99,14 +120,48 @@ def test_rule_spec_binds_score_participation_to_score_model_policy():
         RequirementLevel.REQUIRED,
         RuleVersion("1.0.0", "2026-01-01"),
         ScoreParticipation.INCLUDED,
-        score_model_id="readiness-transparent-v2",
-        score_policy_version="2026.08",
     )
 
-    assert rule.to_dict()["score_model_id"] == "readiness-transparent-v2"
-    assert rule.to_dict()["score_policy_version"] == "2026.08"
+    assert rule.to_dict()["score_role"] == ScoreRole.ELIGIBLE.value
+    assert "score_model_id" not in rule.to_dict()
+    assert "score_policy_version" not in rule.to_dict()
     assert rule.to_dict()["failure_policy"] == FailurePolicy.STRICT.value
-    with pytest.raises(ValueError, match="score model id"):
+    observation = RuleSpec(
+        "observed",
+        "Observed",
+        "metadata",
+        AuthorityLevel.STANDARD,
+        RequirementLevel.SUPPLEMENTAL,
+        RuleVersion("1.0.0", "2026-01-01"),
+        ScoreParticipation.EXCLUDED,
+        score_role=ScoreRole.OBSERVATION,
+    )
+    guard = RuleSpec(
+        "guard",
+        "Guard",
+        "metadata",
+        AuthorityLevel.STANDARD,
+        RequirementLevel.RECOMMENDED,
+        RuleVersion("1.0.0", "2026-01-01"),
+        ScoreParticipation.EXCLUDED,
+        score_role=ScoreRole.GUARD,
+    )
+    legacy = RuleSpec(
+        "legacy",
+        "Legacy",
+        "metadata",
+        AuthorityLevel.STANDARD,
+        RequirementLevel.SUPPLEMENTAL,
+        RuleVersion("1.0.0", "2026-01-01"),
+        ScoreParticipation.EXCLUDED,
+        score_role=ScoreRole.LEGACY_ONLY,
+    )
+    assert {observation.score_role, guard.score_role, legacy.score_role} == {
+        ScoreRole.OBSERVATION,
+        ScoreRole.GUARD,
+        ScoreRole.LEGACY_ONLY,
+    }
+    with pytest.raises(ValueError, match="only score-eligible"):
         RuleSpec(
             "robots",
             "Robots",
@@ -114,5 +169,6 @@ def test_rule_spec_binds_score_participation_to_score_model_policy():
             AuthorityLevel.STANDARD,
             RequirementLevel.REQUIRED,
             RuleVersion("1.0.0", "2026-01-01"),
-            score_model_id="",
+            ScoreParticipation.INCLUDED,
+            score_role=ScoreRole.OBSERVATION,
         )

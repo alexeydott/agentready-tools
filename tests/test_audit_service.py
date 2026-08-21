@@ -126,9 +126,11 @@ def test_audit_service_applies_ruleset_to_saved_facts_without_extra_fetches():
     assert persisted.rule_catalog_digest == result.run.context.rule_catalog_digest == result.report.rule_catalog_digest
     assert persisted.score_model_id == result.run.context.score_model_id == result.report.score_model_id
     assert dict(persisted.fact_schema_versions)
+    assert "links" not in dict(persisted.fact_schema_versions)
     assert store.get_version_manifest(result.run.context.run_id) == {
         "rule_catalog_version": persisted.rule_catalog_version,
         "rule_catalog_digest": persisted.rule_catalog_digest,
+        "rule_catalog_digest_kind": persisted.rule_catalog_digest_kind,
         "score_model_id": persisted.score_model_id,
         "fact_schema_versions": dict(persisted.fact_schema_versions),
     }
@@ -191,7 +193,13 @@ def test_audit_service_seo_mode_uses_shared_crawler_and_atomic_facts() -> None:
     assert next(check for check in result.seo_report.checks if check.id == "indexability").status == "fail"
     assert result.seo_report.recommendations
     assert all(check.remediation for check in result.seo_report.checks if check.status in {"fail", "warn", "error"})
-    assert result.to_dict()["request"]["mode"] == "seo"
+    payload = result.to_dict()
+    assert payload["request"]["mode"] == "seo"
+    assert payload["score_model_id"] == result.run.context.score_model_id == "seo-binary-v1"
+    assert payload["rule_catalog_version"] == result.run.context.rule_catalog_version == "seo-v2-atomic"
+    assert payload["rule_catalog_digest_kind"] == "synthetic"
+    assert payload["run"]["score_model_id"] == payload["score_model_id"]
+    assert payload["run"]["rule_catalog_digest"] == payload["rule_catalog_digest"]
 
 
 def test_audit_service_seo_ruleset_changes_report():
@@ -402,8 +410,38 @@ def test_audit_request_fields_reach_canonical_execution_without_network(monkeypa
         "run_rules": False,
     }
     assert payload["run"]["config_hash"] == result.run.context.config_hash
+    assert payload["run"]["score_model_id"] == result.run.context.score_model_id
+    assert payload["run"]["rule_catalog_version"] == result.run.context.rule_catalog_version
+    assert payload["run"]["rule_catalog_digest"] == result.run.context.rule_catalog_digest
+    assert payload["run"]["rule_catalog_digest_kind"] == "synthetic"
     assert result.report.coverage.urls_fetched == 1
     assert "provider" not in captured
+
+
+def test_audit_service_mobile_projection_preserves_run_identity() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            content=b"<title>Mobile</title><meta name='viewport' content='width=device-width, initial-scale=1'>",
+        )
+
+    result = AuditService().run(
+        AuditRequest(
+            target="https://example.test/",
+            mode="mobile",
+            max_pages=1,
+            allow_private=True,
+            transport=httpx.MockTransport(handler),
+        )
+    )
+    payload = result.to_dict()
+
+    assert result.mobile_report is not None
+    assert payload["run"]["score_model_id"] == result.run.context.score_model_id
+    assert payload["run"]["rule_catalog_version"] == result.run.context.rule_catalog_version == "mobile-v2"
+    assert payload["run"]["rule_catalog_digest"] == payload["rule_catalog_digest"]
+    assert payload["rule_catalog_digest_kind"] == "synthetic"
 
 
 def test_audit_request_projection_fields_are_preserved_and_rescans_have_lineage(monkeypatch: pytest.MonkeyPatch):

@@ -188,6 +188,7 @@ class RunRecord:
     tool_version: str
     rule_catalog_version: str
     rule_catalog_digest: str = ""
+    rule_catalog_digest_kind: str = "synthetic"
     score_model_id: str = "readiness-transparent-v2"
     fact_schema_versions: tuple[tuple[str, str], ...] = ()
     state: str = "running"
@@ -199,6 +200,9 @@ class RunRecord:
             raise ValueError("run id must not be empty")
         if not self.rule_catalog_digest:
             object.__setattr__(self, "rule_catalog_digest", hashlib.sha256(self.rule_catalog_version.encode("utf-8")).hexdigest())
+            object.__setattr__(self, "rule_catalog_digest_kind", "synthetic")
+        elif self.rule_catalog_digest_kind not in {"content", "synthetic", "legacy"}:
+            raise ValueError("rule catalog digest kind must be content, synthetic, or legacy")
         if not self.score_model_id.strip():
             raise ValueError("score model id must not be empty")
         object.__setattr__(self, "fact_schema_versions", tuple(sorted((str(key), str(value)) for key, value in self.fact_schema_versions)))
@@ -392,6 +396,7 @@ class MetricRecord:
 class SiteStore(Protocol):
     def begin_run(self, run: RunRecord) -> RunRecord: ...
     def get_run(self, run_id: str) -> RunRecord: ...
+    def update_run_identity(self, run_id: str, *, fact_schema_versions: tuple[tuple[str, str], ...] | None = None) -> RunRecord: ...
     def put_project(self, project: ProjectRecord) -> ProjectRecord: ...
     def get_project(self, project_id: str) -> ProjectRecord: ...
     def iter_projects(self) -> Iterator[ProjectRecord]: ...
@@ -489,6 +494,15 @@ class MemorySiteStore:
             return self._runs[run_id]
         except KeyError as exc:
             raise KeyError("run not found") from exc
+
+    def update_run_identity(self, run_id: str, *, fact_schema_versions: tuple[tuple[str, str], ...] | None = None) -> RunRecord:
+        run = self.get_run(run_id)
+        updated = RunRecord(**{
+            **asdict(run),
+            "fact_schema_versions": fact_schema_versions if fact_schema_versions is not None else run.fact_schema_versions,
+        })
+        self._runs[run_id] = updated
+        return updated
 
     def put_project(self, project: ProjectRecord) -> ProjectRecord:
         self._projects[project.project_id] = project
@@ -877,6 +891,8 @@ class SQLiteSiteStore:
         columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(runs)")}
         if "rule_catalog_digest" not in columns:
             self._connection.execute("ALTER TABLE runs ADD COLUMN rule_catalog_digest TEXT NOT NULL DEFAULT ''")
+        if "rule_catalog_digest_kind" not in columns:
+            self._connection.execute("ALTER TABLE runs ADD COLUMN rule_catalog_digest_kind TEXT NOT NULL DEFAULT 'synthetic'")
         if "score_model_id" not in columns:
             self._connection.execute("ALTER TABLE runs ADD COLUMN score_model_id TEXT NOT NULL DEFAULT 'readiness-transparent-v2'")
         if "fact_schema_versions" not in columns:
@@ -1014,7 +1030,7 @@ class SQLiteSiteStore:
         self._write_guard()
         with self._transaction():
             self._connection.execute(
-                "INSERT OR IGNORE INTO runs(id, started_at, config_hash, tool_version, rule_catalog_version, rule_catalog_digest, score_model_id, fact_schema_versions, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO runs(id, started_at, config_hash, tool_version, rule_catalog_version, rule_catalog_digest, rule_catalog_digest_kind, score_model_id, fact_schema_versions, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     run.id,
                     run.started_at,
@@ -1022,6 +1038,7 @@ class SQLiteSiteStore:
                     run.tool_version,
                     run.rule_catalog_version,
                     run.rule_catalog_digest,
+                    run.rule_catalog_digest_kind,
                     run.score_model_id,
                     json.dumps(dict(run.fact_schema_versions), sort_keys=True, separators=(",", ":")),
                     run.state,
@@ -1035,6 +1052,17 @@ class SQLiteSiteStore:
         if row is None:
             raise KeyError("run not found")
         return _run_from_row(row)
+
+    def update_run_identity(self, run_id: str, *, fact_schema_versions: tuple[tuple[str, str], ...] | None = None) -> RunRecord:
+        self._write_guard()
+        current = self.get_run(run_id)
+        versions = current.fact_schema_versions if fact_schema_versions is None else tuple(sorted(fact_schema_versions))
+        with self._transaction():
+            self._connection.execute(
+                "UPDATE runs SET fact_schema_versions=? WHERE id=?",
+                (json.dumps(dict(versions), sort_keys=True, separators=(",", ":")), run_id),
+            )
+        return self.get_run(run_id)
 
     def update_run_state(self, run_id: str, state: str, *, finished_at: str | None = None) -> None:
         self._write_guard()
@@ -1574,6 +1602,7 @@ def _run_from_row(row: sqlite3.Row) -> RunRecord:
         id=row["id"], config_hash=row["config_hash"], tool_version=row["tool_version"],
         rule_catalog_version=row["rule_catalog_version"],
         rule_catalog_digest=row["rule_catalog_digest"],
+        rule_catalog_digest_kind=row["rule_catalog_digest_kind"],
         score_model_id=row["score_model_id"],
         fact_schema_versions=tuple(sorted(json.loads(row["fact_schema_versions"]).items())),
         state=row["state"],
@@ -1647,6 +1676,7 @@ CREATE TABLE IF NOT EXISTS runs (
     tool_version TEXT NOT NULL,
     rule_catalog_version TEXT NOT NULL,
     rule_catalog_digest TEXT NOT NULL,
+    rule_catalog_digest_kind TEXT NOT NULL,
     score_model_id TEXT NOT NULL,
     fact_schema_versions TEXT NOT NULL,
     state TEXT NOT NULL

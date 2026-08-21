@@ -30,6 +30,7 @@ from .models import (
     RuleSpec,
     RuleVersion,
     ScoreParticipation,
+    ScoreRole,
     Status,
 )
 from .run_context import AuditRunContext, RunCoordinator, RunSnapshot, RunState
@@ -119,6 +120,7 @@ __all__ = [
     "RunUrlStorageQuery",
     "SQLiteSiteStore",
     "ScoreParticipation",
+    "ScoreRole",
     "Severity",
     "SiteStore",
     "Status",

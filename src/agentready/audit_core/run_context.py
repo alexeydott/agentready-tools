@@ -33,6 +33,7 @@ class AuditRunContext:
     rule_catalog_version: str
     created_at: str
     rule_catalog_digest: str = ""
+    rule_catalog_digest_kind: str = "synthetic"
     score_model_id: str = "readiness-transparent-v2"
     ruleset_version: str | None = None
     ruleset_hash: str | None = None
@@ -44,6 +45,9 @@ class AuditRunContext:
                 "rule_catalog_digest",
                 hashlib.sha256(self.rule_catalog_version.encode("utf-8")).hexdigest(),
             )
+            object.__setattr__(self, "rule_catalog_digest_kind", "synthetic")
+        elif self.rule_catalog_digest_kind not in {"content", "synthetic", "legacy"}:
+            raise ValueError("rule catalog digest kind must be content, synthetic, or legacy")
         if not self.score_model_id.strip():
             raise ValueError("score model id must not be empty")
 
@@ -70,6 +74,7 @@ class AuditRunContext:
             tool_version=tool_version,
             rule_catalog_version=rule_catalog_version,
             rule_catalog_digest=rule_catalog_digest or hashlib.sha256(rule_catalog_version.encode("utf-8")).hexdigest(),
+            rule_catalog_digest_kind="content" if rule_catalog_digest else "synthetic",
             score_model_id=score_model_id,
             created_at=datetime.now(UTC).isoformat(),
             ruleset_version=ruleset_version,

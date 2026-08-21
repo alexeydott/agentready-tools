@@ -19,6 +19,7 @@ SCHEMA = "agentready.audit.v2"
 REPORT_VERSION = "v2"
 DEFAULT_RULE_CATALOG_VERSION = "v2"
 DEFAULT_RULE_CATALOG_DIGEST = hashlib.sha256(DEFAULT_RULE_CATALOG_VERSION.encode("utf-8")).hexdigest()
+DEFAULT_RULE_CATALOG_DIGEST_KIND = "synthetic"
 MAX_PAGES = 100
 MAX_TIMEOUT = 30.0
 
@@ -256,6 +257,7 @@ class AuditReport:
     score_model_id: str = "readiness-transparent-v2"
     rule_catalog_version: str = DEFAULT_RULE_CATALOG_VERSION
     rule_catalog_digest: str = DEFAULT_RULE_CATALOG_DIGEST
+    rule_catalog_digest_kind: str = DEFAULT_RULE_CATALOG_DIGEST_KIND
 
     @property
     def score(self) -> int:
@@ -284,6 +286,7 @@ class AuditReport:
         result["score_model_id"] = self.score_model_id
         result["rule_catalog_version"] = self.rule_catalog_version
         result["rule_catalog_digest"] = self.rule_catalog_digest
+        result["rule_catalog_digest_kind"] = self.rule_catalog_digest_kind
         return result
 
 
@@ -391,6 +394,7 @@ def report_from_dict(payload: Mapping[str, Any]) -> AuditReport:
         score_model_id=payload.get("score_model_id", "readiness-transparent-v2"),
         rule_catalog_version=payload.get("rule_catalog_version", DEFAULT_RULE_CATALOG_VERSION),
         rule_catalog_digest=payload.get("rule_catalog_digest", DEFAULT_RULE_CATALOG_DIGEST),
+        rule_catalog_digest_kind=payload.get("rule_catalog_digest_kind", DEFAULT_RULE_CATALOG_DIGEST_KIND),
     )
 
 
@@ -553,6 +557,7 @@ def _comparison_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) 
     required_identity_fields = (
         ("rule_catalog_version", "rule catalog versions differ"),
         ("rule_catalog_digest", "rule catalog digests differ"),
+        ("rule_catalog_digest_kind", "rule catalog digest provenance differs"),
         ("score_model_id", "score model IDs differ"),
     )
     for field_name, message in required_identity_fields:
@@ -608,7 +613,7 @@ def _diff_coverage(current: Mapping[str, Any], baseline: Mapping[str, Any]) -> d
 
 
 def _diff_rule_versions(current: Mapping[str, Any], baseline: Mapping[str, Any]) -> dict[str, Any]:
-    keys = ("rule_version", "rule_catalog_version", "ruleset", "rules_version")
+    keys = ("rule_version", "rule_catalog_version", "rule_catalog_digest_kind", "ruleset", "rules_version")
     before = {key: baseline.get(key) for key in keys if key in baseline}
     after = {key: current.get(key) for key in keys if key in current}
     before["findings"] = {

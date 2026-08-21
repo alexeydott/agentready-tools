@@ -18,7 +18,6 @@ from .audit_core.run_context import (
     RunSnapshot,
     RunState,
 )
-from .audit_core.fact_schema import DEFAULT_FACT_SCHEMA_VERSIONS
 from .audit_core.store import (
     PageRecord,
     RedirectFact,
@@ -301,25 +300,16 @@ class AsyncCrawler:
         if coordinator is not None:
             coordinator.transition(RunState.RUNNING)
         if self.store is not None:
-            run_record = self.store.begin_run(
+            self.store.begin_run(
                 RunRecord(
                     run_id,
                     self.run_context.config_hash if self.run_context is not None else "crawler",
                     self.run_context.tool_version if self.run_context is not None else "crawler",
                     self.run_context.rule_catalog_version if self.run_context is not None else "crawler",
                     rule_catalog_digest=self.run_context.rule_catalog_digest if self.run_context is not None else "",
+                    rule_catalog_digest_kind=self.run_context.rule_catalog_digest_kind if self.run_context is not None else "synthetic",
                     score_model_id=self.run_context.score_model_id if self.run_context is not None else "readiness-transparent-v2",
-                    fact_schema_versions=tuple(DEFAULT_FACT_SCHEMA_VERSIONS.items()),
                 )
-            )
-            self.store.put_version_manifest(
-                run_id,
-                {
-                    "rule_catalog_version": run_record.rule_catalog_version,
-                    "rule_catalog_digest": run_record.rule_catalog_digest,
-                    "score_model_id": run_record.score_model_id,
-                    "fact_schema_versions": dict(run_record.fact_schema_versions),
-                },
             )
 
         def persist_run_state(state: RunState, *, finished_at: str | None = None) -> None:
