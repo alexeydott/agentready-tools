@@ -43,6 +43,7 @@ try {
         "agentready.mobile.v2.schema.json",
         "agentready.protocol-findings.v2.schema.json",
         "agentready.remediation-plan.v2.schema.json",
+        "agentready.rule-catalog.v2.schema.json",
         "agentready.seo.v2.schema.json"
     )
 
@@ -84,6 +85,17 @@ try {
         $schemaPath = Join-Path $stageRoot "schemas\$schemaFile"
         if (-not (Test-Path -LiteralPath $schemaPath -PathType Leaf)) {
             throw "Required product schema is missing from the source package: $schemaFile"
+        }
+    }
+
+    $requiredCatalogFiles = @(
+        "src\agentready\seo\rules\catalog\agentready.rule-catalog.v2.yaml",
+        "src\agentready\seo\rules\catalog\agentready.rule-catalog.v2.schema.json"
+    )
+    foreach ($relative in $requiredCatalogFiles) {
+        $catalogPath = Join-Path $stageRoot $relative
+        if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) {
+            throw "Required frozen rule catalog artifact is missing from the source package: $relative"
         }
     }
 

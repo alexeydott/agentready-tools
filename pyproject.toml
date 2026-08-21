@@ -49,6 +49,9 @@ agentready = "agentready.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"agentready.seo.rules.catalog" = ["*.yaml", "*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

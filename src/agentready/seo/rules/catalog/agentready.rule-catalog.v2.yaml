@@ -1,0 +1,3893 @@
+# Frozen SEO/GEO v2.1.0-draft.1 rule catalog (issue #17).
+# This file is checked-in immutable runtime package data.
+# Do not hand-edit without updating scripts/generate_rule_catalog_draft.py
+# and recording the change through explicit catalog governance.
+schema: agentready.rule-catalog.v2
+catalog_version: 2.1.0-draft.1
+generated_at: '2026-08-21T00:00:00Z'
+rule_count: 200
+modules:
+- id: core-coverage
+  count: 20
+- id: core-canonical
+  count: 20
+- id: core-links
+  count: 20
+- id: google-hreflang
+  count: 10
+- id: google-metadata
+  count: 15
+- id: robots-sitemap
+  count: 20
+- id: structured-data
+  count: 20
+- id: security
+  count: 15
+- id: images
+  count: 15
+- id: content
+  count: 15
+- id: performance
+  count: 10
+- id: mobile
+  count: 10
+- id: agent-readiness
+  count: 10
+source_registry:
+  google-search-central:
+    title: Google Search Central documentation
+    url: https://developers.google.com/search/docs
+  rfc9309:
+    title: RFC 9309 - Robots Exclusion Protocol
+    url: https://www.rfc-editor.org/rfc/rfc9309
+  sitemaps-org:
+    title: Sitemaps.org protocol
+    url: https://www.sitemaps.org/protocol.html
+  google-hreflang:
+    title: 'Google: Tell Google about localized versions of your page'
+    url: https://developers.google.com/search/docs/specialty/international/localized-versions
+  google-structured-data:
+    title: Google structured data general guidelines
+    url: https://developers.google.com/search/docs/appearance/structured-data/sd-policies
+  schema-org:
+    title: Schema.org vocabulary
+    url: https://schema.org/docs/schemas.html
+  w3c-jsonld:
+    title: JSON-LD 1.1
+    url: https://www.w3.org/TR/json-ld11/
+  whatwg-html:
+    title: HTML Living Standard
+    url: https://html.spec.whatwg.org/multipage/
+  ietf-http-semantics:
+    title: RFC 9110 - HTTP Semantics
+    url: https://www.rfc-editor.org/rfc/rfc9110
+  owasp-secure-headers:
+    title: OWASP Secure Headers Project
+    url: https://owasp.org/www-project-secure-headers/
+  google-mobile-friendly:
+    title: 'Google: Mobile-friendly sites'
+    url: https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites
+  web-vitals:
+    title: 'web.dev: Web Vitals'
+    url: https://web.dev/articles/vitals
+  ogp:
+    title: The Open Graph protocol
+    url: https://ogp.me/
+  indexnow:
+    title: IndexNow protocol documentation
+    url: https://www.indexnow.org/documentation
+rules:
+- rule_id: CORE-COVERAGE-001
+  version: 1.0.0
+  title: Page is discoverable and returns a crawlable response
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Page is discoverable and returns a crawlable response. Draft engineering-candidate rule in
+    the core-coverage module of the frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-001).
+- rule_id: CORE-COVERAGE-002
+  version: 1.0.0
+  title: Core Coverage check 002
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 002. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-002).
+- rule_id: CORE-COVERAGE-003
+  version: 1.0.0
+  title: Core Coverage check 003
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 003. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-003).
+- rule_id: CORE-COVERAGE-004
+  version: 1.0.0
+  title: Core Coverage check 004
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Core Coverage check 004. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-004).
+- rule_id: CORE-COVERAGE-005
+  version: 1.0.0
+  title: Core Coverage check 005
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 005. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-005).
+- rule_id: CORE-COVERAGE-006
+  version: 1.0.0
+  title: Core Coverage check 006
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Core Coverage check 006. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-006).
+- rule_id: CORE-COVERAGE-007
+  version: 1.0.0
+  title: Core Coverage check 007
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 007. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-007).
+- rule_id: CORE-COVERAGE-008
+  version: 1.0.0
+  title: Core Coverage check 008
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 008. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-008).
+- rule_id: CORE-COVERAGE-009
+  version: 1.0.0
+  title: Core Coverage check 009
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 009. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-009).
+- rule_id: CORE-COVERAGE-010
+  version: 1.0.0
+  title: Core Coverage check 010
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 010. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-010).
+- rule_id: CORE-COVERAGE-011
+  version: 1.0.0
+  title: Core Coverage check 011
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Core Coverage check 011. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-011).
+- rule_id: CORE-COVERAGE-012
+  version: 1.0.0
+  title: Core Coverage check 012
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 012. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-012).
+- rule_id: CORE-COVERAGE-013
+  version: 1.0.0
+  title: Core Coverage check 013
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Core Coverage check 013. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-013).
+- rule_id: CORE-COVERAGE-014
+  version: 1.0.0
+  title: Core Coverage check 014
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 014. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-014).
+- rule_id: CORE-COVERAGE-015
+  version: 1.0.0
+  title: Core Coverage check 015
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 015. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-015).
+- rule_id: CORE-COVERAGE-016
+  version: 1.0.0
+  title: Core Coverage check 016
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 016. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-016).
+- rule_id: CORE-COVERAGE-017
+  version: 1.0.0
+  title: Core Coverage check 017
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 017. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-017).
+- rule_id: CORE-COVERAGE-018
+  version: 1.0.0
+  title: Core Coverage check 018
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Core Coverage check 018. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-018).
+- rule_id: CORE-COVERAGE-019
+  version: 1.0.0
+  title: Core Coverage check 019
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Coverage check 019. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-019).
+- rule_id: CORE-COVERAGE-020
+  version: 1.0.0
+  title: Core Coverage check 020
+  module: core-coverage
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  - sitemaps-org
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Core Coverage check 020. Draft engineering-candidate rule in the core-coverage module of the
+    frozen v2.1.0-draft.1 catalog (id CORE-COVERAGE-020).
+- rule_id: CORE-CANON-001
+  version: 1.0.0
+  title: Canonical URL is present and resolves to a single preferred URL
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Canonical URL is present and resolves to a single preferred URL. Draft engineering-candidate
+    rule in the core-canonical module of the frozen v2.1.0-draft.1 catalog (id CORE-CANON-001).
+- rule_id: CORE-CANON-002
+  version: 1.0.0
+  title: Canonical URL uses the same scheme/host as the audited origin
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Canonical URL uses the same scheme/host as the audited origin. Draft engineering-candidate
+    rule in the core-canonical module of the frozen v2.1.0-draft.1 catalog (id CORE-CANON-002).
+- rule_id: CORE-CANON-003
+  version: 1.0.0
+  title: Canonical URL is not blocked by robots directives
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Canonical URL is not blocked by robots directives. Draft engineering-candidate rule in the
+    core-canonical module of the frozen v2.1.0-draft.1 catalog (id CORE-CANON-003).
+- rule_id: CORE-CANON-004
+  version: 1.0.0
+  title: Canonical URL does not point to a redirect chain
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Canonical URL does not point to a redirect chain. Draft engineering-candidate rule in the core-canonical
+    module of the frozen v2.1.0-draft.1 catalog (id CORE-CANON-004).
+- rule_id: CORE-CANON-005
+  version: 1.0.0
+  title: Self-referencing canonical matches the requested URL for paginated pages
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Self-referencing canonical matches the requested URL for paginated pages. Draft engineering-candidate
+    rule in the core-canonical module of the frozen v2.1.0-draft.1 catalog (id CORE-CANON-005).
+- rule_id: CORE-CANON-006
+  version: 1.0.0
+  title: Canonical URL avoids parameter-only duplicate variants
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Canonical URL avoids parameter-only duplicate variants. Draft engineering-candidate rule in
+    the core-canonical module of the frozen v2.1.0-draft.1 catalog (id CORE-CANON-006).
+- rule_id: CORE-CANON-007
+  version: 1.0.0
+  title: Cross-domain canonical targets are consistent across the crawl
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Cross-domain canonical targets are consistent across the crawl. Draft engineering-candidate
+    rule in the core-canonical module of the frozen v2.1.0-draft.1 catalog (id CORE-CANON-007).
+- rule_id: CORE-CANON-008
+  version: 1.0.0
+  title: Canonical URL is declared exactly once per page
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Canonical URL is declared exactly once per page. Draft engineering-candidate rule in the core-canonical
+    module of the frozen v2.1.0-draft.1 catalog (id CORE-CANON-008).
+- rule_id: CORE-CANON-009
+  version: 1.0.0
+  title: Core Canonical check 009
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Canonical check 009. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-009).
+- rule_id: CORE-CANON-010
+  version: 1.0.0
+  title: Core Canonical check 010
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Canonical check 010. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-010).
+- rule_id: CORE-CANON-011
+  version: 1.0.0
+  title: Core Canonical check 011
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Core Canonical check 011. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-011).
+- rule_id: CORE-CANON-012
+  version: 1.0.0
+  title: Core Canonical check 012
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Canonical check 012. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-012).
+- rule_id: CORE-CANON-013
+  version: 1.0.0
+  title: Core Canonical check 013
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Core Canonical check 013. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-013).
+- rule_id: CORE-CANON-014
+  version: 1.0.0
+  title: Core Canonical check 014
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Canonical check 014. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-014).
+- rule_id: CORE-CANON-015
+  version: 1.0.0
+  title: Core Canonical check 015
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Canonical check 015. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-015).
+- rule_id: CORE-CANON-016
+  version: 1.0.0
+  title: Core Canonical check 016
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Canonical check 016. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-016).
+- rule_id: CORE-CANON-017
+  version: 1.0.0
+  title: Core Canonical check 017
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Canonical check 017. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-017).
+- rule_id: CORE-CANON-018
+  version: 1.0.0
+  title: Core Canonical check 018
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Core Canonical check 018. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-018).
+- rule_id: CORE-CANON-019
+  version: 1.0.0
+  title: Core Canonical check 019
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Canonical check 019. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-019).
+- rule_id: CORE-CANON-020
+  version: 1.0.0
+  title: Core Canonical check 020
+  module: core-canonical
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Core Canonical check 020. Draft engineering-candidate rule in the core-canonical module of
+    the frozen v2.1.0-draft.1 catalog (id CORE-CANON-020).
+- rule_id: CORE-LINK-001
+  version: 1.0.0
+  title: Core Links check 001
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 001. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-001).
+- rule_id: CORE-LINK-002
+  version: 1.0.0
+  title: Core Links check 002
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 002. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-002).
+- rule_id: CORE-LINK-003
+  version: 1.0.0
+  title: Core Links check 003
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 003. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-003).
+- rule_id: CORE-LINK-004
+  version: 1.0.0
+  title: Core Links check 004
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Core Links check 004. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-004).
+- rule_id: CORE-LINK-005
+  version: 1.0.0
+  title: Core Links check 005
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 005. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-005).
+- rule_id: CORE-LINK-006
+  version: 1.0.0
+  title: Core Links check 006
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Core Links check 006. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-006).
+- rule_id: CORE-LINK-007
+  version: 1.0.0
+  title: Core Links check 007
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 007. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-007).
+- rule_id: CORE-LINK-008
+  version: 1.0.0
+  title: Core Links check 008
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 008. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-008).
+- rule_id: CORE-LINK-009
+  version: 1.0.0
+  title: Core Links check 009
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 009. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-009).
+- rule_id: CORE-LINK-010
+  version: 1.0.0
+  title: Core Links check 010
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 010. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-010).
+- rule_id: CORE-LINK-011
+  version: 1.0.0
+  title: Core Links check 011
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Core Links check 011. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-011).
+- rule_id: CORE-LINK-012
+  version: 1.0.0
+  title: Core Links check 012
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 012. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-012).
+- rule_id: CORE-LINK-013
+  version: 1.0.0
+  title: Core Links check 013
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Core Links check 013. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-013).
+- rule_id: CORE-LINK-014
+  version: 1.0.0
+  title: Core Links check 014
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 014. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-014).
+- rule_id: CORE-LINK-015
+  version: 1.0.0
+  title: Core Links check 015
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 015. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-015).
+- rule_id: CORE-LINK-016
+  version: 1.0.0
+  title: Core Links check 016
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 016. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-016).
+- rule_id: CORE-LINK-017
+  version: 1.0.0
+  title: Core Links check 017
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 017. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-017).
+- rule_id: CORE-LINK-018
+  version: 1.0.0
+  title: Core Links check 018
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Core Links check 018. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-018).
+- rule_id: CORE-LINK-019
+  version: 1.0.0
+  title: Core Links check 019
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Core Links check 019. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-019).
+- rule_id: CORE-LINK-020
+  version: 1.0.0
+  title: Core Links check 020
+  module: core-links
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: links
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Core Links check 020. Draft engineering-candidate rule in the core-links module of the frozen
+    v2.1.0-draft.1 catalog (id CORE-LINK-020).
+- rule_id: GOOGLE-HREF-001
+  version: 1.0.0
+  title: Hreflang annotations declare a valid language-region code
+  module: google-hreflang
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-hreflang
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Hreflang annotations declare a valid language-region code. Draft engineering-candidate rule
+    in the google-hreflang module of the frozen v2.1.0-draft.1 catalog (id GOOGLE-HREF-001).
+- rule_id: GOOGLE-HREF-002
+  version: 1.0.0
+  title: Hreflang cluster is reciprocal across all listed URLs
+  module: google-hreflang
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-hreflang
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Hreflang cluster is reciprocal across all listed URLs. Draft engineering-candidate rule in
+    the google-hreflang module of the frozen v2.1.0-draft.1 catalog (id GOOGLE-HREF-002).
+- rule_id: GOOGLE-HREF-003
+  version: 1.0.0
+  title: Hreflang cluster includes a self-referencing entry
+  module: google-hreflang
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-hreflang
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Hreflang cluster includes a self-referencing entry. Draft engineering-candidate rule in the
+    google-hreflang module of the frozen v2.1.0-draft.1 catalog (id GOOGLE-HREF-003).
+- rule_id: GOOGLE-HREF-004
+  version: 1.0.0
+  title: x-default hreflang entry is present for language-neutral fallback
+  module: google-hreflang
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-hreflang
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: x-default hreflang entry is present for language-neutral fallback. Draft engineering-candidate
+    rule in the google-hreflang module of the frozen v2.1.0-draft.1 catalog (id GOOGLE-HREF-004).
+- rule_id: GOOGLE-HREF-005
+  version: 1.0.0
+  title: Hreflang target URLs are canonical and not blocked from indexing
+  module: google-hreflang
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-hreflang
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Hreflang target URLs are canonical and not blocked from indexing. Draft engineering-candidate
+    rule in the google-hreflang module of the frozen v2.1.0-draft.1 catalog (id GOOGLE-HREF-005).
+- rule_id: GOOGLE-HREF-006
+  version: 1.0.0
+  title: Google Hreflang check 006
+  module: google-hreflang
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-hreflang
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Google Hreflang check 006. Draft engineering-candidate rule in the google-hreflang module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-HREF-006).
+- rule_id: GOOGLE-HREF-007
+  version: 1.0.0
+  title: Google Hreflang check 007
+  module: google-hreflang
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-hreflang
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Hreflang check 007. Draft engineering-candidate rule in the google-hreflang module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-HREF-007).
+- rule_id: GOOGLE-HREF-008
+  version: 1.0.0
+  title: Google Hreflang check 008
+  module: google-hreflang
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-hreflang
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Hreflang check 008. Draft engineering-candidate rule in the google-hreflang module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-HREF-008).
+- rule_id: GOOGLE-HREF-009
+  version: 1.0.0
+  title: Google Hreflang check 009
+  module: google-hreflang
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: links
+    min_schema_version: '1'
+  source_ids:
+  - google-hreflang
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Hreflang check 009. Draft engineering-candidate rule in the google-hreflang module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-HREF-009).
+- rule_id: GOOGLE-HREF-010
+  version: 1.0.0
+  title: Google Hreflang check 010
+  module: google-hreflang
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-hreflang
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Hreflang check 010. Draft engineering-candidate rule in the google-hreflang module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-HREF-010).
+- rule_id: GOOGLE-DESC-001
+  version: 1.0.0
+  title: Meta description is present and within recommended length
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Meta description is present and within recommended length. Draft engineering-candidate rule
+    in the google-metadata module of the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-001).
+- rule_id: GOOGLE-TITLE-001
+  version: 1.0.0
+  title: Title tag is present and within recommended length
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Title tag is present and within recommended length. Draft engineering-candidate rule in the
+    google-metadata module of the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-002).
+- rule_id: GOOGLE-META-003
+  version: 1.0.0
+  title: Google Metadata check 003
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Metadata check 003. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-003).
+- rule_id: GOOGLE-META-004
+  version: 1.0.0
+  title: Google Metadata check 004
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Google Metadata check 004. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-004).
+- rule_id: GOOGLE-META-005
+  version: 1.0.0
+  title: Google Metadata check 005
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Metadata check 005. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-005).
+- rule_id: GOOGLE-META-006
+  version: 1.0.0
+  title: Google Metadata check 006
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Google Metadata check 006. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-006).
+- rule_id: GOOGLE-META-007
+  version: 1.0.0
+  title: Google Metadata check 007
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Metadata check 007. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-007).
+- rule_id: GOOGLE-META-008
+  version: 1.0.0
+  title: Google Metadata check 008
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Metadata check 008. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-008).
+- rule_id: GOOGLE-META-009
+  version: 1.0.0
+  title: Google Metadata check 009
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Metadata check 009. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-009).
+- rule_id: GOOGLE-META-010
+  version: 1.0.0
+  title: Google Metadata check 010
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Metadata check 010. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-010).
+- rule_id: GOOGLE-META-011
+  version: 1.0.0
+  title: Google Metadata check 011
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Google Metadata check 011. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-011).
+- rule_id: GOOGLE-META-012
+  version: 1.0.0
+  title: Google Metadata check 012
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Metadata check 012. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-012).
+- rule_id: GOOGLE-META-013
+  version: 1.0.0
+  title: Google Metadata check 013
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Google Metadata check 013. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-013).
+- rule_id: GOOGLE-META-014
+  version: 1.0.0
+  title: Google Metadata check 014
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Metadata check 014. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-014).
+- rule_id: GOOGLE-META-015
+  version: 1.0.0
+  title: Google Metadata check 015
+  module: google-metadata
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - ogp
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Google Metadata check 015. Draft engineering-candidate rule in the google-metadata module of
+    the frozen v2.1.0-draft.1 catalog (id GOOGLE-META-015).
+- rule_id: ROBOTS-SITEMAP-001
+  version: 1.0.0
+  title: Robots Sitemap check 001
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 001. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-001).
+- rule_id: ROBOTS-SITEMAP-002
+  version: 1.0.0
+  title: Robots Sitemap check 002
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 002. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-002).
+- rule_id: ROBOTS-SITEMAP-003
+  version: 1.0.0
+  title: Robots Sitemap check 003
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 003. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-003).
+- rule_id: ROBOTS-SITEMAP-004
+  version: 1.0.0
+  title: Robots Sitemap check 004
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  - family: sitemap.fetch
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Robots Sitemap check 004. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-004).
+- rule_id: ROBOTS-SITEMAP-005
+  version: 1.0.0
+  title: Robots Sitemap check 005
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  - family: sitemap.fetch
+    min_schema_version: '1'
+  - family: sitemap.parsed
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 005. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-005).
+- rule_id: ROBOTS-SITEMAP-006
+  version: 1.0.0
+  title: Robots Sitemap check 006
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  - family: sitemap.fetch
+    min_schema_version: '1'
+  - family: sitemap.parsed
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Robots Sitemap check 006. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-006).
+- rule_id: ROBOTS-SITEMAP-007
+  version: 1.0.0
+  title: Robots Sitemap check 007
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 007. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-007).
+- rule_id: ROBOTS-SITEMAP-008
+  version: 1.0.0
+  title: Robots Sitemap check 008
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 008. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-008).
+- rule_id: ROBOTS-SITEMAP-009
+  version: 1.0.0
+  title: Robots Sitemap check 009
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 009. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-009).
+- rule_id: ROBOTS-SITEMAP-010
+  version: 1.0.0
+  title: Robots Sitemap check 010
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 010. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-010).
+- rule_id: ROBOTS-SITEMAP-011
+  version: 1.0.0
+  title: Robots Sitemap check 011
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  - family: sitemap.fetch
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Robots Sitemap check 011. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-011).
+- rule_id: ROBOTS-SITEMAP-012
+  version: 1.0.0
+  title: Robots Sitemap check 012
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  - family: sitemap.fetch
+    min_schema_version: '1'
+  - family: sitemap.parsed
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 012. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-012).
+- rule_id: ROBOTS-SITEMAP-013
+  version: 1.0.0
+  title: Robots Sitemap check 013
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  - family: sitemap.fetch
+    min_schema_version: '1'
+  - family: sitemap.parsed
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Robots Sitemap check 013. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-013).
+- rule_id: ROBOTS-SITEMAP-014
+  version: 1.0.0
+  title: Robots Sitemap check 014
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 014. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-014).
+- rule_id: ROBOTS-SITEMAP-015
+  version: 1.0.0
+  title: Robots Sitemap check 015
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 015. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-015).
+- rule_id: ROBOTS-SITEMAP-016
+  version: 1.0.0
+  title: Robots Sitemap check 016
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 016. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-016).
+- rule_id: ROBOTS-SITEMAP-017
+  version: 1.0.0
+  title: Robots Sitemap check 017
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 017. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-017).
+- rule_id: ROBOTS-SITEMAP-018
+  version: 1.0.0
+  title: Robots Sitemap check 018
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  - family: sitemap.fetch
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Robots Sitemap check 018. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-018).
+- rule_id: ROBOTS-SITEMAP-019
+  version: 1.0.0
+  title: Robots Sitemap check 019
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  - family: sitemap.fetch
+    min_schema_version: '1'
+  - family: sitemap.parsed
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Robots Sitemap check 019. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-019).
+- rule_id: ROBOTS-SITEMAP-020
+  version: 1.0.0
+  title: Robots Sitemap check 020
+  module: robots-sitemap
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: robots.fetch
+    min_schema_version: '1'
+  - family: robots.parsed
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: sitemap.discovery
+    min_schema_version: '1'
+  - family: sitemap.fetch
+    min_schema_version: '1'
+  - family: sitemap.parsed
+    min_schema_version: '1'
+  - family: sitemap.urls
+    min_schema_version: '1'
+  source_ids:
+  - rfc9309
+  - sitemaps-org
+  - indexnow
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Robots Sitemap check 020. Draft engineering-candidate rule in the robots-sitemap module of
+    the frozen v2.1.0-draft.1 catalog (id ROBOTS-SITEMAP-020).
+- rule_id: SDATA-001
+  version: 1.0.0
+  title: Structured Data check 001
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 001. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-001).
+- rule_id: SDATA-002
+  version: 1.0.0
+  title: Structured Data check 002
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 002. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-002).
+- rule_id: SDATA-003
+  version: 1.0.0
+  title: Structured Data check 003
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 003. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-003).
+- rule_id: SDATA-004
+  version: 1.0.0
+  title: Structured Data check 004
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Structured Data check 004. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-004).
+- rule_id: SDATA-005
+  version: 1.0.0
+  title: Structured Data check 005
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 005. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-005).
+- rule_id: SDATA-006
+  version: 1.0.0
+  title: Structured Data check 006
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Structured Data check 006. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-006).
+- rule_id: SDATA-007
+  version: 1.0.0
+  title: Structured Data check 007
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 007. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-007).
+- rule_id: SDATA-008
+  version: 1.0.0
+  title: Structured Data check 008
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 008. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-008).
+- rule_id: SDATA-009
+  version: 1.0.0
+  title: Structured Data check 009
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 009. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-009).
+- rule_id: SDATA-010
+  version: 1.0.0
+  title: Structured Data check 010
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 010. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-010).
+- rule_id: SDATA-011
+  version: 1.0.0
+  title: Structured Data check 011
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Structured Data check 011. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-011).
+- rule_id: SDATA-012
+  version: 1.0.0
+  title: Structured Data check 012
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 012. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-012).
+- rule_id: SDATA-013
+  version: 1.0.0
+  title: Structured Data check 013
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Structured Data check 013. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-013).
+- rule_id: SDATA-014
+  version: 1.0.0
+  title: Structured Data check 014
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 014. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-014).
+- rule_id: SDATA-015
+  version: 1.0.0
+  title: Structured Data check 015
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 015. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-015).
+- rule_id: SDATA-016
+  version: 1.0.0
+  title: Structured Data check 016
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 016. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-016).
+- rule_id: SDATA-017
+  version: 1.0.0
+  title: Structured Data check 017
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 017. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-017).
+- rule_id: SDATA-018
+  version: 1.0.0
+  title: Structured Data check 018
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Structured Data check 018. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-018).
+- rule_id: SDATA-019
+  version: 1.0.0
+  title: Structured Data check 019
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Structured Data check 019. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-019).
+- rule_id: SDATA-020
+  version: 1.0.0
+  title: Structured Data check 020
+  module: structured-data
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - schema-org
+  - w3c-jsonld
+  - google-structured-data
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Structured Data check 020. Draft engineering-candidate rule in the structured-data module of
+    the frozen v2.1.0-draft.1 catalog (id SDATA-020).
+- rule_id: SEC-001
+  version: 1.0.0
+  title: Security check 001
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 001. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-001).
+- rule_id: SEC-002
+  version: 1.0.0
+  title: Security check 002
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 002. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-002).
+- rule_id: SEC-003
+  version: 1.0.0
+  title: Security check 003
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 003. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-003).
+- rule_id: SEC-004
+  version: 1.0.0
+  title: Security check 004
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Security check 004. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-004).
+- rule_id: SEC-005
+  version: 1.0.0
+  title: Security check 005
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 005. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-005).
+- rule_id: SEC-006
+  version: 1.0.0
+  title: Security check 006
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Security check 006. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-006).
+- rule_id: SEC-007
+  version: 1.0.0
+  title: Security check 007
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 007. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-007).
+- rule_id: SEC-008
+  version: 1.0.0
+  title: Security check 008
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 008. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-008).
+- rule_id: SEC-009
+  version: 1.0.0
+  title: Security check 009
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 009. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-009).
+- rule_id: SEC-010
+  version: 1.0.0
+  title: Security check 010
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 010. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-010).
+- rule_id: SEC-011
+  version: 1.0.0
+  title: Security check 011
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Security check 011. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-011).
+- rule_id: SEC-012
+  version: 1.0.0
+  title: Security check 012
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 012. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-012).
+- rule_id: SEC-013
+  version: 1.0.0
+  title: Security check 013
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Security check 013. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-013).
+- rule_id: SEC-014
+  version: 1.0.0
+  title: Security check 014
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 014. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-014).
+- rule_id: SEC-015
+  version: 1.0.0
+  title: Security check 015
+  module: security
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - ietf-http-semantics
+  - owasp-secure-headers
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Security check 015. Draft engineering-candidate rule in the security module of the frozen v2.1.0-draft.1
+    catalog (id SEC-015).
+- rule_id: IMG-001
+  version: 1.0.0
+  title: Images check 001
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 001. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-001).
+- rule_id: IMG-002
+  version: 1.0.0
+  title: Images check 002
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 002. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-002).
+- rule_id: IMG-003
+  version: 1.0.0
+  title: Images check 003
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 003. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-003).
+- rule_id: IMG-004
+  version: 1.0.0
+  title: Images check 004
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Images check 004. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-004).
+- rule_id: IMG-005
+  version: 1.0.0
+  title: Images check 005
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 005. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-005).
+- rule_id: IMG-006
+  version: 1.0.0
+  title: Images check 006
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Images check 006. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-006).
+- rule_id: IMG-007
+  version: 1.0.0
+  title: Images check 007
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 007. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-007).
+- rule_id: IMG-008
+  version: 1.0.0
+  title: Images check 008
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 008. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-008).
+- rule_id: IMG-009
+  version: 1.0.0
+  title: Images check 009
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 009. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-009).
+- rule_id: IMG-010
+  version: 1.0.0
+  title: Images check 010
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 010. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-010).
+- rule_id: IMG-011
+  version: 1.0.0
+  title: Images check 011
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Images check 011. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-011).
+- rule_id: IMG-012
+  version: 1.0.0
+  title: Images check 012
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 012. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-012).
+- rule_id: IMG-013
+  version: 1.0.0
+  title: Images check 013
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Images check 013. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-013).
+- rule_id: IMG-014
+  version: 1.0.0
+  title: Images check 014
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 014. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-014).
+- rule_id: IMG-015
+  version: 1.0.0
+  title: Images check 015
+  module: images
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: resources
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Images check 015. Draft engineering-candidate rule in the images module of the frozen v2.1.0-draft.1
+    catalog (id IMG-015).
+- rule_id: CONTENT-001
+  version: 1.0.0
+  title: Content check 001
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 001. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-001).
+- rule_id: CONTENT-002
+  version: 1.0.0
+  title: Content check 002
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 002. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-002).
+- rule_id: CONTENT-003
+  version: 1.0.0
+  title: Content check 003
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 003. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-003).
+- rule_id: CONTENT-004
+  version: 1.0.0
+  title: Content check 004
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Content check 004. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-004).
+- rule_id: CONTENT-005
+  version: 1.0.0
+  title: Content check 005
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 005. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-005).
+- rule_id: CONTENT-006
+  version: 1.0.0
+  title: Content check 006
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Content check 006. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-006).
+- rule_id: CONTENT-007
+  version: 1.0.0
+  title: Content check 007
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 007. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-007).
+- rule_id: CONTENT-008
+  version: 1.0.0
+  title: Content check 008
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 008. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-008).
+- rule_id: CONTENT-009
+  version: 1.0.0
+  title: Content check 009
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 009. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-009).
+- rule_id: CONTENT-010
+  version: 1.0.0
+  title: Content check 010
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 010. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-010).
+- rule_id: CONTENT-011
+  version: 1.0.0
+  title: Content check 011
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Content check 011. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-011).
+- rule_id: CONTENT-012
+  version: 1.0.0
+  title: Content check 012
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 012. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-012).
+- rule_id: CONTENT-013
+  version: 1.0.0
+  title: Content check 013
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Content check 013. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-013).
+- rule_id: CONTENT-014
+  version: 1.0.0
+  title: Content check 014
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 014. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-014).
+- rule_id: CONTENT-015
+  version: 1.0.0
+  title: Content check 015
+  module: content
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - whatwg-html
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Content check 015. Draft engineering-candidate rule in the content module of the frozen v2.1.0-draft.1
+    catalog (id CONTENT-015).
+- rule_id: PERF-001
+  version: 1.0.0
+  title: Performance check 001
+  module: performance
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - web-vitals
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Performance check 001. Draft engineering-candidate rule in the performance module of the frozen
+    v2.1.0-draft.1 catalog (id PERF-001).
+- rule_id: PERF-002
+  version: 1.0.0
+  title: Performance check 002
+  module: performance
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - web-vitals
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Performance check 002. Draft engineering-candidate rule in the performance module of the frozen
+    v2.1.0-draft.1 catalog (id PERF-002).
+- rule_id: PERF-003
+  version: 1.0.0
+  title: Performance check 003
+  module: performance
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - web-vitals
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Performance check 003. Draft engineering-candidate rule in the performance module of the frozen
+    v2.1.0-draft.1 catalog (id PERF-003).
+- rule_id: PERF-004
+  version: 1.0.0
+  title: Performance check 004
+  module: performance
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - web-vitals
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Performance check 004. Draft engineering-candidate rule in the performance module of the frozen
+    v2.1.0-draft.1 catalog (id PERF-004).
+- rule_id: PERF-005
+  version: 1.0.0
+  title: Performance check 005
+  module: performance
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - web-vitals
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Performance check 005. Draft engineering-candidate rule in the performance module of the frozen
+    v2.1.0-draft.1 catalog (id PERF-005).
+- rule_id: PERF-006
+  version: 1.0.0
+  title: Performance check 006
+  module: performance
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - web-vitals
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Performance check 006. Draft engineering-candidate rule in the performance module of the frozen
+    v2.1.0-draft.1 catalog (id PERF-006).
+- rule_id: PERF-007
+  version: 1.0.0
+  title: Performance check 007
+  module: performance
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - web-vitals
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Performance check 007. Draft engineering-candidate rule in the performance module of the frozen
+    v2.1.0-draft.1 catalog (id PERF-007).
+- rule_id: PERF-008
+  version: 1.0.0
+  title: Performance check 008
+  module: performance
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - web-vitals
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Performance check 008. Draft engineering-candidate rule in the performance module of the frozen
+    v2.1.0-draft.1 catalog (id PERF-008).
+- rule_id: PERF-009
+  version: 1.0.0
+  title: Performance check 009
+  module: performance
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  - family: resources
+    min_schema_version: '1'
+  source_ids:
+  - web-vitals
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Performance check 009. Draft engineering-candidate rule in the performance module of the frozen
+    v2.1.0-draft.1 catalog (id PERF-009).
+- rule_id: PERF-010
+  version: 1.0.0
+  title: Performance check 010
+  module: performance
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: transport
+    min_schema_version: '1'
+  source_ids:
+  - web-vitals
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Performance check 010. Draft engineering-candidate rule in the performance module of the frozen
+    v2.1.0-draft.1 catalog (id PERF-010).
+- rule_id: MOBILE-001
+  version: 1.0.0
+  title: Mobile check 001
+  module: mobile
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: representation
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-mobile-friendly
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Mobile check 001. Draft engineering-candidate rule in the mobile module of the frozen v2.1.0-draft.1
+    catalog (id MOBILE-001).
+- rule_id: MOBILE-002
+  version: 1.0.0
+  title: Mobile check 002
+  module: mobile
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-mobile-friendly
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Mobile check 002. Draft engineering-candidate rule in the mobile module of the frozen v2.1.0-draft.1
+    catalog (id MOBILE-002).
+- rule_id: MOBILE-003
+  version: 1.0.0
+  title: Mobile check 003
+  module: mobile
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: representation
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-mobile-friendly
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Mobile check 003. Draft engineering-candidate rule in the mobile module of the frozen v2.1.0-draft.1
+    catalog (id MOBILE-003).
+- rule_id: MOBILE-004
+  version: 1.0.0
+  title: Mobile check 004
+  module: mobile
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-mobile-friendly
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Mobile check 004. Draft engineering-candidate rule in the mobile module of the frozen v2.1.0-draft.1
+    catalog (id MOBILE-004).
+- rule_id: MOBILE-005
+  version: 1.0.0
+  title: Mobile check 005
+  module: mobile
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: representation
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-mobile-friendly
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Mobile check 005. Draft engineering-candidate rule in the mobile module of the frozen v2.1.0-draft.1
+    catalog (id MOBILE-005).
+- rule_id: MOBILE-006
+  version: 1.0.0
+  title: Mobile check 006
+  module: mobile
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-mobile-friendly
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Mobile check 006. Draft engineering-candidate rule in the mobile module of the frozen v2.1.0-draft.1
+    catalog (id MOBILE-006).
+- rule_id: MOBILE-007
+  version: 1.0.0
+  title: Mobile check 007
+  module: mobile
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: representation
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-mobile-friendly
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Mobile check 007. Draft engineering-candidate rule in the mobile module of the frozen v2.1.0-draft.1
+    catalog (id MOBILE-007).
+- rule_id: MOBILE-008
+  version: 1.0.0
+  title: Mobile check 008
+  module: mobile
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-mobile-friendly
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Mobile check 008. Draft engineering-candidate rule in the mobile module of the frozen v2.1.0-draft.1
+    catalog (id MOBILE-008).
+- rule_id: MOBILE-009
+  version: 1.0.0
+  title: Mobile check 009
+  module: mobile
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: representation
+    min_schema_version: '1'
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-mobile-friendly
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Mobile check 009. Draft engineering-candidate rule in the mobile module of the frozen v2.1.0-draft.1
+    catalog (id MOBILE-009).
+- rule_id: MOBILE-010
+  version: 1.0.0
+  title: Mobile check 010
+  module: mobile
+  applicability:
+    applies_to: html-page
+    condition: applies whenever a html-page subject was collected for the run
+  fact_requirements:
+  - family: representation
+    min_schema_version: '1'
+  source_ids:
+  - google-mobile-friendly
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Mobile check 010. Draft engineering-candidate rule in the mobile module of the frozen v2.1.0-draft.1
+    catalog (id MOBILE-010).
+- rule_id: AGENT-001
+  version: 1.0.0
+  title: Agent Readiness check 001
+  module: agent-readiness
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Agent Readiness check 001. Draft engineering-candidate rule in the agent-readiness module of
+    the frozen v2.1.0-draft.1 catalog (id AGENT-001).
+- rule_id: AGENT-002
+  version: 1.0.0
+  title: Agent Readiness check 002
+  module: agent-readiness
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Agent Readiness check 002. Draft engineering-candidate rule in the agent-readiness module of
+    the frozen v2.1.0-draft.1 catalog (id AGENT-002).
+- rule_id: AGENT-003
+  version: 1.0.0
+  title: Agent Readiness check 003
+  module: agent-readiness
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Agent Readiness check 003. Draft engineering-candidate rule in the agent-readiness module of
+    the frozen v2.1.0-draft.1 catalog (id AGENT-003).
+- rule_id: AGENT-004
+  version: 1.0.0
+  title: Agent Readiness check 004
+  module: agent-readiness
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  score_role: diagnostic
+  failure_policy: unknown_on_missing_facts
+  summary: Agent Readiness check 004. Draft engineering-candidate rule in the agent-readiness module of
+    the frozen v2.1.0-draft.1 catalog (id AGENT-004).
+- rule_id: AGENT-005
+  version: 1.0.0
+  title: Agent Readiness check 005
+  module: agent-readiness
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Agent Readiness check 005. Draft engineering-candidate rule in the agent-readiness module of
+    the frozen v2.1.0-draft.1 catalog (id AGENT-005).
+- rule_id: AGENT-006
+  version: 1.0.0
+  title: Agent Readiness check 006
+  module: agent-readiness
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  score_role: observation_only
+  failure_policy: unknown_on_missing_facts
+  summary: Agent Readiness check 006. Draft engineering-candidate rule in the agent-readiness module of
+    the frozen v2.1.0-draft.1 catalog (id AGENT-006).
+- rule_id: AGENT-007
+  version: 1.0.0
+  title: Agent Readiness check 007
+  module: agent-readiness
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Agent Readiness check 007. Draft engineering-candidate rule in the agent-readiness module of
+    the frozen v2.1.0-draft.1 catalog (id AGENT-007).
+- rule_id: AGENT-008
+  version: 1.0.0
+  title: Agent Readiness check 008
+  module: agent-readiness
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  - family: structured-data
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Agent Readiness check 008. Draft engineering-candidate rule in the agent-readiness module of
+    the frozen v2.1.0-draft.1 catalog (id AGENT-008).
+- rule_id: AGENT-009
+  version: 1.0.0
+  title: Agent Readiness check 009
+  module: agent-readiness
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Agent Readiness check 009. Draft engineering-candidate rule in the agent-readiness module of
+    the frozen v2.1.0-draft.1 catalog (id AGENT-009).
+- rule_id: AGENT-010
+  version: 1.0.0
+  title: Agent Readiness check 010
+  module: agent-readiness
+  applicability:
+    applies_to: origin
+    condition: applies whenever a origin subject was collected for the run
+  fact_requirements:
+  - family: page
+    min_schema_version: '1'
+  - family: robots.policy
+    min_schema_version: '1'
+  source_ids:
+  - google-search-central
+  - rfc9309
+  score_role: scored
+  failure_policy: block_on_missing_facts
+  summary: Agent Readiness check 010. Draft engineering-candidate rule in the agent-readiness module of
+    the frozen v2.1.0-draft.1 catalog (id AGENT-010).
