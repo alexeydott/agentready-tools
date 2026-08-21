@@ -144,24 +144,46 @@ STAGE_E_PLAN_REFERENCES: tuple[StageEPlanReference, ...] = (
         31,
         ("GOOGLE-DESC-001", "GOOGLE-TITLE-001"),
         ReconciliationClassification.SEMANTIC_MISMATCH,
-        "rewrite #31 so description remains observation-only and title remains content.main-gated",
-        "presentation-source rules without legacy length-threshold claims",
+        "accept the catalog-defined role/facts exactly; legacy observation-only and content.main-gated semantics are not binding here",
+        "catalog-authoritative exact per-rule contract",
     ),
     *_refs(
         32,
         ("GOOGLE-TITLE-001",),
         ReconciliationClassification.SEMANTIC_MISMATCH,
-        "keep #32 as a prerequisite; define content.main before title binding",
-        "title suitability requires html.title and content.main",
+        "accept the catalog-defined title contract exactly; do not add an unrecorded content.main prerequisite",
+        "catalog-authoritative exact per-rule contract",
     ),
     *_refs(
         33,
         ("GOOGLE-TITLE-001",),
         ReconciliationClassification.SEMANTIC_MISMATCH,
-        "rewrite #33 against the same content.main-gated title contract",
-        "title-source suitability without the legacy 30-65 threshold",
+        "accept the catalog-defined title contract exactly; legacy length-threshold wording is not binding",
+        "catalog-authoritative exact per-rule contract",
     ),
 )
+
+_MISSING_RULE_SEMANTICS: dict[str, str] = {
+    "CORE-ROBOTS-001": "robots.txt fetch state is known",
+    "CORE-ROBOTS-002": "robots.txt is parsed under an explicit versioned REP profile",
+    "CORE-ROBOTS-003": "robots policy is consistent with explicit intent.indexability",
+    "CORE-ROBOTS-004": "robots blocking does not hide a noindex directive",
+    "CORE-SITEMAP-001": "sitemap discovery state is known",
+    "CORE-SITEMAP-002": "sitemap fetch state is known",
+    "CORE-SITEMAP-003": "sitemap parse state is known",
+    "CORE-SITEMAP-004": "sitemap URLs are absolute and valid",
+    "CORE-SITEMAP-005": "sitemap contains preferred/canonical URLs",
+    "CORE-SITEMAP-006": "sitemap URLs are not redirect URLs",
+    "CORE-SITEMAP-007": "sitemap URLs do not return 4xx/5xx",
+    "CORE-SITEMAP-008": "sitemap preferred URLs are not marked noindex",
+    "CORE-DUP-001": "exact duplicate clusters use content.hash and canonical facts",
+    "CORE-DUP-002": "near-duplicate clusters use content.signatures as observation-only data",
+    "CORE-HTTP-002": "HTTP/indexability consistency is evaluated only with explicit intent.indexability",
+    "GOOGLE-IDX-001": "Google indexability intent-dependent rule from issue #30",
+    "GOOGLE-IDX-002": "Google indexability outcome rule requiring explicit intent provenance",
+    "YANDEX-IDX-001": "Yandex indexability intent-dependent rule from issue #30",
+    "YANDEX-IDX-002": "Yandex indexability outcome rule requiring explicit intent provenance",
+}
 
 
 def _catalog_entry(entry: Any) -> dict[str, object]:
@@ -170,6 +192,7 @@ def _catalog_entry(entry: Any) -> dict[str, object]:
         "version": entry.version,
         "title": entry.title,
         "scope": entry.scope,
+        "applicability_condition": entry.condition,
         "fact_requirements": [
             {"family": req.family, "min_schema_version": req.min_schema_version}
             for req in entry.fact_requirements
@@ -190,12 +213,25 @@ def build_stage_e_reconciliation_matrix(
     rows: list[dict[str, object]] = []
     for reference in STAGE_E_PLAN_REFERENCES:
         entry = by_id.get(reference.planned_rule_id)
+        planned_semantics = _MISSING_RULE_SEMANTICS.get(
+            reference.planned_rule_id,
+            reference.planned_semantics,
+        )
+        if entry is not None:
+            planned_semantics = (
+                "catalog-authoritative exact contract: "
+                f"{entry.title}; scope={entry.scope}; condition={entry.condition}; "
+                f"facts={','.join(req.family + '@' + req.min_schema_version for req in entry.fact_requirements)}; "
+                f"score_role={entry.score_role}; failure_policy={entry.failure_policy}; "
+                f"mechanism={entry.mechanism}; rule_kind={entry.rule_kind}; "
+                f"automation_mode={entry.automation_mode}; version={entry.version}"
+            )
         row: dict[str, object] = {
             "issue": reference.issue,
             "planned_rule_id": reference.planned_rule_id,
             "classification": reference.classification,
             "disposition": reference.disposition,
-            "planned_semantics": reference.planned_semantics,
+            "planned_semantics": planned_semantics,
             "catalog": _catalog_entry(entry) if entry is not None else None,
         }
         rows.append(row)
@@ -208,7 +244,17 @@ def build_stage_e_reconciliation_matrix(
             "catalog_version": snapshot.catalog_version,
             "rule_catalog_digest": snapshot.rule_catalog_digest,
         },
-        "issues": [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
+        "issues": list(range(22, 35)),
+        "issue_dispositions": [
+            {
+                "issue": 34,
+                "classification": ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE,
+                "disposition": (
+                    "downstream golden-cutover work is not implementable until each "
+                    "dependent issue has an exact catalog-authoritative contract"
+                ),
+            }
+        ],
         "rows": rows,
     }
 
@@ -216,7 +262,34 @@ def build_stage_e_reconciliation_matrix(
 def stage_e_binding_is_blocked(
     matrix: Mapping[str, object] | None = None,
 ) -> bool:
-    """Return the fail-closed pre-binding state required by issue #42."""
+    """Return the fail-closed pre-binding state required by issue #42.
+
+    The caller cannot bypass unresolved rows by toggling ``binding_allowed``.
+    A future binding-capable matrix must have every row resolved to MATCH,
+    carry a catalog entry with a version and applicability condition, and
+    contain no missing or mismatched issue-level dispositions.
+    """
     if matrix is None:
         return True
-    return matrix.get("authority") != "catalog-authoritative" or matrix.get("binding_allowed") is not True
+    if matrix.get("authority") != "catalog-authoritative":
+        return True
+    rows = matrix.get("rows")
+    if not isinstance(rows, list) or not rows:
+        return True
+    if any(
+        not isinstance(row, Mapping)
+        or row.get("classification") != ReconciliationClassification.MATCH
+        or not isinstance(row.get("catalog"), Mapping)
+        or not row["catalog"].get("version")
+        or not row["catalog"].get("applicability_condition")
+        for row in rows
+    ):
+        return True
+    dispositions = matrix.get("issue_dispositions", [])
+    if not isinstance(dispositions, list) or any(
+        not isinstance(item, Mapping)
+        or item.get("classification") != ReconciliationClassification.MATCH
+        for item in dispositions
+    ):
+        return True
+    return matrix.get("binding_allowed") is not True

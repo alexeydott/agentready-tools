@@ -58,6 +58,8 @@ def test_matrix_preserves_catalog_identity_and_metadata_for_existing_ids():
         {"family": "page", "min_schema_version": "1"},
         {"family": "robots.policy", "min_schema_version": "1"},
     ]
+    assert row["catalog"]["applicability_condition"].startswith("applies whenever")
+    assert row["planned_semantics"].startswith("catalog-authoritative exact contract:")
 
 
 def test_no_stage_e_reference_is_silently_treated_as_a_match():
@@ -66,6 +68,34 @@ def test_no_stage_e_reference_is_silently_treated_as_a_match():
         row["classification"] == ReconciliationClassification.MATCH
         for row in matrix["rows"]
     )
+
+
+def test_binding_gate_cannot_be_bypassed_by_setting_binding_allowed_true():
+    matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
+    matrix["binding_allowed"] = True
+    assert stage_e_binding_is_blocked(matrix)
+
+
+def test_binding_gate_rejects_semantic_and_version_mismatches():
+    matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
+    matrix["binding_allowed"] = True
+    row = next(row for row in matrix["rows"] if row["catalog"] is not None)
+    row["classification"] = ReconciliationClassification.MATCH
+    row["catalog"]["version"] = ""
+    assert stage_e_binding_is_blocked(matrix)
+
+
+def test_issue_34_has_an_explicit_issue_level_disposition():
+    matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
+    assert matrix["issues"] == list(range(22, 35))
+    assert matrix["issue_dispositions"] == [{
+        "issue": 34,
+        "classification": ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE,
+        "disposition": (
+            "downstream golden-cutover work is not implementable until each "
+            "dependent issue has an exact catalog-authoritative contract"
+        ),
+    }]
 
 
 def test_checked_in_matrix_matches_the_loaded_catalog_snapshot():
