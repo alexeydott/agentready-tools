@@ -128,7 +128,9 @@ def test_finding_contract_allows_evidence_unknown_without_operational_failure():
 
     assert contract.outcome is EvaluationOutcome.UNKNOWN
     assert contract.operational_state.value == "none"
-    assert contract.to_report_finding(title="Metadata", reason="insufficient evidence").status.value == "skip"
+    report = contract.to_report_finding(title="Metadata", reason="insufficient evidence")
+    assert report.status.value == "skip"
+    assert report.to_contract(target="https://example.test/").outcome is EvaluationOutcome.UNKNOWN
 
 
 def test_rule_spec_exposes_score_role_without_score_model_policy():

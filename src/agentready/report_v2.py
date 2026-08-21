@@ -111,6 +111,10 @@ class Finding:
     reason: str
     evidence: tuple[FindingEvidence, ...] = ()
     rule_version: str = "1.0.0"
+    outcome: str | None = None
+    applicability: str | None = None
+    completeness: str | None = None
+    operational_state: str | None = None
 
     def to_contract(self, *, target: str, rule_version: str | None = None) -> Any:
         """Return the canonical machine identity behind this v2 DTO."""
@@ -132,24 +136,31 @@ class Finding:
         status = Status.ERROR if self.status is FindingStatus.UNAVAILABLE else (
             Status.SKIP if self.status is FindingStatus.SKIP else Status(self.status.value)
         )
-        outcome = {
+        outcome = EvaluationOutcome(self.outcome) if self.outcome else {
             FindingStatus.PASS: EvaluationOutcome.PASS,
             FindingStatus.FAIL: EvaluationOutcome.FAIL,
             FindingStatus.WARN: EvaluationOutcome.WARN,
             FindingStatus.SKIP: EvaluationOutcome.NOT_APPLICABLE,
             FindingStatus.UNAVAILABLE: EvaluationOutcome.UNKNOWN,
         }[self.status]
-        applicability = (
+        applicability = Applicability(self.applicability) if self.applicability else (
             Applicability.UNKNOWN
             if self.status is FindingStatus.UNAVAILABLE
             else Applicability.NOT_APPLICABLE
             if self.status is FindingStatus.SKIP
             else Applicability.APPLICABLE
         )
-        completeness = (
+        completeness = EvaluationCompleteness(self.completeness) if self.completeness else (
             EvaluationCompleteness.NOT_EVALUATED
             if self.status in {FindingStatus.SKIP, FindingStatus.UNAVAILABLE}
             else EvaluationCompleteness.COMPLETE
+        )
+        operational_state = (
+            OperationalState(self.operational_state)
+            if self.operational_state
+            else OperationalState.UNAVAILABLE
+            if self.status is FindingStatus.UNAVAILABLE
+            else OperationalState.NONE
         )
         key = FindingKey(self.id, rule_version or self.rule_version or "1.0.0", UrlIdentity.parse(target))
         evidence = tuple(EvidenceRef(item.id, item.url or target, item.summary) for item in self.evidence)
@@ -161,22 +172,14 @@ class Finding:
                 applicability=applicability,
                 completeness=completeness,
                 outcome=outcome,
-                operational_state=(
-                    OperationalState.UNAVAILABLE
-                    if self.status is FindingStatus.UNAVAILABLE
-                    else OperationalState.NONE
-                ),
+                operational_state=operational_state,
                 evidence_ids=tuple(item.id for item in self.evidence),
             ),
             status=status,
             applicability=applicability,
             completeness=completeness,
             outcome=outcome,
-            operational_state=(
-                OperationalState.UNAVAILABLE
-                if self.status is FindingStatus.UNAVAILABLE
-                else OperationalState.NONE
-            ),
+            operational_state=operational_state,
             severity=Severity.INFO if status is Status.PASS else Severity.LOW,
             impact="info" if status is Status.PASS else "low",
             effort=Effort.LOW,
@@ -201,11 +204,15 @@ class Finding:
             "status": self.status.value,
             "evidence": [{"id": item.id, "url": item.url} for item in self.evidence],
             "rule_version": self.rule_version,
+            "outcome": self.outcome,
+            "applicability": self.applicability,
+            "completeness": self.completeness,
+            "operational_state": self.operational_state,
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "id": self.id,
             "title": self.title,
             "status": self.status.value,
@@ -214,7 +221,12 @@ class Finding:
             "state_hash": self.state_hash,
             "evidence": [item.to_dict() for item in self.evidence],
             "rule_version": self.rule_version,
+            "outcome": self.outcome,
+            "applicability": self.applicability,
+            "completeness": self.completeness,
+            "operational_state": self.operational_state,
         }
+        return {key: value for key, value in result.items() if value is not None}
 
 
 @dataclass(frozen=True, slots=True)
@@ -371,6 +383,10 @@ def report_from_dict(payload: Mapping[str, Any]) -> AuditReport:
             item.get("reason", ""),
             tuple(FindingEvidence(e["id"], e["summary"], e.get("url")) for e in item.get("evidence", ())),
             item.get("rule_version", "1.0.0"),
+            item.get("outcome"),
+            item.get("applicability"),
+            item.get("completeness"),
+            item.get("operational_state"),
         )
         for item in payload.get("findings", ())
     )

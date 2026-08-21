@@ -325,47 +325,63 @@ class AuditService:
     def _fact_views(crawl: CrawlResult) -> tuple[FactView, ...]:
         """Project crawler output once for all downstream analyzers."""
         views = tuple(
-            FactView(
-                CollectedPage(
-                    page.url,
-                    page.depth,
-                    page.status_code,
-                    page.parsed.representation if page.parsed is not None else None,
-                    page.parsed.facts if page.parsed is not None else None,
-                    page.error,
-                    page.headers,
-                    page.body,
-                    page.requested_url,
-                    page.fetch_error_kind.value if page.fetch_error_kind is not None else None,
-                    page.redirect_records,
-                    page.rendered,
-                    page.parsed,
-                )
-            )
+            FactView(AuditService._collected_page(page))
             for page in crawl.pages
         )
         logger.debug("collection fact views built pages=%d", len(views))
         return views
 
     @staticmethod
-    def _observed_fact_schema_versions(fact_views: tuple[FactView, ...]) -> tuple[tuple[str, str], ...]:
+    def _collected_page(page: Any) -> CollectedPage:
+        representation = page.parsed.representation if page.parsed is not None else None
+        facts = page.parsed.facts if page.parsed is not None else None
+        return CollectedPage(
+            page.url,
+            page.depth,
+            page.status_code,
+            representation,
+            facts,
+            page.error,
+            page.headers,
+            page.body,
+            page.requested_url,
+            page.fetch_error_kind.value if page.fetch_error_kind is not None else None,
+            page.redirect_records,
+            page.rendered,
+            page.parsed,
+            AuditService._page_fact_schema_versions(
+                requested_url=page.requested_url,
+                status_code=page.status_code,
+                fetch_error_kind=page.fetch_error_kind.value if page.fetch_error_kind is not None else None,
+                representation=representation,
+                facts=facts,
+            ),
+        )
+
+    @staticmethod
+    def _page_fact_schema_versions(
+        *,
+        requested_url: str | None,
+        status_code: int | None,
+        fetch_error_kind: str | None,
+        representation: Any | None,
+        facts: Any | None,
+    ) -> tuple[tuple[str, str], ...]:
         observed: set[str] = set()
-        for view in fact_views:
-            if view.page.requested_url or view.page.status_code is not None or view.page.fetch_error_kind:
-                observed.add("transport")
-            if view.representation is not None:
-                observed.add("representation")
-            facts = view.facts
-            if facts is None:
-                continue
-            observed.add("page")
-            if facts.links:
-                observed.add("links")
-            if facts.resources or facts.images:
-                observed.add("resources")
-            if facts.jsonld_block_count or facts.jsonld_nodes or facts.jsonld_errors or facts.microdata_markers:
-                observed.add("structured-data")
+        if requested_url or status_code is not None or fetch_error_kind:
+            observed.add("transport")
+        if representation is not None:
+            observed.add("representation")
+        if facts is not None:
+            observed.update({"page", "links", "resources", "structured-data"})
         return tuple(sorted((family, DEFAULT_FACT_SCHEMA_VERSIONS[family]) for family in observed))
+
+    @staticmethod
+    def _observed_fact_schema_versions(fact_views: tuple[FactView, ...]) -> tuple[tuple[str, str], ...]:
+        observed: dict[str, str] = {}
+        for view in fact_views:
+            observed.update(dict(view.page.fact_schema_versions))
+        return tuple(sorted(observed.items()))
 
     @staticmethod
     def _persist_run_identity(store: Any | None, context: AuditRunContext, fact_views: tuple[FactView, ...]) -> None:

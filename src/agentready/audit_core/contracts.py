@@ -185,4 +185,8 @@ class FindingContract:
             reason=reason,
             evidence=evidence,
             rule_version=self.key.rule_version,
+            outcome=self.outcome.value,
+            applicability=self.applicability.value,
+            completeness=self.completeness.value,
+            operational_state=self.operational_state.value,
         )
