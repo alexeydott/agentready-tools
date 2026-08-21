@@ -12,6 +12,7 @@ from typing import Any
 
 from . import __version__
 from .audit_core import AuditRunContext, CollectedPage, FactView, RunSnapshot, RunState
+from .audit_core.fact_schema import DEFAULT_FACT_SCHEMA_VERSIONS
 from .crawl_profiles import HARD_CAPS, resolve_profile, resolve_request_profile
 from .custom_rules import CustomRuleDocument, apply_rules, compile_rules, css_matches_from_html
 from .crawler import AsyncCrawler, CrawlResult, CrawlScope
@@ -241,12 +242,21 @@ class AuditResult:
     def to_dict(self) -> dict[str, Any]:
         projection = self.mobile_report or self.seo_report or self.report
         payload = projection.to_dict()
+        payload.setdefault("score_model_id", self.run.context.score_model_id)
+        payload.setdefault("rule_catalog_version", self.run.context.rule_catalog_version)
+        payload.setdefault("rule_catalog_digest", self.run.context.rule_catalog_digest)
+        payload.setdefault("rule_catalog_digest_kind", self.run.context.rule_catalog_digest_kind)
         payload["run"] = {
             "id": self.run.context.run_id,
             "state": self.run.state.value,
             "config_hash": self.run.context.config_hash,
             "parent_run_id": self.request.parent_run_id,
             "lineage_id": self.lineage_id,
+            "tool_version": self.run.context.tool_version,
+            "rule_catalog_version": self.run.context.rule_catalog_version,
+            "rule_catalog_digest": self.run.context.rule_catalog_digest,
+            "rule_catalog_digest_kind": self.run.context.rule_catalog_digest_kind,
+            "score_model_id": self.run.context.score_model_id,
         }
         payload["request"] = {
             "preset": self.request.preset,
@@ -315,27 +325,82 @@ class AuditService:
     def _fact_views(crawl: CrawlResult) -> tuple[FactView, ...]:
         """Project crawler output once for all downstream analyzers."""
         views = tuple(
-            FactView(
-                CollectedPage(
-                    page.url,
-                    page.depth,
-                    page.status_code,
-                    page.parsed.representation if page.parsed is not None else None,
-                    page.parsed.facts if page.parsed is not None else None,
-                    page.error,
-                    page.headers,
-                    page.body,
-                    page.requested_url,
-                    page.fetch_error_kind.value if page.fetch_error_kind is not None else None,
-                    page.redirect_records,
-                    page.rendered,
-                    page.parsed,
-                )
-            )
+            FactView(AuditService._collected_page(page))
             for page in crawl.pages
         )
         logger.debug("collection fact views built pages=%d", len(views))
         return views
+
+    @staticmethod
+    def _collected_page(page: Any) -> CollectedPage:
+        representation = page.parsed.representation if page.parsed is not None else None
+        facts = page.parsed.facts if page.parsed is not None else None
+        return CollectedPage(
+            page.url,
+            page.depth,
+            page.status_code,
+            representation,
+            facts,
+            page.error,
+            page.headers,
+            page.body,
+            page.requested_url,
+            page.fetch_error_kind.value if page.fetch_error_kind is not None else None,
+            page.redirect_records,
+            page.rendered,
+            page.parsed,
+            AuditService._page_fact_schema_versions(
+                requested_url=page.requested_url,
+                status_code=page.status_code,
+                fetch_error_kind=page.fetch_error_kind.value if page.fetch_error_kind is not None else None,
+                representation=representation,
+                facts=facts,
+            ),
+        )
+
+    @staticmethod
+    def _page_fact_schema_versions(
+        *,
+        requested_url: str | None,
+        status_code: int | None,
+        fetch_error_kind: str | None,
+        representation: Any | None,
+        facts: Any | None,
+    ) -> tuple[tuple[str, str], ...]:
+        observed: set[str] = set()
+        if requested_url or status_code is not None or fetch_error_kind:
+            observed.add("transport")
+        if representation is not None:
+            observed.add("representation")
+        if facts is not None:
+            observed.update({"page", "links", "resources", "structured-data"})
+        return tuple(sorted((family, DEFAULT_FACT_SCHEMA_VERSIONS[family]) for family in observed))
+
+    @staticmethod
+    def _observed_fact_schema_versions(fact_views: tuple[FactView, ...]) -> tuple[tuple[str, str], ...]:
+        observed: dict[str, str] = {}
+        for view in fact_views:
+            observed.update(dict(view.page.fact_schema_versions))
+        return tuple(sorted(observed.items()))
+
+    @staticmethod
+    def _persist_run_identity(store: Any | None, context: AuditRunContext, fact_views: tuple[FactView, ...]) -> None:
+        if store is None:
+            return
+        run_record = store.update_run_identity(
+            context.run_id,
+            fact_schema_versions=AuditService._observed_fact_schema_versions(fact_views),
+        )
+        store.put_version_manifest(
+            context.run_id,
+            {
+                "rule_catalog_version": run_record.rule_catalog_version,
+                "rule_catalog_digest": run_record.rule_catalog_digest,
+                "rule_catalog_digest_kind": run_record.rule_catalog_digest_kind,
+                "score_model_id": run_record.score_model_id,
+                "fact_schema_versions": dict(run_record.fact_schema_versions),
+            },
+        )
 
     @staticmethod
     def _discovery_seeds(target: str, request: AuditRequest) -> tuple[tuple[str, ...], str]:
@@ -489,6 +554,7 @@ class AuditService:
                 ).crawl()
             )
             fact_views = self._fact_views(crawl)
+            self._persist_run_identity(request.store, context, fact_views)
             custom_rule_results = _apply_ruleset(ruleset_document, fact_views) if ruleset_document else ()
             if ruleset_document and request.store is not None:
                 for page_result in custom_rule_results:
@@ -544,7 +610,17 @@ class AuditService:
             for page in custom_rule_results
             for item in page["matches"]
         )
-        report = self._report(target, crawl, run_id=context.run_id, check_report=check_report, custom_findings=custom_findings)
+        report = self._report(
+            target,
+            crawl,
+            run_id=context.run_id,
+            check_report=check_report,
+            custom_findings=custom_findings,
+            score_model_id=context.score_model_id,
+            rule_catalog_version=context.rule_catalog_version,
+            rule_catalog_digest=context.rule_catalog_digest,
+            rule_catalog_digest_kind=context.rule_catalog_digest_kind,
+        )
         state = (
             RunState.PARTIAL
             if crawl.coverage.classification.value != "complete_within_scope"
@@ -614,6 +690,7 @@ class AuditService:
             ).crawl()
         )
         fact_views = self._fact_views(crawl)
+        self._persist_run_identity(request.store, context, fact_views)
         replay_client = CollectedHttpClient(None, fact_views)
 
         async def analyze_page() -> Any:
@@ -662,8 +739,20 @@ class AuditService:
             started_at=started_at,
             finished_at=utc_now_iso(),
             language=request.language,
+            score_model_id=context.score_model_id,
+            rule_catalog_version=context.rule_catalog_version,
+            rule_catalog_digest=context.rule_catalog_digest,
+            rule_catalog_digest_kind=context.rule_catalog_digest_kind,
         )
-        report = self._report(target, crawl, run_id=context.run_id)
+        report = self._report(
+            target,
+            crawl,
+            run_id=context.run_id,
+            score_model_id=context.score_model_id,
+            rule_catalog_version=context.rule_catalog_version,
+            rule_catalog_digest=context.rule_catalog_digest,
+            rule_catalog_digest_kind=context.rule_catalog_digest_kind,
+        )
         state = (
             RunState.PARTIAL
             if crawl.coverage.classification.value != "complete_within_scope"
@@ -715,6 +804,7 @@ class AuditService:
             configuration,
             tool_version=__version__,
             rule_catalog_version="seo-v2-atomic",
+            score_model_id="seo-binary-v1",
             run_id=None,
             ruleset_version=ruleset_document.version if ruleset_document else None,
             ruleset_hash=ruleset_document.rule_hash if ruleset_document else None,
@@ -768,6 +858,7 @@ class AuditService:
         selection = normalize_selection(request.include, request.exclude)
         requested_ids = selection.include
         fact_views = self._fact_views(crawl)
+        self._persist_run_identity(request.store, context, fact_views)
         for view in fact_views:
             if view.facts is None:
                 continue
@@ -919,8 +1010,20 @@ class AuditService:
                 "images": sum(len(page.parsed.facts.images) for page in crawl.pages if page.parsed and page.parsed.facts),
                 "checks": len(checks),
             },
+            score_model_id=context.score_model_id,
+            rule_catalog_version=context.rule_catalog_version,
+            rule_catalog_digest=context.rule_catalog_digest,
+            rule_catalog_digest_kind=context.rule_catalog_digest_kind,
         )
-        report = self._report(target, crawl, run_id=context.run_id)
+        report = self._report(
+            target,
+            crawl,
+            run_id=context.run_id,
+            score_model_id=context.score_model_id,
+            rule_catalog_version=context.rule_catalog_version,
+            rule_catalog_digest=context.rule_catalog_digest,
+            rule_catalog_digest_kind=context.rule_catalog_digest_kind,
+        )
         state = RunState.PARTIAL if crawl.coverage.classification.value != "complete_within_scope" else RunState.COMPLETED
         run = crawl.run or RunSnapshot(context, state, None, "crawl-partial" if state is RunState.PARTIAL else None)
         lineage_id = request.parent_run_id or context.run_id
@@ -953,6 +1056,10 @@ class AuditService:
         run_id: str | None = None,
         check_report: AuditReport | None = None,
         custom_findings: tuple[Finding, ...] = (),
+        score_model_id: str = "readiness-transparent-v2",
+        rule_catalog_version: str = "v2",
+        rule_catalog_digest: str | None = None,
+        rule_catalog_digest_kind: str = "synthetic",
     ) -> AuditReport:
         coverage = Coverage(
             total_rules=1,
@@ -996,7 +1103,17 @@ class AuditService:
                 classification=crawl.coverage.classification.value,
             )
         evidence = check_report.evidence if check_report else ()
-        report = AuditReport(target, findings, coverage, evidence=evidence, run_id=run_id)
+        report = AuditReport(
+            target,
+            findings,
+            coverage,
+            evidence=evidence,
+            run_id=run_id,
+            score_model_id=score_model_id,
+            rule_catalog_version=rule_catalog_version,
+            rule_catalog_digest=rule_catalog_digest or hashlib.sha256(rule_catalog_version.encode("utf-8")).hexdigest(),
+            rule_catalog_digest_kind=rule_catalog_digest_kind,
+        )
         logger.info("[FIX:v2-report] target=%s findings=%d score=%d", target, len(report.findings), report.score)
         return report
 

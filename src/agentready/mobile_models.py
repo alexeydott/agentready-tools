@@ -141,6 +141,10 @@ class MobileReport:
     finished_at: str
     language: str = "en"
     tool_version: str = __version__
+    score_model_id: str = "readiness-transparent-v2"
+    rule_catalog_version: str = "mobile-v2"
+    rule_catalog_digest: str = ""
+    rule_catalog_digest_kind: str = "synthetic"
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

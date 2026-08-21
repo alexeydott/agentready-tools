@@ -53,6 +53,46 @@ def test_memory_store_is_idempotent_and_metadata_only_by_default():
 
 
 @pytest.mark.parametrize("store_kind", ["memory", "sqlite"])
+def test_run_identity_and_version_manifest_round_trip(tmp_path: Path, store_kind: str):
+    store = MemorySiteStore() if store_kind == "memory" else SQLiteSiteStore(tmp_path / "identity.sqlite")
+    try:
+        run = RunRecord(
+            "run-identity",
+            "config",
+            "tool",
+            "catalog-v2",
+            rule_catalog_digest="digest-123",
+            rule_catalog_digest_kind="content",
+            score_model_id="score-v1",
+            fact_schema_versions=(("page", "2"), ("transport", "1")),
+        )
+        store.begin_run(run)
+        store.put_version_manifest(
+            "run-identity",
+            {
+                "rule_catalog_digest": run.rule_catalog_digest,
+                "rule_catalog_digest_kind": run.rule_catalog_digest_kind,
+                "score_model_id": run.score_model_id,
+                "fact_schema_versions": dict(run.fact_schema_versions),
+            },
+        )
+
+        restored = store.get_run("run-identity")
+        assert restored.rule_catalog_digest == "digest-123"
+        assert restored.rule_catalog_digest_kind == "content"
+        assert restored.score_model_id == "score-v1"
+        assert restored.fact_schema_versions == (("page", "2"), ("transport", "1"))
+        assert store.get_version_manifest("run-identity") == {
+            "rule_catalog_digest": "digest-123",
+            "rule_catalog_digest_kind": "content",
+            "score_model_id": "score-v1",
+            "fact_schema_versions": {"page": "2", "transport": "1"},
+        }
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("store_kind", ["memory", "sqlite"])
 def test_storage_queries_are_bounded_and_cursor_bound(tmp_path: Path, store_kind: str):
     store = MemorySiteStore() if store_kind == "memory" else SQLiteSiteStore(tmp_path / "query.sqlite")
     try:
@@ -290,11 +330,36 @@ def test_sqlite_migration_is_idempotent_and_recovery_is_durable(tmp_path: Path):
     second = SQLiteSiteStore(path)
     try:
         assert second.recover_interrupted_runs() == 0
-        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 8
+        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 9
         assert second._connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 1
         assert second.resume_run("run-recovery").state == "running"
     finally:
         second.close()
+
+
+def test_sqlite_v8_run_identity_migration_is_durable(tmp_path: Path):
+    path = tmp_path / "v8-identity.sqlite"
+    store = SQLiteSiteStore(path)
+    store.begin_run(RunRecord("run-v8", "config", "tool", "rules-v8"))
+    store.close()
+    connection = sqlite3.connect(path)
+    connection.execute("ALTER TABLE runs DROP COLUMN rule_catalog_digest")
+    connection.execute("ALTER TABLE runs DROP COLUMN score_model_id")
+    connection.execute("ALTER TABLE runs DROP COLUMN fact_schema_versions")
+    connection.execute("PRAGMA user_version=8")
+    connection.commit()
+    connection.close()
+
+    reopened = SQLiteSiteStore(path)
+    try:
+        restored = reopened.get_run("run-v8")
+        assert restored.rule_catalog_digest
+        assert restored.rule_catalog_digest_kind == "synthetic"
+        assert restored.score_model_id == "readiness-transparent-v2"
+        assert restored.fact_schema_versions == ()
+        assert reopened._connection.execute("PRAGMA user_version").fetchone()[0] == 9
+    finally:
+        reopened.close()
 
 
 def test_sqlite_reclaims_stale_pending_evidence(tmp_path: Path):

@@ -1,9 +1,13 @@
 from agentready.audit_core import (
+    CollectedPage,
     FactEnvelope,
+    FactView,
     FactCompatibility,
     FactSchemaRegistry,
     FactSchemaRequirement,
 )
+from agentready.audit_service import AuditService
+from agentready.page_parser import ParsedFacts
 from agentready.audit_core.urls import UrlIdentity
 
 
@@ -36,3 +40,25 @@ def test_fact_envelope_schema_identity_round_trips_and_conflicts_are_unknown() -
     assert FactSchemaRegistry.from_envelopes((first, conflicting)).versions == {"page": "unknown"}
     legacy = FactEnvelope("4", "legacy-title", target, "D", "2026-01-01")
     assert FactSchemaRegistry.from_envelopes((legacy,)).versions == {"legacy-title": "unknown"}
+
+
+def test_fact_view_missing_default_does_not_claim_capability_families() -> None:
+    view = FactView(CollectedPage("https://example.test/", 0, 200, None, None))
+
+    result = view.check_fact_requirements((FactSchemaRequirement("links", "1"),))[0]
+
+    assert result.compatibility is FactCompatibility.MISSING
+
+
+def test_empty_emitted_fact_family_is_present_not_missing() -> None:
+    versions = AuditService._page_fact_schema_versions(
+        requested_url="https://example.test/",
+        status_code=200,
+        fetch_error_kind=None,
+        representation=None,
+        facts=ParsedFacts(),
+    )
+    registry = FactSchemaRegistry(dict(versions))
+
+    assert registry.check(FactSchemaRequirement("links", "1")).compatibility is FactCompatibility.COMPATIBLE
+    assert registry.check(FactSchemaRequirement("structured-data", "1")).compatibility is FactCompatibility.COMPATIBLE

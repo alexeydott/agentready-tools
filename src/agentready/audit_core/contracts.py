@@ -11,6 +11,7 @@ from .models import (
     Applicability,
     EvaluationCompleteness,
     EvaluationOutcome,
+    FailurePolicy,
     OperationalState,
     Status,
 )
@@ -125,6 +126,7 @@ class FindingContract:
     evidence: tuple[EvidenceRef, ...] = ()
     outcome: EvaluationOutcome | None = None
     operational_state: OperationalState = OperationalState.NONE
+    failure_policy: FailurePolicy = FailurePolicy.STRICT
 
     def __post_init__(self) -> None:
         if self.priority < 0:
@@ -140,6 +142,18 @@ class FindingContract:
             object.__setattr__(self, "outcome", outcome)
         if self.status is Status.ERROR and self.operational_state is OperationalState.NONE:
             object.__setattr__(self, "operational_state", OperationalState.ERROR)
+        if (
+            self.status in {Status.PASS, Status.FAIL}
+            and self.completeness is not EvaluationCompleteness.COMPLETE
+            and self.failure_policy is FailurePolicy.STRICT
+        ):
+            raise ValueError("pass/fail findings require complete evaluation")
+        if (
+            self.completeness is not EvaluationCompleteness.COMPLETE
+            and self.failure_policy is FailurePolicy.STRICT
+            and self.outcome in {EvaluationOutcome.PASS, EvaluationOutcome.FAIL}
+        ):
+            raise ValueError("strict failure policy rejects incomplete pass/fail outcomes")
 
     def to_report_finding(
         self,
@@ -171,4 +185,8 @@ class FindingContract:
             reason=reason,
             evidence=evidence,
             rule_version=self.key.rule_version,
+            outcome=self.outcome.value,
+            applicability=self.applicability.value,
+            completeness=self.completeness.value,
+            operational_state=self.operational_state.value,
         )

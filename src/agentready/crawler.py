@@ -306,6 +306,9 @@ class AsyncCrawler:
                     self.run_context.config_hash if self.run_context is not None else "crawler",
                     self.run_context.tool_version if self.run_context is not None else "crawler",
                     self.run_context.rule_catalog_version if self.run_context is not None else "crawler",
+                    rule_catalog_digest=self.run_context.rule_catalog_digest if self.run_context is not None else "",
+                    rule_catalog_digest_kind=self.run_context.rule_catalog_digest_kind if self.run_context is not None else "synthetic",
+                    score_model_id=self.run_context.score_model_id if self.run_context is not None else "readiness-transparent-v2",
                 )
             )
 

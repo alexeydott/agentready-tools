@@ -19,6 +19,7 @@ SCHEMA = "agentready.audit.v2"
 REPORT_VERSION = "v2"
 DEFAULT_RULE_CATALOG_VERSION = "v2"
 DEFAULT_RULE_CATALOG_DIGEST = hashlib.sha256(DEFAULT_RULE_CATALOG_VERSION.encode("utf-8")).hexdigest()
+DEFAULT_RULE_CATALOG_DIGEST_KIND = "synthetic"
 MAX_PAGES = 100
 MAX_TIMEOUT = 30.0
 
@@ -110,6 +111,10 @@ class Finding:
     reason: str
     evidence: tuple[FindingEvidence, ...] = ()
     rule_version: str = "1.0.0"
+    outcome: str | None = None
+    applicability: str | None = None
+    completeness: str | None = None
+    operational_state: str | None = None
 
     def to_contract(self, *, target: str, rule_version: str | None = None) -> Any:
         """Return the canonical machine identity behind this v2 DTO."""
@@ -131,24 +136,31 @@ class Finding:
         status = Status.ERROR if self.status is FindingStatus.UNAVAILABLE else (
             Status.SKIP if self.status is FindingStatus.SKIP else Status(self.status.value)
         )
-        outcome = {
+        outcome = EvaluationOutcome(self.outcome) if self.outcome else {
             FindingStatus.PASS: EvaluationOutcome.PASS,
             FindingStatus.FAIL: EvaluationOutcome.FAIL,
             FindingStatus.WARN: EvaluationOutcome.WARN,
             FindingStatus.SKIP: EvaluationOutcome.NOT_APPLICABLE,
             FindingStatus.UNAVAILABLE: EvaluationOutcome.UNKNOWN,
         }[self.status]
-        applicability = (
+        applicability = Applicability(self.applicability) if self.applicability else (
             Applicability.UNKNOWN
             if self.status is FindingStatus.UNAVAILABLE
             else Applicability.NOT_APPLICABLE
             if self.status is FindingStatus.SKIP
             else Applicability.APPLICABLE
         )
-        completeness = (
+        completeness = EvaluationCompleteness(self.completeness) if self.completeness else (
             EvaluationCompleteness.NOT_EVALUATED
             if self.status in {FindingStatus.SKIP, FindingStatus.UNAVAILABLE}
             else EvaluationCompleteness.COMPLETE
+        )
+        operational_state = (
+            OperationalState(self.operational_state)
+            if self.operational_state
+            else OperationalState.UNAVAILABLE
+            if self.status is FindingStatus.UNAVAILABLE
+            else OperationalState.NONE
         )
         key = FindingKey(self.id, rule_version or self.rule_version or "1.0.0", UrlIdentity.parse(target))
         evidence = tuple(EvidenceRef(item.id, item.url or target, item.summary) for item in self.evidence)
@@ -160,22 +172,14 @@ class Finding:
                 applicability=applicability,
                 completeness=completeness,
                 outcome=outcome,
-                operational_state=(
-                    OperationalState.UNAVAILABLE
-                    if self.status is FindingStatus.UNAVAILABLE
-                    else OperationalState.NONE
-                ),
+                operational_state=operational_state,
                 evidence_ids=tuple(item.id for item in self.evidence),
             ),
             status=status,
             applicability=applicability,
             completeness=completeness,
             outcome=outcome,
-            operational_state=(
-                OperationalState.UNAVAILABLE
-                if self.status is FindingStatus.UNAVAILABLE
-                else OperationalState.NONE
-            ),
+            operational_state=operational_state,
             severity=Severity.INFO if status is Status.PASS else Severity.LOW,
             impact="info" if status is Status.PASS else "low",
             effort=Effort.LOW,
@@ -200,11 +204,15 @@ class Finding:
             "status": self.status.value,
             "evidence": [{"id": item.id, "url": item.url} for item in self.evidence],
             "rule_version": self.rule_version,
+            "outcome": self.outcome,
+            "applicability": self.applicability,
+            "completeness": self.completeness,
+            "operational_state": self.operational_state,
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "id": self.id,
             "title": self.title,
             "status": self.status.value,
@@ -213,7 +221,12 @@ class Finding:
             "state_hash": self.state_hash,
             "evidence": [item.to_dict() for item in self.evidence],
             "rule_version": self.rule_version,
+            "outcome": self.outcome,
+            "applicability": self.applicability,
+            "completeness": self.completeness,
+            "operational_state": self.operational_state,
         }
+        return {key: value for key, value in result.items() if value is not None}
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,6 +269,7 @@ class AuditReport:
     score_model_id: str = "readiness-transparent-v2"
     rule_catalog_version: str = DEFAULT_RULE_CATALOG_VERSION
     rule_catalog_digest: str = DEFAULT_RULE_CATALOG_DIGEST
+    rule_catalog_digest_kind: str = DEFAULT_RULE_CATALOG_DIGEST_KIND
 
     @property
     def score(self) -> int:
@@ -284,6 +298,7 @@ class AuditReport:
         result["score_model_id"] = self.score_model_id
         result["rule_catalog_version"] = self.rule_catalog_version
         result["rule_catalog_digest"] = self.rule_catalog_digest
+        result["rule_catalog_digest_kind"] = self.rule_catalog_digest_kind
         return result
 
 
@@ -368,6 +383,10 @@ def report_from_dict(payload: Mapping[str, Any]) -> AuditReport:
             item.get("reason", ""),
             tuple(FindingEvidence(e["id"], e["summary"], e.get("url")) for e in item.get("evidence", ())),
             item.get("rule_version", "1.0.0"),
+            item.get("outcome"),
+            item.get("applicability"),
+            item.get("completeness"),
+            item.get("operational_state"),
         )
         for item in payload.get("findings", ())
     )
@@ -391,6 +410,7 @@ def report_from_dict(payload: Mapping[str, Any]) -> AuditReport:
         score_model_id=payload.get("score_model_id", "readiness-transparent-v2"),
         rule_catalog_version=payload.get("rule_catalog_version", DEFAULT_RULE_CATALOG_VERSION),
         rule_catalog_digest=payload.get("rule_catalog_digest", DEFAULT_RULE_CATALOG_DIGEST),
+        rule_catalog_digest_kind=payload.get("rule_catalog_digest_kind", DEFAULT_RULE_CATALOG_DIGEST_KIND),
     )
 
 
@@ -553,6 +573,7 @@ def _comparison_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) 
     required_identity_fields = (
         ("rule_catalog_version", "rule catalog versions differ"),
         ("rule_catalog_digest", "rule catalog digests differ"),
+        ("rule_catalog_digest_kind", "rule catalog digest provenance differs"),
         ("score_model_id", "score model IDs differ"),
     )
     for field_name, message in required_identity_fields:
@@ -564,6 +585,9 @@ def _comparison_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) 
         if field_name in current or field_name in baseline:
             if current.get(field_name) != baseline.get(field_name):
                 return message
+    finding_reason = _finding_rule_version_reason(current, baseline)
+    if finding_reason is not None:
+        return finding_reason
     current_coverage = current.get("coverage", {})
     baseline_coverage = baseline.get("coverage", {})
     if isinstance(current_coverage, Mapping) and isinstance(baseline_coverage, Mapping):
@@ -572,6 +596,24 @@ def _comparison_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) 
             after = current_coverage.get(field_name)
             if isinstance(before, int) and isinstance(after, int) and after < before:
                 return f"coverage decreased for {field_name}"
+    return None
+
+
+def _finding_rule_version_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) -> str | None:
+    def versions(report: Mapping[str, Any]) -> dict[str, str | None]:
+        return {
+            str(item["id"]): item.get("rule_version") if isinstance(item.get("rule_version"), str) else None
+            for item in report.get("findings", ())
+            if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+        }
+
+    current_versions = versions(current)
+    baseline_versions = versions(baseline)
+    for finding_id in sorted(set(current_versions) & set(baseline_versions)):
+        if current_versions[finding_id] is None or baseline_versions[finding_id] is None:
+            return f"missing finding rule version for {finding_id}"
+        if current_versions[finding_id] != baseline_versions[finding_id]:
+            return f"finding rule versions differ for {finding_id}"
     return None
 
 
@@ -587,9 +629,19 @@ def _diff_coverage(current: Mapping[str, Any], baseline: Mapping[str, Any]) -> d
 
 
 def _diff_rule_versions(current: Mapping[str, Any], baseline: Mapping[str, Any]) -> dict[str, Any]:
-    keys = ("rule_version", "rule_catalog_version", "ruleset", "rules_version")
+    keys = ("rule_version", "rule_catalog_version", "rule_catalog_digest_kind", "ruleset", "rules_version")
     before = {key: baseline.get(key) for key in keys if key in baseline}
     after = {key: current.get(key) for key in keys if key in current}
+    before["findings"] = {
+        item["id"]: item.get("rule_version")
+        for item in baseline.get("findings", ())
+        if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+    }
+    after["findings"] = {
+        item["id"]: item.get("rule_version")
+        for item in current.get("findings", ())
+        if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+    }
     return {"changed": before != after, "before": before, "after": after}
 
 

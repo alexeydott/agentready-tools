@@ -78,6 +78,9 @@ class SeoReport:
     provider_freshness: dict[str, Any] = field(default_factory=dict)
     comparison: dict[str, Any] = field(default_factory=dict)
     score_model_id: str = "seo-binary-v1"
+    rule_catalog_version: str = "seo-v2-atomic"
+    rule_catalog_digest: str = ""
+    rule_catalog_digest_kind: str = "synthetic"
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
