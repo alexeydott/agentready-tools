@@ -21,7 +21,7 @@ from agentready.security import SecretRedactor
 from .urls import UrlIdentity
 
 logger = logging.getLogger(__name__)
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 11
 EVIDENCE_CLAIM_STALE_SECONDS = 3600.0
 
 
@@ -333,6 +333,36 @@ class FetchFact:
 
 
 @dataclass(frozen=True, slots=True)
+class RepresentationRecord:
+    run_id: str
+    url_key: str
+    representation_id: str
+    source: str
+    content_type: str
+    body_hash: str
+    byte_size: int
+    observed_at: str
+    parser_backend: str | None = None
+    error: str | None = None
+    body: bytes | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RunFactRecord:
+    run_id: str
+    family: str
+    schema_version: str
+    scope: str
+    subject: str
+    payload: Mapping[str, Any]
+    observed_at: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.observed_at:
+            object.__setattr__(self, "observed_at", _now())
+
+
+@dataclass(frozen=True, slots=True)
 class RedirectFact:
     run_id: str
     from_url: str
@@ -415,6 +445,11 @@ class SiteStore(Protocol):
     def update_run_state(self, run_id: str, state: str, *, finished_at: str | None = None) -> None: ...
     def put_run_url(self, record: RunUrlRecord) -> None: ...
     def put_fetch(self, fetch: FetchFact) -> None: ...
+    def iter_fetches(self, run_id: str) -> Iterator[FetchFact]: ...
+    def put_representation(self, representation: RepresentationRecord) -> None: ...
+    def iter_representations(self, run_id: str, url_key: str | None = None) -> Iterator[RepresentationRecord]: ...
+    def put_run_fact(self, fact: RunFactRecord) -> None: ...
+    def iter_run_facts(self, run_id: str, family: str | None = None) -> Iterator[RunFactRecord]: ...
     def put_url(self, identity: UrlIdentity) -> None: ...
     def put_redirect(self, redirect: RedirectFact) -> None: ...
     def put_page(self, page: PageRecord) -> None: ...
@@ -469,6 +504,8 @@ class MemorySiteStore:
         self._pages: dict[tuple[str, str], PageRecord] = {}
         self._run_urls: dict[tuple[str, str], RunUrlRecord] = {}
         self._fetches: dict[str, FetchFact] = {}
+        self._representations: dict[tuple[str, str, str, str], RepresentationRecord] = {}
+        self._run_facts: dict[tuple[str, str, str, str], RunFactRecord] = {}
         self._urls: dict[str, UrlIdentity] = {}
         self._redirects: dict[tuple[str, str, str], RedirectFact] = {}
         self._links: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -596,6 +633,40 @@ class MemorySiteStore:
 
     def put_fetch(self, fetch: FetchFact) -> None:
         self._fetches.setdefault(fetch.id, fetch)
+
+    def iter_fetches(self, run_id: str) -> Iterator[FetchFact]:
+        yield from sorted(
+            (fetch for fetch in self._fetches.values() if fetch.run_id == run_id),
+            key=lambda fetch: (fetch.request_url, fetch.id),
+        )
+
+    def put_representation(self, representation: RepresentationRecord) -> None:
+        body = _retained_bytes(representation.body, self.retention)
+        stored = RepresentationRecord(**{**asdict(representation), "body": body})
+        self._representations.setdefault(
+            (stored.run_id, stored.url_key, stored.source, stored.representation_id),
+            stored,
+        )
+
+    def iter_representations(self, run_id: str, url_key: str | None = None) -> Iterator[RepresentationRecord]:
+        rows = (
+            record
+            for key, record in self._representations.items()
+            if key[0] == run_id and (url_key is None or key[1] == url_key)
+        )
+        yield from sorted(rows, key=lambda record: (record.url_key, record.source, record.representation_id))
+
+    def put_run_fact(self, fact: RunFactRecord) -> None:
+        safe = RunFactRecord(**{**asdict(fact), "payload": self._redactor.value(dict(fact.payload))})
+        self._run_facts[(safe.run_id, safe.family, safe.scope, safe.subject)] = safe
+
+    def iter_run_facts(self, run_id: str, family: str | None = None) -> Iterator[RunFactRecord]:
+        rows = (
+            record
+            for key, record in self._run_facts.items()
+            if key[0] == run_id and (family is None or key[1] == family)
+        )
+        yield from sorted(rows, key=lambda record: (record.family, record.scope, record.subject))
 
     def put_run_url(self, record: RunUrlRecord) -> None:
         self._run_urls[(record.run_id, record.url_key)] = record
@@ -883,6 +954,8 @@ class SQLiteSiteStore:
                 self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             self._connection.executescript(_MIGRATION_7)
             self._connection.executescript(_MIGRATION_8)
+            self._connection.executescript(_MIGRATION_10)
+            self._connection.executescript(_MIGRATION_11)
             self._migrate_run_identity_columns()
             self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             self._connection.execute("PRAGMA optimize")
@@ -1080,6 +1153,96 @@ class SQLiteSiteStore:
                 (id, run_id, request_url, final_url, status_code, error_kind, total_ms, wire_bytes, decoded_bytes, body_hash)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 tuple(asdict(fetch).values()),
+            )
+
+    def iter_fetches(self, run_id: str) -> Iterator[FetchFact]:
+        rows = self._connection.execute(
+            "SELECT * FROM fetches WHERE run_id=? ORDER BY request_url, id",
+            (run_id,),
+        )
+        for row in rows:
+            yield FetchFact(
+                row["id"],
+                row["run_id"],
+                row["request_url"],
+                row["final_url"],
+                row["status_code"],
+                row["error_kind"],
+                row["total_ms"],
+                row["wire_bytes"],
+                row["decoded_bytes"],
+                row["body_hash"],
+            )
+
+    def put_representation(self, representation: RepresentationRecord) -> None:
+        self._write_guard()
+        body = _retained_bytes(representation.body, self.retention)
+        with self._transaction():
+            self._connection.execute(
+                """INSERT OR REPLACE INTO representations
+                (run_id, url_key, representation_id, source, content_type, body_hash, byte_size,
+                 observed_at, parser_backend, error, body)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    representation.run_id,
+                    representation.url_key,
+                    representation.representation_id,
+                    representation.source,
+                    representation.content_type,
+                    representation.body_hash,
+                    representation.byte_size,
+                    representation.observed_at,
+                    representation.parser_backend,
+                    representation.error,
+                    body,
+                ),
+            )
+
+    def iter_representations(self, run_id: str, url_key: str | None = None) -> Iterator[RepresentationRecord]:
+        if url_key is None:
+            rows = self._connection.execute(
+                "SELECT * FROM representations WHERE run_id=? ORDER BY url_key, source, representation_id",
+                (run_id,),
+            )
+        else:
+            rows = self._connection.execute(
+                "SELECT * FROM representations WHERE run_id=? AND url_key=? ORDER BY source, representation_id",
+                (run_id, url_key),
+            )
+        for row in rows:
+            yield _representation_from_row(row)
+
+    def put_run_fact(self, fact: RunFactRecord) -> None:
+        self._write_guard()
+        payload = json.dumps(self._redactor.value(dict(fact.payload)), sort_keys=True, separators=(",", ":"))
+        with self._transaction():
+            self._connection.execute(
+                """INSERT OR REPLACE INTO run_facts
+                (run_id, family, schema_version, scope, subject, payload, observed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (fact.run_id, fact.family, fact.schema_version, fact.scope, fact.subject, payload, fact.observed_at),
+            )
+
+    def iter_run_facts(self, run_id: str, family: str | None = None) -> Iterator[RunFactRecord]:
+        if family is None:
+            rows = self._connection.execute(
+                "SELECT * FROM run_facts WHERE run_id=? ORDER BY family, scope, subject",
+                (run_id,),
+            )
+        else:
+            rows = self._connection.execute(
+                "SELECT * FROM run_facts WHERE run_id=? AND family=? ORDER BY family, scope, subject",
+                (run_id, family),
+            )
+        for row in rows:
+            yield RunFactRecord(
+                row["run_id"],
+                row["family"],
+                row["schema_version"],
+                row["scope"],
+                row["subject"],
+                json.loads(row["payload"]),
+                row["observed_at"],
             )
 
     def put_run_url(self, record: RunUrlRecord) -> None:
@@ -1597,6 +1760,14 @@ def _retained_content(content: str | None, retention: ContentRetention) -> str |
     return content
 
 
+def _retained_bytes(content: bytes | None, retention: ContentRetention) -> bytes | None:
+    if content is None or retention == ContentRetention.METADATA_ONLY:
+        return None
+    if retention == ContentRetention.SAMPLES:
+        return content[:4096]
+    return content
+
+
 def _run_from_row(row: sqlite3.Row) -> RunRecord:
     return RunRecord(
         id=row["id"], config_hash=row["config_hash"], tool_version=row["tool_version"],
@@ -1628,6 +1799,22 @@ def _page_from_row(row: sqlite3.Row) -> PageRecord:
         content_type=row["content_type"], title=row["title"], canonical=row["canonical"],
         locally_indexable=None if row["locally_indexable"] is None else bool(row["locally_indexable"]),
         content_hash=row["content_hash"], content=row["content"],
+    )
+
+
+def _representation_from_row(row: sqlite3.Row) -> RepresentationRecord:
+    return RepresentationRecord(
+        run_id=row["run_id"],
+        url_key=row["url_key"],
+        representation_id=row["representation_id"],
+        source=row["source"],
+        content_type=row["content_type"],
+        body_hash=row["body_hash"],
+        byte_size=row["byte_size"],
+        observed_at=row["observed_at"],
+        parser_backend=row["parser_backend"],
+        error=row["error"],
+        body=row["body"],
     )
 
 
@@ -1693,6 +1880,30 @@ CREATE TABLE IF NOT EXISTS fetches (
     decoded_bytes INTEGER,
     body_hash TEXT
 ) STRICT;
+CREATE TABLE IF NOT EXISTS representations (
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    url_key TEXT NOT NULL,
+    representation_id TEXT NOT NULL,
+    source TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    body_hash TEXT NOT NULL,
+    byte_size INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    parser_backend TEXT,
+    error TEXT,
+    body BLOB,
+    PRIMARY KEY(run_id, url_key, source, representation_id)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS run_facts (
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    family TEXT NOT NULL,
+    schema_version TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    PRIMARY KEY(run_id, family, scope, subject)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS urls (
     id INTEGER PRIMARY KEY,
     url_key TEXT NOT NULL UNIQUE,
@@ -1831,6 +2042,8 @@ CREATE INDEX IF NOT EXISTS idx_pages_run_status ON pages(run_id, status_code);
 CREATE INDEX IF NOT EXISTS idx_pages_run_url ON pages(run_id, url_key);
 CREATE INDEX IF NOT EXISTS idx_pages_run_status_url ON pages(run_id, status_code, url_key);
 CREATE INDEX IF NOT EXISTS idx_fetches_run ON fetches(run_id);
+CREATE INDEX IF NOT EXISTS idx_representations_run_url ON representations(run_id, url_key);
+CREATE INDEX IF NOT EXISTS idx_run_facts_run_family ON run_facts(run_id, family);
 CREATE INDEX IF NOT EXISTS idx_findings_run_item ON findings(run_id, item_id);
 CREATE INDEX IF NOT EXISTS idx_run_urls_run_url_state ON run_urls(run_id, url_key, state);
 """
@@ -1993,4 +2206,36 @@ CREATE TABLE IF NOT EXISTS schedule_executions (
     error TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_schedule_executions_history ON schedule_executions(schedule_id, started_at DESC);
+"""
+
+_MIGRATION_10 = """
+CREATE TABLE IF NOT EXISTS representations (
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    url_key TEXT NOT NULL,
+    representation_id TEXT NOT NULL,
+    source TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    body_hash TEXT NOT NULL,
+    byte_size INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    parser_backend TEXT,
+    error TEXT,
+    body BLOB,
+    PRIMARY KEY(run_id, url_key, source, representation_id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_representations_run_url ON representations(run_id, url_key);
+"""
+
+_MIGRATION_11 = """
+CREATE TABLE IF NOT EXISTS run_facts (
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    family TEXT NOT NULL,
+    schema_version TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    PRIMARY KEY(run_id, family, scope, subject)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_run_facts_run_family ON run_facts(run_id, family);
 """

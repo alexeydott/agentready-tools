@@ -33,6 +33,6 @@ def test_projects_round_trip_through_sqlite_and_forward_migration(tmp_path):
     try:
         assert reopened.get_project("p1").default_ruleset == "rules.yml"
         assert list(reopened.iter_project_runs("p1"))[0].parent_run_id == "parent"
-        assert reopened._connection.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert reopened._connection.execute("PRAGMA user_version").fetchone()[0] == 11
     finally:
         reopened.close()

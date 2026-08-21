@@ -553,3 +553,67 @@ def test_crawler_projects_page_facts_and_redirects_with_memory_sqlite_parity(tmp
         assert memory_page == replace(sqlite_page, run_id="run-memory")
     finally:
         sqlite.close()
+
+
+def test_crawler_persists_transport_facts_for_replay_without_fake_dns_tls(tmp_path) -> None:
+    class FakeFetcher:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, request, *, use_cache=True):
+            from agentready.fetcher import FetchError, FetchErrorKind, FetchResult
+
+            if request.url.endswith("/fail"):
+                raise FetchError("mock protocol failure", kind=FetchErrorKind.PROTOCOL)
+            return FetchResult(
+                url=request.url,
+                status_code=200,
+                headers={"content-type": "text/html"},
+                body=b"<title>OK</title>",
+                redirects=(),
+                elapsed_ms=7,
+            )
+
+    async def run(store) -> None:
+        context = AuditRunContext.create(
+            "https://example.test/",
+            {"max_pages": 2},
+            tool_version="test",
+            rule_catalog_version="rules-1",
+            run_id="run-transport-replay",
+        )
+        await AsyncCrawler(
+            CrawlScope(
+                ("https://example.test/ok", "https://example.test/fail"),
+                allowed_origins=("https://example.test",),
+                follow_links=False,
+            ),
+            config=CrawlConfig(max_pages=2, min_request_interval_ms=0),
+            policy=EgressPolicy(allowed_origins=frozenset({"https://example.test"})),
+            fetcher_factory=FakeFetcher,
+            store=store,
+            run_context=context,
+        ).crawl()
+
+    from agentready.audit_core.collection import replay_collected_pages
+    from agentready.audit_core.store import ContentRetention, SQLiteSiteStore
+
+    store = SQLiteSiteStore(tmp_path / "transport-replay.sqlite", retention=ContentRetention.FULL_CONTENT)
+    try:
+        asyncio.run(run(store))
+        fetches = {item.request_url: item for item in store.iter_fetches("run-transport-replay")}
+        assert fetches["https://example.test/ok"].status_code == 200
+        assert fetches["https://example.test/fail"].error_kind == "protocol"
+        assert fetches["https://example.test/fail"].error_kind not in {"dns", "tls"}
+
+        replayed = {page.requested_url: page for page in replay_collected_pages(store, "run-transport-replay")}
+        assert replayed["https://example.test/ok"].status_code == 200
+        assert replayed["https://example.test/fail"].fetch_error_kind == "protocol"
+    finally:
+        store.close()

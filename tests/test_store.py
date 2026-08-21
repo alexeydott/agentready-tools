@@ -13,6 +13,8 @@ from agentready.audit_core.store import (
     PageRecord,
     PageStorageQuery,
     RedirectFact,
+    RepresentationRecord,
+    RunFactRecord,
     RunRecord,
     RunUrlRecord,
     RunUrlState,
@@ -29,6 +31,20 @@ def _populate(store: MemorySiteStore | SQLiteSiteStore) -> None:
     store.put_page(PageRecord("run-1", "https://example.com/a", "https://example.com/a", status_code=200, content="secret body"))
     store.put_page(PageRecord("run-1", "https://example.com/b", "https://example.com/b", status_code=404, content="not found"))
     store.put_fetch(FetchFact("fetch-1", "run-1", "https://example.com/a", status_code=200))
+    store.put_representation(
+        RepresentationRecord(
+            "run-1",
+            "https://example.com/a",
+            "static-html:abc",
+            "static-html",
+            "text/html",
+            "abc",
+            11,
+            "2026-01-01T00:00:00+00:00",
+            "stdlib-htmlparser",
+            body=b"secret body",
+        )
+    )
     store.put_url(UrlIdentity.parse("https://example.com/a"))
     store.put_resource("run-1", "https://example.com/a", "https://cdn.example.com/app.js", "script", status_code=200)
     store.put_evidence("run-1", "evidence-1", {"Authorization": "secret", "status": "pass"})
@@ -50,6 +66,7 @@ def test_memory_store_is_idempotent_and_metadata_only_by_default():
     ]
     assert store.recover_interrupted_runs() == 1
     assert store.resume_run("run-1").state == "running"
+    assert next(store.iter_representations("run-1")).body is None
 
 
 @pytest.mark.parametrize("store_kind", ["memory", "sqlite"])
@@ -112,6 +129,76 @@ def test_storage_queries_are_bounded_and_cursor_bound(tmp_path: Path, store_kind
             PageStorageQuery("run-1", sort_key="status")
         with pytest.raises(ValueError):
             FindingStorageQuery("run-1", descending=True)
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("store_kind", ["memory", "sqlite"])
+def test_fetch_and_representation_records_round_trip_with_retention(tmp_path: Path, store_kind: str):
+    store = (
+        MemorySiteStore(retention=ContentRetention.FULL_CONTENT)
+        if store_kind == "memory"
+        else SQLiteSiteStore(tmp_path / "representations.sqlite", retention=ContentRetention.FULL_CONTENT)
+    )
+    try:
+        store.begin_run(RunRecord("run-representations", "config", "tool", "rules"))
+        store.put_fetch(
+            FetchFact(
+                "fetch-ok",
+                "run-representations",
+                "https://example.test/",
+                final_url="https://example.test/final",
+                status_code=200,
+                total_ms=12,
+                decoded_bytes=32,
+                body_hash="hash",
+            )
+        )
+        store.put_representation(
+            RepresentationRecord(
+                "run-representations",
+                "https://example.test/",
+                "static-html:hash",
+                "static-html",
+                "text/html",
+                "hash",
+                32,
+                "2026-01-01T00:00:00+00:00",
+                "stdlib-htmlparser",
+                body=b"<title>Stored</title>",
+            )
+        )
+
+        assert next(store.iter_fetches("run-representations")).final_url == "https://example.test/final"
+        restored = next(store.iter_representations("run-representations", "https://example.test/"))
+        assert restored.source == "static-html"
+        assert restored.body == b"<title>Stored</title>"
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("store_kind", ["memory", "sqlite"])
+def test_run_facts_round_trip_as_versioned_run_scope_records(tmp_path: Path, store_kind: str):
+    store = MemorySiteStore() if store_kind == "memory" else SQLiteSiteStore(tmp_path / "run-facts.sqlite")
+    try:
+        store.begin_run(RunRecord("run-facts", "config", "tool", "rules"))
+        store.put_run_fact(
+            RunFactRecord(
+                "run-facts",
+                "robots.fetch",
+                "1",
+                "origin",
+                "https://example.test",
+                {"state": "available", "Authorization": "secret"},
+                "2026-01-01T00:00:00+00:00",
+            )
+        )
+
+        facts = tuple(store.iter_run_facts("run-facts", "robots.fetch"))
+        assert len(facts) == 1
+        assert facts[0].schema_version == "1"
+        assert facts[0].payload["state"] == "available"
+        assert facts[0].payload["Authorization"] == "[REDACTED]"
     finally:
         store.close()
 
@@ -330,7 +417,7 @@ def test_sqlite_migration_is_idempotent_and_recovery_is_durable(tmp_path: Path):
     second = SQLiteSiteStore(path)
     try:
         assert second.recover_interrupted_runs() == 0
-        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 11
         assert second._connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 1
         assert second.resume_run("run-recovery").state == "running"
     finally:
@@ -357,7 +444,7 @@ def test_sqlite_v8_run_identity_migration_is_durable(tmp_path: Path):
         assert restored.rule_catalog_digest_kind == "synthetic"
         assert restored.score_model_id == "readiness-transparent-v2"
         assert restored.fact_schema_versions == ()
-        assert reopened._connection.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert reopened._connection.execute("PRAGMA user_version").fetchone()[0] == 11
     finally:
         reopened.close()
 
