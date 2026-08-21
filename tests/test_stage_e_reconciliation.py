@@ -75,15 +75,19 @@ def test_no_stage_e_reference_is_silently_treated_as_a_match():
 
 def test_binding_gate_cannot_be_bypassed_by_setting_binding_allowed_true():
     matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
-    matrix["binding_allowed"] = True
     assert stage_e_binding_is_blocked(matrix)
-    assert not stage_e_binding_is_blocked(matrix, issue=22, rule_id="CORE-COVERAGE-001")
+    assert stage_e_binding_is_blocked(
+        matrix, issue=22, rule_id="CORE-COVERAGE-001"
+    )
 
 
 def test_binding_gate_is_target_scoped_but_rejects_unresolved_target():
     matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
-    matrix["binding_allowed"] = True
 
+    assert stage_e_binding_is_blocked(
+        matrix, issue=22, rule_id="CORE-COVERAGE-001"
+    )
+    matrix["binding_allowed"] = True
     assert not stage_e_binding_is_blocked(
         matrix, issue=22, rule_id="CORE-COVERAGE-001"
     )

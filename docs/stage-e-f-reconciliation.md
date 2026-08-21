@@ -45,7 +45,7 @@ actual catalog digest rather than a copied expectation.
 | Links (#27) | IDs exist, but score/failure/fact semantics differ; amend the plan. |
 | Hreflang (#28) | IDs exist, but planned numbering/meaning differs from catalog titles and facts; amend the plan. |
 | Intent (#30) | No inferred `intent.indexability` fact is created; missing IDs remain blocked. |
-| Description/title (#31–#33) | Existing IDs require catalog-defined roles/facts; title remains gated by `content.main`. |
+| Description/title (#31–#33) | Existing IDs require catalog-defined roles/facts; `GOOGLE-TITLE-001` uses the catalog's `page@1` requirement without an undeclared `content.main` prerequisite. |
 
 ## Binding gate
 

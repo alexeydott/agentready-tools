@@ -307,6 +307,6 @@ def stage_e_binding_is_blocked(
         for item in dispositions
     ):
         return True
-    if issue is not None or rule_id is not None:
-        return False
-    return matrix.get("binding_allowed") is not True
+    if matrix.get("binding_allowed") is not True:
+        return True
+    return False
