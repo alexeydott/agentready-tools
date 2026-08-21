@@ -38,6 +38,11 @@ class ScoreParticipation(StrEnum):
     EXCLUDED = "excluded"
 
 
+class FailurePolicy(StrEnum):
+    STRICT = "strict"
+    PARTIAL_DECISION_ALLOWED = "partial_decision_allowed"
+
+
 class Status(StrEnum):
     PASS = "pass"
     FAIL = "fail"
@@ -78,6 +83,9 @@ class RuleSpec:
     requirement: RequirementLevel
     version: RuleVersion
     score_participation: ScoreParticipation = ScoreParticipation.INCLUDED
+    score_model_id: str = "readiness-transparent-v2"
+    score_policy_version: str = "1.0.0"
+    failure_policy: FailurePolicy = FailurePolicy.STRICT
 
     def __post_init__(self) -> None:
         logger.debug("[WP1.1] validating RuleSpec id=%s authority=%s", self.id, self.authority.value)
@@ -85,6 +93,10 @@ class RuleSpec:
             raise ValueError("rule id must not be empty")
         if not self.title.strip():
             raise ValueError("rule title must not be empty")
+        if not self.score_model_id.strip():
+            raise ValueError("score model id must not be empty")
+        if not self.score_policy_version.strip():
+            raise ValueError("score policy version must not be empty")
         if self.authority == AuthorityLevel.HEURISTIC and self.score_participation == ScoreParticipation.INCLUDED:
             raise ValueError("heuristic rules must be excluded from the mandatory score")
         logger.debug("[WP1.1] RuleSpec validated id=%s version=%s", self.id, self.version.version)
@@ -94,4 +106,5 @@ class RuleSpec:
         value["authority"] = self.authority.value
         value["requirement"] = self.requirement.value
         value["score_participation"] = self.score_participation.value
+        value["failure_policy"] = self.failure_policy.value
         return value

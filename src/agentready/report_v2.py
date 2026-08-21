@@ -564,6 +564,9 @@ def _comparison_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) 
         if field_name in current or field_name in baseline:
             if current.get(field_name) != baseline.get(field_name):
                 return message
+    finding_reason = _finding_rule_version_reason(current, baseline)
+    if finding_reason is not None:
+        return finding_reason
     current_coverage = current.get("coverage", {})
     baseline_coverage = baseline.get("coverage", {})
     if isinstance(current_coverage, Mapping) and isinstance(baseline_coverage, Mapping):
@@ -572,6 +575,24 @@ def _comparison_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) 
             after = current_coverage.get(field_name)
             if isinstance(before, int) and isinstance(after, int) and after < before:
                 return f"coverage decreased for {field_name}"
+    return None
+
+
+def _finding_rule_version_reason(current: Mapping[str, Any], baseline: Mapping[str, Any]) -> str | None:
+    def versions(report: Mapping[str, Any]) -> dict[str, str | None]:
+        return {
+            str(item["id"]): item.get("rule_version") if isinstance(item.get("rule_version"), str) else None
+            for item in report.get("findings", ())
+            if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+        }
+
+    current_versions = versions(current)
+    baseline_versions = versions(baseline)
+    for finding_id in sorted(set(current_versions) & set(baseline_versions)):
+        if current_versions[finding_id] is None or baseline_versions[finding_id] is None:
+            return f"missing finding rule version for {finding_id}"
+        if current_versions[finding_id] != baseline_versions[finding_id]:
+            return f"finding rule versions differ for {finding_id}"
     return None
 
 
@@ -590,6 +611,16 @@ def _diff_rule_versions(current: Mapping[str, Any], baseline: Mapping[str, Any])
     keys = ("rule_version", "rule_catalog_version", "ruleset", "rules_version")
     before = {key: baseline.get(key) for key in keys if key in baseline}
     after = {key: current.get(key) for key in keys if key in current}
+    before["findings"] = {
+        item["id"]: item.get("rule_version")
+        for item in baseline.get("findings", ())
+        if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+    }
+    after["findings"] = {
+        item["id"]: item.get("rule_version")
+        for item in current.get("findings", ())
+        if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+    }
     return {"changed": before != after, "before": before, "after": after}
 
 

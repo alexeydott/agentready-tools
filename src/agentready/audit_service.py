@@ -544,7 +544,16 @@ class AuditService:
             for page in custom_rule_results
             for item in page["matches"]
         )
-        report = self._report(target, crawl, run_id=context.run_id, check_report=check_report, custom_findings=custom_findings)
+        report = self._report(
+            target,
+            crawl,
+            run_id=context.run_id,
+            check_report=check_report,
+            custom_findings=custom_findings,
+            score_model_id=context.score_model_id,
+            rule_catalog_version=context.rule_catalog_version,
+            rule_catalog_digest=context.rule_catalog_digest,
+        )
         state = (
             RunState.PARTIAL
             if crawl.coverage.classification.value != "complete_within_scope"
@@ -663,7 +672,14 @@ class AuditService:
             finished_at=utc_now_iso(),
             language=request.language,
         )
-        report = self._report(target, crawl, run_id=context.run_id)
+        report = self._report(
+            target,
+            crawl,
+            run_id=context.run_id,
+            score_model_id=context.score_model_id,
+            rule_catalog_version=context.rule_catalog_version,
+            rule_catalog_digest=context.rule_catalog_digest,
+        )
         state = (
             RunState.PARTIAL
             if crawl.coverage.classification.value != "complete_within_scope"
@@ -715,6 +731,7 @@ class AuditService:
             configuration,
             tool_version=__version__,
             rule_catalog_version="seo-v2-atomic",
+            score_model_id="seo-binary-v1",
             run_id=None,
             ruleset_version=ruleset_document.version if ruleset_document else None,
             ruleset_hash=ruleset_document.rule_hash if ruleset_document else None,
@@ -920,7 +937,14 @@ class AuditService:
                 "checks": len(checks),
             },
         )
-        report = self._report(target, crawl, run_id=context.run_id)
+        report = self._report(
+            target,
+            crawl,
+            run_id=context.run_id,
+            score_model_id=context.score_model_id,
+            rule_catalog_version=context.rule_catalog_version,
+            rule_catalog_digest=context.rule_catalog_digest,
+        )
         state = RunState.PARTIAL if crawl.coverage.classification.value != "complete_within_scope" else RunState.COMPLETED
         run = crawl.run or RunSnapshot(context, state, None, "crawl-partial" if state is RunState.PARTIAL else None)
         lineage_id = request.parent_run_id or context.run_id
@@ -953,6 +977,9 @@ class AuditService:
         run_id: str | None = None,
         check_report: AuditReport | None = None,
         custom_findings: tuple[Finding, ...] = (),
+        score_model_id: str = "readiness-transparent-v2",
+        rule_catalog_version: str = "v2",
+        rule_catalog_digest: str | None = None,
     ) -> AuditReport:
         coverage = Coverage(
             total_rules=1,
@@ -996,7 +1023,16 @@ class AuditService:
                 classification=crawl.coverage.classification.value,
             )
         evidence = check_report.evidence if check_report else ()
-        report = AuditReport(target, findings, coverage, evidence=evidence, run_id=run_id)
+        report = AuditReport(
+            target,
+            findings,
+            coverage,
+            evidence=evidence,
+            run_id=run_id,
+            score_model_id=score_model_id,
+            rule_catalog_version=rule_catalog_version,
+            rule_catalog_digest=rule_catalog_digest or hashlib.sha256(rule_catalog_version.encode("utf-8")).hexdigest(),
+        )
         logger.info("[FIX:v2-report] target=%s findings=%d score=%d", target, len(report.findings), report.score)
         return report
 

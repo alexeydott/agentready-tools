@@ -21,7 +21,7 @@ from agentready.security import SecretRedactor
 from .urls import UrlIdentity
 
 logger = logging.getLogger(__name__)
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 EVIDENCE_CLAIM_STALE_SECONDS = 3600.0
 
 
@@ -187,6 +187,9 @@ class RunRecord:
     config_hash: str
     tool_version: str
     rule_catalog_version: str
+    rule_catalog_digest: str = ""
+    score_model_id: str = "readiness-transparent-v2"
+    fact_schema_versions: tuple[tuple[str, str], ...] = ()
     state: str = "running"
     started_at: str = ""
     finished_at: str | None = None
@@ -194,6 +197,11 @@ class RunRecord:
     def __post_init__(self) -> None:
         if not self.id.strip():
             raise ValueError("run id must not be empty")
+        if not self.rule_catalog_digest:
+            object.__setattr__(self, "rule_catalog_digest", hashlib.sha256(self.rule_catalog_version.encode("utf-8")).hexdigest())
+        if not self.score_model_id.strip():
+            raise ValueError("score model id must not be empty")
+        object.__setattr__(self, "fact_schema_versions", tuple(sorted((str(key), str(value)) for key, value in self.fact_schema_versions)))
         if not self.started_at:
             object.__setattr__(self, "started_at", _now())
 
@@ -383,6 +391,7 @@ class MetricRecord:
 
 class SiteStore(Protocol):
     def begin_run(self, run: RunRecord) -> RunRecord: ...
+    def get_run(self, run_id: str) -> RunRecord: ...
     def put_project(self, project: ProjectRecord) -> ProjectRecord: ...
     def get_project(self, project_id: str) -> ProjectRecord: ...
     def iter_projects(self) -> Iterator[ProjectRecord]: ...
@@ -420,6 +429,7 @@ class SiteStore(Protocol):
     def put_finding(self, run_id: str, finding_id: str, payload: Mapping[str, Any]) -> None: ...
     def put_coverage(self, run_id: str, payload: Mapping[str, Any]) -> None: ...
     def put_version_manifest(self, run_id: str, payload: Mapping[str, Any]) -> None: ...
+    def get_version_manifest(self, run_id: str) -> Mapping[str, Any] | None: ...
     def iter_pages(self, run_id: str) -> Iterator[PageRecord]: ...
     def iter_run_urls(self, run_id: str) -> Iterator[RunUrlRecord]: ...
     def query_pages(self, run_id: str, *, status_code: int | None = None) -> list[PageRecord]: ...
@@ -473,6 +483,12 @@ class MemorySiteStore:
         self._runs[run.id] = run
         logger.debug("[WP3.1] memory run created id=%s", run.id)
         return run
+
+    def get_run(self, run_id: str) -> RunRecord:
+        try:
+            return self._runs[run_id]
+        except KeyError as exc:
+            raise KeyError("run not found") from exc
 
     def put_project(self, project: ProjectRecord) -> ProjectRecord:
         self._projects[project.project_id] = project
@@ -664,6 +680,10 @@ class MemorySiteStore:
     def put_version_manifest(self, run_id: str, payload: Mapping[str, Any]) -> None:
         self._evidence.setdefault((run_id, "version-manifest"), self._redactor.value(dict(payload)))
 
+    def get_version_manifest(self, run_id: str) -> Mapping[str, Any] | None:
+        payload = self._evidence.get((run_id, "version-manifest"))
+        return dict(payload) if payload is not None else None
+
     def iter_pages(self, run_id: str) -> Iterator[PageRecord]:
         yield from sorted(
             (page for (page_run, _), page in self._pages.items() if page_run == run_id),
@@ -849,8 +869,27 @@ class SQLiteSiteStore:
                 self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             self._connection.executescript(_MIGRATION_7)
             self._connection.executescript(_MIGRATION_8)
+            self._migrate_run_identity_columns()
             self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             self._connection.execute("PRAGMA optimize")
+
+    def _migrate_run_identity_columns(self) -> None:
+        columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(runs)")}
+        if "rule_catalog_digest" not in columns:
+            self._connection.execute("ALTER TABLE runs ADD COLUMN rule_catalog_digest TEXT NOT NULL DEFAULT ''")
+        if "score_model_id" not in columns:
+            self._connection.execute("ALTER TABLE runs ADD COLUMN score_model_id TEXT NOT NULL DEFAULT 'readiness-transparent-v2'")
+        if "fact_schema_versions" not in columns:
+            self._connection.execute("ALTER TABLE runs ADD COLUMN fact_schema_versions TEXT NOT NULL DEFAULT '{}'")
+        rows = self._connection.execute(
+            "SELECT id, rule_catalog_version FROM runs WHERE rule_catalog_digest=''"
+        ).fetchall()
+        for row in rows:
+            digest = hashlib.sha256(row["rule_catalog_version"].encode("utf-8")).hexdigest()
+            self._connection.execute(
+                "UPDATE runs SET rule_catalog_digest=? WHERE id=?",
+                (digest, row["id"]),
+            )
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
@@ -975,10 +1014,26 @@ class SQLiteSiteStore:
         self._write_guard()
         with self._transaction():
             self._connection.execute(
-                "INSERT OR IGNORE INTO runs(id, started_at, config_hash, tool_version, rule_catalog_version, state) VALUES (?, ?, ?, ?, ?, ?)",
-                (run.id, run.started_at, run.config_hash, run.tool_version, run.rule_catalog_version, run.state),
+                "INSERT OR IGNORE INTO runs(id, started_at, config_hash, tool_version, rule_catalog_version, rule_catalog_digest, score_model_id, fact_schema_versions, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    run.id,
+                    run.started_at,
+                    run.config_hash,
+                    run.tool_version,
+                    run.rule_catalog_version,
+                    run.rule_catalog_digest,
+                    run.score_model_id,
+                    json.dumps(dict(run.fact_schema_versions), sort_keys=True, separators=(",", ":")),
+                    run.state,
+                ),
             )
             row = self._connection.execute("SELECT * FROM runs WHERE id=?", (run.id,)).fetchone()
+        return _run_from_row(row)
+
+    def get_run(self, run_id: str) -> RunRecord:
+        row = self._connection.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
+        if row is None:
+            raise KeyError("run not found")
         return _run_from_row(row)
 
     def update_run_state(self, run_id: str, state: str, *, finished_at: str | None = None) -> None:
@@ -1161,6 +1216,13 @@ class SQLiteSiteStore:
 
     def put_version_manifest(self, run_id: str, payload: Mapping[str, Any]) -> None:
         self._put_json("version_manifests", run_id, "manifest", payload)
+
+    def get_version_manifest(self, run_id: str) -> Mapping[str, Any] | None:
+        row = self._connection.execute(
+            "SELECT payload FROM version_manifests WHERE run_id=? AND item_id='manifest'",
+            (run_id,),
+        ).fetchone()
+        return json.loads(row["payload"]) if row is not None else None
 
     def _put_json(self, table: str, run_id: str, item_id: str, payload: Mapping[str, Any]) -> None:
         self._write_guard()
@@ -1510,7 +1572,11 @@ def _retained_content(content: str | None, retention: ContentRetention) -> str |
 def _run_from_row(row: sqlite3.Row) -> RunRecord:
     return RunRecord(
         id=row["id"], config_hash=row["config_hash"], tool_version=row["tool_version"],
-        rule_catalog_version=row["rule_catalog_version"], state=row["state"],
+        rule_catalog_version=row["rule_catalog_version"],
+        rule_catalog_digest=row["rule_catalog_digest"],
+        score_model_id=row["score_model_id"],
+        fact_schema_versions=tuple(sorted(json.loads(row["fact_schema_versions"]).items())),
+        state=row["state"],
         started_at=row["started_at"], finished_at=row["finished_at"],
     )
 
@@ -1580,6 +1646,9 @@ CREATE TABLE IF NOT EXISTS runs (
     config_hash TEXT NOT NULL,
     tool_version TEXT NOT NULL,
     rule_catalog_version TEXT NOT NULL,
+    rule_catalog_digest TEXT NOT NULL,
+    score_model_id TEXT NOT NULL,
+    fact_schema_versions TEXT NOT NULL,
     state TEXT NOT NULL
 ) STRICT;
 CREATE TABLE IF NOT EXISTS fetches (

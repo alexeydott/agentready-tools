@@ -33,6 +33,7 @@ class AuditRunContext:
     rule_catalog_version: str
     created_at: str
     rule_catalog_digest: str = ""
+    score_model_id: str = "readiness-transparent-v2"
     ruleset_version: str | None = None
     ruleset_hash: str | None = None
 
@@ -43,6 +44,8 @@ class AuditRunContext:
                 "rule_catalog_digest",
                 hashlib.sha256(self.rule_catalog_version.encode("utf-8")).hexdigest(),
             )
+        if not self.score_model_id.strip():
+            raise ValueError("score model id must not be empty")
 
     @classmethod
     def create(
@@ -53,6 +56,7 @@ class AuditRunContext:
         tool_version: str,
         rule_catalog_version: str,
         rule_catalog_digest: str | None = None,
+        score_model_id: str = "readiness-transparent-v2",
         run_id: str | None = None,
         ruleset_version: str | None = None,
         ruleset_hash: str | None = None,
@@ -66,6 +70,7 @@ class AuditRunContext:
             tool_version=tool_version,
             rule_catalog_version=rule_catalog_version,
             rule_catalog_digest=rule_catalog_digest or hashlib.sha256(rule_catalog_version.encode("utf-8")).hexdigest(),
+            score_model_id=score_model_id,
             created_at=datetime.now(UTC).isoformat(),
             ruleset_version=ruleset_version,
             ruleset_hash=ruleset_hash,

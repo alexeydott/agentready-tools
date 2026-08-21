@@ -234,6 +234,16 @@ def test_semantic_diff_ignores_localized_text_and_input_order_but_rejects_incomp
     assert result.reason == "targets differ"
 
 
+def test_semantic_diff_rejects_same_finding_with_different_rule_version():
+    current = AuditReport("https://example.com", (Finding("a", "A", FindingStatus.PASS, "ok", rule_version="2"),), Coverage(1, 1, 1, 1)).to_dict()
+    baseline = AuditReport("https://example.com", (Finding("a", "A", FindingStatus.PASS, "ok", rule_version="1"),), Coverage(1, 1, 1, 1)).to_dict()
+
+    result = semantic_diff(current, baseline)
+
+    assert not result.comparable
+    assert result.reason == "finding rule versions differ for a"
+
+
 def test_job_manager_completes_work():
     manager = AuditJobManager(max_jobs=1)
     job_id = manager.submit(lambda: {"ok": True})

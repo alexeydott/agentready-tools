@@ -122,6 +122,16 @@ def test_audit_service_applies_ruleset_to_saved_facts_without_extra_fetches():
     assert any(item.id.startswith("custom-rule:marker:") and item.status.value == "fail" for item in result.report.findings)
     assert any(item.id.startswith("custom-rule:css:") and item.status.value == "fail" for item in result.report.findings)
     assert list(store.iter_findings(result.run.context.run_id))
+    persisted = store.get_run(result.run.context.run_id)
+    assert persisted.rule_catalog_digest == result.run.context.rule_catalog_digest == result.report.rule_catalog_digest
+    assert persisted.score_model_id == result.run.context.score_model_id == result.report.score_model_id
+    assert dict(persisted.fact_schema_versions)
+    assert store.get_version_manifest(result.run.context.run_id) == {
+        "rule_catalog_version": persisted.rule_catalog_version,
+        "rule_catalog_digest": persisted.rule_catalog_digest,
+        "score_model_id": persisted.score_model_id,
+        "fact_schema_versions": dict(persisted.fact_schema_versions),
+    }
 
 
 def test_audit_service_ignores_non_http_links_without_aborting_crawl():
