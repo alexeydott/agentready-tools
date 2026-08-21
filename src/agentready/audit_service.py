@@ -12,6 +12,11 @@ from typing import Any
 
 from . import __version__
 from .audit_core import AuditRunContext, CollectedPage, FactView, RunSnapshot, RunState
+from .audit_core.run_facts import (
+    persist_robots_observation_run_facts,
+    persist_robots_run_facts,
+    persist_sitemap_run_facts,
+)
 from .audit_core.fact_schema import DEFAULT_FACT_SCHEMA_VERSIONS
 from .crawl_profiles import HARD_CAPS, resolve_profile, resolve_request_profile
 from .custom_rules import CustomRuleDocument, apply_rules, compile_rules, css_matches_from_html
@@ -387,9 +392,12 @@ class AuditService:
     def _persist_run_identity(store: Any | None, context: AuditRunContext, fact_views: tuple[FactView, ...]) -> None:
         if store is None:
             return
+        observed = dict(AuditService._observed_fact_schema_versions(fact_views))
+        for fact in store.iter_run_facts(context.run_id):
+            observed[fact.family] = fact.schema_version
         run_record = store.update_run_identity(
             context.run_id,
-            fact_schema_versions=AuditService._observed_fact_schema_versions(fact_views),
+            fact_schema_versions=tuple(sorted(observed.items())),
         )
         store.put_version_manifest(
             context.run_id,
@@ -489,11 +497,25 @@ class AuditService:
         if request.discovery_kind == "robots-sitemap":
             source = RobotsSitemapSource(target, tuple(request.discovery_sitemap_urls))
 
-            async def discover_robots() -> tuple[str, ...]:
+            async def discover_robots():
                 async with Fetcher(policy=policy, timeout=request.timeout, transport=request.transport) as fetcher:
-                    return await source.discover_from_fetcher(fetcher, limit=request.discovery_limit)
+                    return await source.collect_from_fetcher(fetcher, limit=request.discovery_limit)
 
-            seeds = tuple(dict.fromkeys(self._validate_selected_urls(target, asyncio.run(discover_robots()))))
+            robots_sitemap_discovery = asyncio.run(discover_robots())
+            seeds = tuple(dict.fromkeys(self._validate_selected_urls(target, robots_sitemap_discovery.urls)))
+            if request.store is not None:
+                persist_robots_observation_run_facts(
+                    request.store,
+                    context.run_id,
+                    origin=origin,
+                    observation=robots_sitemap_discovery.robots,
+                )
+                persist_sitemap_run_facts(
+                    request.store,
+                    context.run_id,
+                    origin=origin,
+                    documents=robots_sitemap_discovery.sitemap_documents,
+                )
         logger.info(
             "discovery plan run_id=%s kind=%s plan_hash=%s count=%d limit=%d",
             context.run_id,
@@ -589,13 +611,33 @@ class AuditService:
                 )
                 check_report = report_from_checks(target, self._apply_check_limit(list(rule_engine_report.checks), request.limits))
                 cached_robots = rule_client.cached(f"{origin}/robots.txt")
-                if cached_robots is not None and cached_robots.status_code == 200:
-                    robots_text = cached_robots.text
+                if cached_robots is not None:
+                    robots_text = cached_robots.text if cached_robots.status_code == 200 else None
                     logger.info(
                         "[FIX:robots-session] captured discovered robots policy run_id=%s bytes=%d",
                         context.run_id,
-                        len(robots_text),
+                        len(robots_text or ""),
                     )
+                    if request.store is not None:
+                        persist_robots_run_facts(
+                            request.store,
+                            context.run_id,
+                            origin=origin,
+                            robots_text=robots_text,
+                            status_code=cached_robots.status_code,
+                            source_url=f"{origin}/robots.txt",
+                        )
+                        self._persist_run_identity(request.store, context, fact_views)
+            if request.discovery_kind == "sitemap" and request.store is not None:
+                persist_sitemap_run_facts(
+                    request.store,
+                    context.run_id,
+                    origin=origin,
+                    documents=(request.discovery_sitemap_xml,),
+                    source_urls=(target,),
+                    source_kind="supplied",
+                )
+                self._persist_run_identity(request.store, context, fact_views)
         finally:
             if rule_client is not None:
                 rule_client.close()

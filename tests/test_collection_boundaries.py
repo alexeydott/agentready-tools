@@ -11,7 +11,9 @@ from typing import Self
 import pytest
 import httpx
 
-from agentready.audit_core.collection import CollectedPage, FactView
+from agentready.audit_core.collection import CollectedPage, FactView, replay_collected_pages
+from agentready.audit_core.run_context import AuditRunContext
+from agentready.audit_core.store import ContentRetention, SQLiteSiteStore
 from agentready.browser_pool import (
     BrowserPool,
     BrowserPoolConfig,
@@ -187,7 +189,7 @@ class _FakePage:
     url = "https://example.test/"
 
     async def content(self) -> str:
-        return "<title>Rendered</title>"
+        return "<title>Rendered</title><a href='/rendered'>Rendered link</a>"
 
 
 class _FakeBrowserPool:
@@ -307,3 +309,58 @@ def test_pair_rendered_preserves_static_and_rendered_representations() -> None:
     assert page.rendered.parsed.facts.titles == ("Rendered",)
     assert page.parsed.representation is not page.rendered.parsed.representation
     assert pool.closed
+
+
+@pytest.mark.parametrize(
+    "retention",
+    [ContentRetention.METADATA_ONLY, ContentRetention.SAMPLES, ContentRetention.FULL_CONTENT],
+)
+def test_pair_rendered_persists_replays_and_compares_representations(tmp_path: Path, retention: ContentRetention) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            content=b"<title>Static</title><a href='/static'>Static link</a>",
+        )
+
+    async def run() -> tuple[str, SQLiteSiteStore]:
+        store = SQLiteSiteStore(tmp_path / f"paired-replay-{retention.value}.sqlite", retention=retention)
+        context = AuditRunContext.create(
+            "https://example.test/",
+            {"max_pages": 1, "pair_rendered": True},
+            tool_version="test",
+            rule_catalog_version="rules",
+            run_id="run-paired-replay",
+        )
+        pool = _FakeBrowserPool()
+        await AsyncCrawler(
+            CrawlScope(("https://example.test/",), allowed_origins=("https://example.test",)),
+            config=CrawlConfig(max_pages=1, concurrency=1, min_request_interval_ms=0, max_duration=10),
+            policy=EgressPolicy(allowed_origins=frozenset({"https://example.test"})),
+            transport=httpx.MockTransport(handler),
+            store=store,
+            run_context=context,
+            pair_rendered=True,
+            browser_pool_factory=lambda _: pool,
+        ).crawl()
+        return context.run_id, store
+
+    run_id, store = asyncio.run(run())
+    try:
+        representations = tuple(store.iter_representations(run_id, "https://example.test/"))
+        assert {item.source for item in representations} == {"static-html", "rendered-dom"}
+        if retention is ContentRetention.METADATA_ONLY:
+            assert all(item.body is None for item in representations)
+        assert all(item.facts for item in representations)
+        occurrences = tuple(store.iter_link_occurrences(run_id))
+        assert {item.representation_id for item in occurrences} == {item.representation_id for item in representations}
+
+        replayed = replay_collected_pages(store, run_id)
+        view = FactView(replayed[0])
+        comparison = view.representation_comparison
+        assert comparison is not None
+        assert comparison.title_changed is True
+        assert comparison.added_links == ("https://example.test/rendered",)
+        assert comparison.removed_links == ("https://example.test/static",)
+    finally:
+        store.close()

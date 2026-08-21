@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
+import hashlib
 import heapq
 import logging
 import time
@@ -20,7 +21,9 @@ from .audit_core.run_context import (
 )
 from .audit_core.store import (
     PageRecord,
+    FetchFact,
     RedirectFact,
+    RepresentationRecord,
     RunRecord,
     RunUrlRecord,
     RunUrlState,
@@ -33,7 +36,7 @@ from .browser_pool import (
     BrowserPoolFactory,
     CapabilityUnavailableError,
 )
-from .audit_core.collection import RepresentationObservation
+from .audit_core.collection import RepresentationObservation, parsed_facts_to_dict
 from .egress import EgressPolicy
 from .egress import PassivePublicContext, TrustedLocalCredentialContext
 from .fetcher import (
@@ -432,6 +435,15 @@ class AsyncCrawler:
                                     )
                                 )
                         except FetchError as exc:
+                            if self.store is not None:
+                                self.store.put_fetch(
+                                    FetchFact(
+                                        f"{run_id}:{item.url}",
+                                        run_id,
+                                        item.url,
+                                        error_kind=exc.kind.value,
+                                    )
+                                )
                             failed += 1
                             frontier.set_state(item.url, CrawlItemState.FAILED)
                             record_url(item.url, RunUrlState.FAILED, item.depth, error_kind=exc.kind.value)
@@ -448,13 +460,26 @@ class AsyncCrawler:
                         deadline_hit = True
                     fetched += 1
                     if self.store is not None:
+                        self.store.put_fetch(
+                            FetchFact(
+                                f"{run_id}:{item.url}",
+                                run_id,
+                                item.url,
+                                final_url=response.url,
+                                status_code=response.status_code,
+                                total_ms=response.elapsed_ms,
+                                decoded_bytes=len(response.body),
+                                body_hash=hashlib.sha256(response.body).hexdigest(),
+                            )
+                        )
                         logger.debug(
                             "crawl redirect projection run_id=%s source=%s hops=%d",
                             run_id,
                             _safe_log_url(item.url),
                             len(response.redirect_records),
                         )
-                        for hop in response.redirect_records:
+                        fetch_id = f"{run_id}:{item.url}"
+                        for hop_index, hop in enumerate(response.redirect_records):
                             self.store.put_redirect(
                                 RedirectFact(
                                     run_id,
@@ -462,6 +487,11 @@ class AsyncCrawler:
                                     hop.to_url,
                                     hop.status_code,
                                     hop.location_raw,
+                                    request_url=item.url,
+                                    fetch_id=fetch_id,
+                                    hop_index=hop_index,
+                                    cross_origin=hop.cross_origin,
+                                    downgrade_https_to_http=hop.downgrade_https_to_http,
                                 )
                             )
                     parsed: ParsedPage | None = None
@@ -480,6 +510,22 @@ class AsyncCrawler:
                         )
                         parsed = parse_page(response.body, representation=representation)
                         parsed_html += 1
+                        if self.store is not None:
+                            self.store.put_representation(
+                                RepresentationRecord(
+                                    run_id,
+                                    item.url,
+                                    representation.representation_id,
+                                    representation.source,
+                                    representation.content_type,
+                                    representation.body_hash,
+                                    representation.byte_size,
+                                    representation.observed_at,
+                                    parsed.parser_backend,
+                                    body=response.body,
+                                    facts=parsed_facts_to_dict(parsed.facts) if parsed.facts is not None else None,
+                                )
+                            )
                         frontier.set_state(item.url, CrawlItemState.PARSED)
                         occurrences = parsed.facts.links if parsed.facts is not None else ()
                         for occurrence in occurrences:
@@ -545,6 +591,20 @@ class AsyncCrawler:
                         if self.pair_rendered and browser_pool is None
                         else None
                     )
+                    if self.store is not None and rendered_observation is not None and rendered_observation.error:
+                        self.store.put_representation(
+                            RepresentationRecord(
+                                run_id,
+                                item.url,
+                                f"rendered-dom:unavailable:{hashlib.sha256(item.url.encode('utf-8')).hexdigest()}",
+                                "rendered-dom",
+                                "text/html",
+                                hashlib.sha256(b"").hexdigest(),
+                                0,
+                                datetime.now(UTC).isoformat(),
+                                error=rendered_observation.error,
+                            )
+                        )
                     if self.pair_rendered and browser_pool is not None and response.status_code == 200:
                         try:
                             async with browser_pool.page() as rendered_page:
@@ -562,8 +622,82 @@ class AsyncCrawler:
                                     parse_page(rendered_body, representation=rendered_representation),
                                     rendered_body,
                                 )
+                                if self.store is not None and rendered_observation.parsed is not None:
+                                    self.store.put_representation(
+                                        RepresentationRecord(
+                                            run_id,
+                                            item.url,
+                                            rendered_representation.representation_id,
+                                            rendered_representation.source,
+                                            rendered_representation.content_type,
+                                            rendered_representation.body_hash,
+                                            rendered_representation.byte_size,
+                                            rendered_representation.observed_at,
+                                            rendered_observation.parsed.parser_backend,
+                                            body=rendered_body,
+                                            facts=(
+                                                parsed_facts_to_dict(rendered_observation.parsed.facts)
+                                                if rendered_observation.parsed.facts is not None
+                                                else None
+                                            ),
+                                        )
+                                    )
+                                    rendered_facts = rendered_observation.parsed.facts
+                                    if rendered_facts is not None:
+                                        for occurrence in rendered_facts.links:
+                                            try:
+                                                child = _normalize(urljoin(response.url, occurrence.raw_href))
+                                            except ValueError:
+                                                logger.warning(
+                                                    "rendered crawl link ignored because it is not an absolute HTTP(S) URL "
+                                                    "run_id=%s source=%s href=%r",
+                                                    run_id,
+                                                    _safe_log_url(item.url),
+                                                    occurrence.raw_href[:200],
+                                                )
+                                                continue
+                                            self.store.put_link(
+                                                run_id,
+                                                item.url,
+                                                occurrence.raw_href,
+                                                target_key=child,
+                                                resolved_url=child,
+                                                discovery_method="rendered-link",
+                                                ordinal=occurrence.ordinal,
+                                                representation_id=occurrence.source_representation_id,
+                                                rel=occurrence.rel,
+                                                element=occurrence.element,
+                                                dom_path=occurrence.dom_path,
+                                                anchor_text=occurrence.anchor_text,
+                                            )
+                                        for resource in rendered_facts.resources:
+                                            self.store.put_resource(
+                                                run_id,
+                                                item.url,
+                                                resource.url,
+                                                resource.resource_type,
+                                                ordinal=resource.ordinal,
+                                                resolved_url=_normalize_resource(urljoin(response.url, resource.url)),
+                                                representation_id=resource.source_representation_id,
+                                                element=resource.element,
+                                                dom_path=resource.dom_path,
+                                            )
                         except Exception as exc:
                             rendered_observation = RepresentationObservation("rendered-dom", None, error=str(exc))
+                            if self.store is not None:
+                                self.store.put_representation(
+                                    RepresentationRecord(
+                                        run_id,
+                                        item.url,
+                                        f"rendered-dom:unavailable:{hashlib.sha256(item.url.encode('utf-8')).hexdigest()}",
+                                        "rendered-dom",
+                                        "text/html",
+                                        hashlib.sha256(b"").hexdigest(),
+                                        0,
+                                        datetime.now(UTC).isoformat(),
+                                        error=str(exc),
+                                    )
+                                )
                     record_url(
                         item.url,
                         RunUrlState.PARSED if parsed is not None else RunUrlState.FETCHED,

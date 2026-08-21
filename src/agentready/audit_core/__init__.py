@@ -1,6 +1,14 @@
 """Versioned, transport-independent contracts for the vNext audit core."""
 
-from .collection import CollectedPage, FactView, RepresentationObservation
+from .collection import (
+    CollectedPage,
+    FactView,
+    RepresentationComparison,
+    RepresentationObservation,
+    compare_representations,
+    parsed_facts_to_dict,
+    replay_collected_pages,
+)
 from .fact_schema import (
     DEFAULT_FACT_SCHEMA_VERSIONS,
     FactCompatibility,
@@ -34,6 +42,13 @@ from .models import (
     Status,
 )
 from .run_context import AuditRunContext, RunCoordinator, RunSnapshot, RunState
+from .run_facts import (
+    persist_robots_observation_run_facts,
+    persist_robots_run_facts,
+    persist_sitemap_run_facts,
+    robots_policy_from_run_facts,
+    sitemap_reconciliation_from_run_facts,
+)
 from .store import (
     ContentRetention,
     FetchFact,
@@ -50,8 +65,10 @@ from .store import (
     ScheduleExecutionRecord,
     ScheduleRecord,
     RedirectFact,
+    RepresentationRecord,
     ResourceOccurrenceRecord,
     ResourceStorageQuery,
+    RunFactRecord,
     RunRecord,
     RunUrlRecord,
     RunUrlState,
@@ -81,6 +98,10 @@ __all__ = [
     "FactEnvelope",
     "FactView",
     "RepresentationObservation",
+    "RepresentationComparison",
+    "compare_representations",
+    "parsed_facts_to_dict",
+    "replay_collected_pages",
     "DEFAULT_FACT_SCHEMA_VERSIONS",
     "FactCompatibility",
     "FactSchemaRegistry",
@@ -106,9 +127,16 @@ __all__ = [
     "ScheduleExecutionRecord",
     "ScheduleRecord",
     "RedirectFact",
+    "RepresentationRecord",
     "RequirementLevel",
     "ResourceOccurrenceRecord",
     "ResourceStorageQuery",
+    "RunFactRecord",
+    "persist_robots_run_facts",
+    "persist_robots_observation_run_facts",
+    "persist_sitemap_run_facts",
+    "robots_policy_from_run_facts",
+    "sitemap_reconciliation_from_run_facts",
     "RuleSpec",
     "RuleVersion",
     "RunCoordinator",
