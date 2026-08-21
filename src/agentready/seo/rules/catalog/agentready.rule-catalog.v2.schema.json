@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentready.rule-catalog.v2",
+  "type": "object",
+  "required": ["schema", "catalog_version", "generated_at", "rule_count", "modules", "source_registry", "rules"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {"const": "agentready.rule-catalog.v2"},
+    "catalog_version": {"type": "string", "minLength": 1},
+    "generated_at": {"type": "string", "minLength": 1},
+    "rule_count": {"type": "integer", "minimum": 1},
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "count"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "count": {"type": "integer", "minimum": 0}
+        },
+        "additionalProperties": true
+      }
+    },
+    "source_registry": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["title", "url"],
+        "properties": {
+          "title": {"type": "string", "minLength": 1},
+          "url": {"type": "string", "pattern": "^https?://"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "rule_id",
+          "version",
+          "title",
+          "module",
+          "applicability",
+          "fact_requirements",
+          "source_ids",
+          "score_role",
+          "failure_policy",
+          "summary",
+          "mechanism",
+          "rule_kind",
+          "automation_mode",
+          "profiles",
+          "comparison_dimensions",
+          "verification_plan"
+        ],
+        "properties": {
+          "rule_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"},
+          "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+          "title": {"type": "string", "minLength": 1},
+          "module": {"type": "string", "minLength": 1},
+          "applicability": {
+            "type": "object",
+            "required": ["applies_to", "condition"],
+            "properties": {
+              "applies_to": {"type": "string", "minLength": 1},
+              "condition": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": true
+          },
+          "fact_requirements": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["family", "min_schema_version"],
+              "properties": {
+                "family": {"type": "string", "minLength": 1},
+                "min_schema_version": {"type": "string", "minLength": 1}
+              },
+              "additionalProperties": true
+            }
+          },
+          "source_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "score_role": {"type": "string", "enum": ["scored", "diagnostic", "observation_only"]},
+          "failure_policy": {"type": "string", "enum": ["block_on_missing_facts", "unknown_on_missing_facts"]},
+          "summary": {"type": "string", "minLength": 1},
+          "mechanism": {"type": "string", "enum": ["atomic_check", "composite_check"]},
+          "rule_kind": {"type": "string", "enum": ["scored_rule", "diagnostic_rule", "observation_rule"]},
+          "automation_mode": {"type": "string", "enum": ["automated", "manual", "hybrid"]},
+          "profiles": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "comparison_dimensions": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "verification_plan": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}

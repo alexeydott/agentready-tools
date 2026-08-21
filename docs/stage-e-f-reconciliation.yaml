@@ -1,0 +1,1300 @@
+schema: agentready.stage-e-reconciliation.v1
+authority: catalog-authoritative
+binding_allowed: false
+catalog:
+  schema: agentready.rule-catalog.v2
+  catalog_version: 2.1.0-draft.1
+  rule_catalog_digest: a1507f064f95248d6ee21a1a2123f3b09f4f138012f10d3dd310654a72b62f17
+issues:
+- 22
+- 23
+- 24
+- 25
+- 26
+- 27
+- 28
+- 29
+- 30
+- 31
+- 32
+- 33
+- 34
+issue_dispositions:
+- issue: 34
+  classification: PLAN_NO_LONGER_APPLICABLE
+  disposition: downstream golden-cutover work is not implementable until each dependent
+    issue has an exact catalog-authoritative contract
+rows:
+- issue: 22
+  planned_rule_id: CORE-COVERAGE-001
+  classification: SEMANTIC_MISMATCH
+  disposition: 'replan #22 against the catalog entry before binding; no evaluator
+    is enabled by #42'
+  planned_semantics: run-scoped guard-only coverage completeness over audit.coverage
+  catalog:
+    rule_id: CORE-COVERAGE-001
+    version: 1.0.0
+    title: Page is discoverable and returns a crawlable response
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: robots.policy
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-COVERAGE-001
+    version: 1.0.0
+    title: Page is discoverable and returns a crawlable response
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: robots.policy
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 23
+  planned_rule_id: CORE-ROBOTS-001
+  classification: MISSING_FROM_CATALOG
+  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
+    catalog IDs in a follow-up plan
+  planned_semantics: robots.txt fetch state is known
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 23
+  planned_rule_id: CORE-ROBOTS-002
+  classification: MISSING_FROM_CATALOG
+  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
+    catalog IDs in a follow-up plan
+  planned_semantics: robots.txt is parsed under an explicit versioned REP profile
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 23
+  planned_rule_id: CORE-SITEMAP-001
+  classification: MISSING_FROM_CATALOG
+  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
+    catalog IDs in a follow-up plan
+  planned_semantics: sitemap discovery state is known
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 23
+  planned_rule_id: CORE-SITEMAP-002
+  classification: MISSING_FROM_CATALOG
+  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
+    catalog IDs in a follow-up plan
+  planned_semantics: sitemap fetch state is known
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 23
+  planned_rule_id: CORE-SITEMAP-003
+  classification: MISSING_FROM_CATALOG
+  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
+    catalog IDs in a follow-up plan
+  planned_semantics: sitemap parse state is known
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 23
+  planned_rule_id: CORE-SITEMAP-004
+  classification: MISSING_FROM_CATALOG
+  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
+    catalog IDs in a follow-up plan
+  planned_semantics: sitemap URLs are absolute and valid
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 23
+  planned_rule_id: CORE-ROBOTS-003
+  classification: MISSING_FROM_CATALOG
+  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
+    catalog IDs in a follow-up plan
+  planned_semantics: robots policy is consistent with explicit intent.indexability
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 23
+  planned_rule_id: CORE-ROBOTS-004
+  classification: MISSING_FROM_CATALOG
+  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
+    catalog IDs in a follow-up plan
+  planned_semantics: robots blocking does not hide a noindex directive
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 23
+  planned_rule_id: CORE-SITEMAP-005
+  classification: MISSING_FROM_CATALOG
+  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
+    catalog IDs in a follow-up plan
+  planned_semantics: sitemap contains preferred/canonical URLs
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 23
+  planned_rule_id: CORE-SITEMAP-008
+  classification: MISSING_FROM_CATALOG
+  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
+    catalog IDs in a follow-up plan
+  planned_semantics: sitemap preferred URLs are not marked noindex
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 24
+  planned_rule_id: CORE-CANON-001
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #24 acceptance text from the loaded catalog metadata before
+    implementation'
+  planned_semantics: mechanism-specific canonical target, redirect, robots, conflict,
+    and observation checks
+  catalog:
+    rule_id: CORE-CANON-001
+    version: 1.0.0
+    title: Canonical URL is present and resolves to a single preferred URL
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-CANON-001
+    version: 1.0.0
+    title: Canonical URL is present and resolves to a single preferred URL
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 24
+  planned_rule_id: CORE-CANON-002
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #24 acceptance text from the loaded catalog metadata before
+    implementation'
+  planned_semantics: mechanism-specific canonical target, redirect, robots, conflict,
+    and observation checks
+  catalog:
+    rule_id: CORE-CANON-002
+    version: 1.0.0
+    title: Canonical URL uses the same scheme/host as the audited origin
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    - family: transport
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-CANON-002
+    version: 1.0.0
+    title: Canonical URL uses the same scheme/host as the audited origin
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    - family: transport
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 24
+  planned_rule_id: CORE-CANON-003
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #24 acceptance text from the loaded catalog metadata before
+    implementation'
+  planned_semantics: mechanism-specific canonical target, redirect, robots, conflict,
+    and observation checks
+  catalog:
+    rule_id: CORE-CANON-003
+    version: 1.0.0
+    title: Canonical URL is not blocked by robots directives
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-CANON-003
+    version: 1.0.0
+    title: Canonical URL is not blocked by robots directives
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 24
+  planned_rule_id: CORE-CANON-004
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #24 acceptance text from the loaded catalog metadata before
+    implementation'
+  planned_semantics: mechanism-specific canonical target, redirect, robots, conflict,
+    and observation checks
+  catalog:
+    rule_id: CORE-CANON-004
+    version: 1.0.0
+    title: Canonical URL does not point to a redirect chain
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: diagnostic
+    failure_policy: unknown_on_missing_facts
+    mechanism: composite_check
+    rule_kind: diagnostic_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-CANON-004
+    version: 1.0.0
+    title: Canonical URL does not point to a redirect chain
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: diagnostic
+    failure_policy: unknown_on_missing_facts
+    mechanism: composite_check
+    rule_kind: diagnostic_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 24
+  planned_rule_id: CORE-CANON-005
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #24 acceptance text from the loaded catalog metadata before
+    implementation'
+  planned_semantics: mechanism-specific canonical target, redirect, robots, conflict,
+    and observation checks
+  catalog:
+    rule_id: CORE-CANON-005
+    version: 1.0.0
+    title: Self-referencing canonical matches the requested URL for paginated pages
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    - family: transport
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-CANON-005
+    version: 1.0.0
+    title: Self-referencing canonical matches the requested URL for paginated pages
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    - family: transport
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 24
+  planned_rule_id: CORE-CANON-006
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #24 acceptance text from the loaded catalog metadata before
+    implementation'
+  planned_semantics: mechanism-specific canonical target, redirect, robots, conflict,
+    and observation checks
+  catalog:
+    rule_id: CORE-CANON-006
+    version: 1.0.0
+    title: Canonical URL avoids parameter-only duplicate variants
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: observation_only
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: observation_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-CANON-006
+    version: 1.0.0
+    title: Canonical URL avoids parameter-only duplicate variants
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: observation_only
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: observation_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 24
+  planned_rule_id: CORE-CANON-007
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #24 acceptance text from the loaded catalog metadata before
+    implementation'
+  planned_semantics: mechanism-specific canonical target, redirect, robots, conflict,
+    and observation checks
+  catalog:
+    rule_id: CORE-CANON-007
+    version: 1.0.0
+    title: Cross-domain canonical targets are consistent across the crawl
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-CANON-007
+    version: 1.0.0
+    title: Cross-domain canonical targets are consistent across the crawl
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 24
+  planned_rule_id: CORE-CANON-008
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #24 acceptance text from the loaded catalog metadata before
+    implementation'
+  planned_semantics: mechanism-specific canonical target, redirect, robots, conflict,
+    and observation checks
+  catalog:
+    rule_id: CORE-CANON-008
+    version: 1.0.0
+    title: Canonical URL is declared exactly once per page
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    - family: transport
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-CANON-008
+    version: 1.0.0
+    title: Canonical URL is declared exactly once per page
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    - family: transport
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 25
+  planned_rule_id: CORE-DUP-001
+  classification: MISSING_FROM_CATALOG
+  disposition: retain duplicate work as blocked until catalog IDs are intentionally
+    added by a reviewed catalog change
+  planned_semantics: exact duplicate clusters use content.hash and canonical facts
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 25
+  planned_rule_id: CORE-DUP-002
+  classification: MISSING_FROM_CATALOG
+  disposition: retain duplicate work as blocked until catalog IDs are intentionally
+    added by a reviewed catalog change
+  planned_semantics: near-duplicate clusters use content.signatures as observation-only
+    data
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 26
+  planned_rule_id: CORE-CANON-001
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #26 to the catalog entry; keep review-gating as plan policy
+    until catalog governance changes it'
+  planned_semantics: review-gated duplicate-strategy canonical rule
+  catalog:
+    rule_id: CORE-CANON-001
+    version: 1.0.0
+    title: Canonical URL is present and resolves to a single preferred URL
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-CANON-001
+    version: 1.0.0
+    title: Canonical URL is present and resolves to a single preferred URL
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 27
+  planned_rule_id: CORE-LINK-001
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #27 per catalog score role, failure policy, and fact requirements'
+  planned_semantics: fact-ready link mechanisms plus explicit compatibility-only behavior
+  catalog:
+    rule_id: CORE-LINK-001
+    version: 1.0.0
+    title: Core Links check 001
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-LINK-001
+    version: 1.0.0
+    title: Core Links check 001
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 27
+  planned_rule_id: CORE-LINK-002
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #27 per catalog score role, failure policy, and fact requirements'
+  planned_semantics: fact-ready link mechanisms plus explicit compatibility-only behavior
+  catalog:
+    rule_id: CORE-LINK-002
+    version: 1.0.0
+    title: Core Links check 002
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    - family: page
+      min_schema_version: '1'
+    - family: resources
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-LINK-002
+    version: 1.0.0
+    title: Core Links check 002
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    - family: page
+      min_schema_version: '1'
+    - family: resources
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 27
+  planned_rule_id: CORE-LINK-003
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #27 per catalog score role, failure policy, and fact requirements'
+  planned_semantics: fact-ready link mechanisms plus explicit compatibility-only behavior
+  catalog:
+    rule_id: CORE-LINK-003
+    version: 1.0.0
+    title: Core Links check 003
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-LINK-003
+    version: 1.0.0
+    title: Core Links check 003
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 27
+  planned_rule_id: CORE-LINK-004
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #27 per catalog score role, failure policy, and fact requirements'
+  planned_semantics: fact-ready link mechanisms plus explicit compatibility-only behavior
+  catalog:
+    rule_id: CORE-LINK-004
+    version: 1.0.0
+    title: Core Links check 004
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    - family: page
+      min_schema_version: '1'
+    score_role: diagnostic
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: diagnostic_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-LINK-004
+    version: 1.0.0
+    title: Core Links check 004
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    - family: page
+      min_schema_version: '1'
+    score_role: diagnostic
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: diagnostic_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 27
+  planned_rule_id: CORE-LINK-005
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #27 per catalog score role, failure policy, and fact requirements'
+  planned_semantics: fact-ready link mechanisms plus explicit compatibility-only behavior
+  catalog:
+    rule_id: CORE-LINK-005
+    version: 1.0.0
+    title: Core Links check 005
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    - family: page
+      min_schema_version: '1'
+    - family: resources
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-LINK-005
+    version: 1.0.0
+    title: Core Links check 005
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    - family: page
+      min_schema_version: '1'
+    - family: resources
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 27
+  planned_rule_id: CORE-LINK-006
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #27 per catalog score role, failure policy, and fact requirements'
+  planned_semantics: fact-ready link mechanisms plus explicit compatibility-only behavior
+  catalog:
+    rule_id: CORE-LINK-006
+    version: 1.0.0
+    title: Core Links check 006
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    score_role: observation_only
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: observation_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-LINK-006
+    version: 1.0.0
+    title: Core Links check 006
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    score_role: observation_only
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: observation_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 28
+  planned_rule_id: GOOGLE-HREF-001
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #28 to the catalog title/fact/role mapping; do not swap meanings
+    by evaluator code'
+  planned_semantics: hreflang code, reciprocity, self-reference, x-default, and target
+    consistency
+  catalog:
+    rule_id: GOOGLE-HREF-001
+    version: 1.0.0
+    title: Hreflang annotations declare a valid language-region code
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: GOOGLE-HREF-001
+    version: 1.0.0
+    title: Hreflang annotations declare a valid language-region code
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 28
+  planned_rule_id: GOOGLE-HREF-002
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #28 to the catalog title/fact/role mapping; do not swap meanings
+    by evaluator code'
+  planned_semantics: hreflang code, reciprocity, self-reference, x-default, and target
+    consistency
+  catalog:
+    rule_id: GOOGLE-HREF-002
+    version: 1.0.0
+    title: Hreflang cluster is reciprocal across all listed URLs
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: GOOGLE-HREF-002
+    version: 1.0.0
+    title: Hreflang cluster is reciprocal across all listed URLs
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 28
+  planned_rule_id: GOOGLE-HREF-003
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #28 to the catalog title/fact/role mapping; do not swap meanings
+    by evaluator code'
+  planned_semantics: hreflang code, reciprocity, self-reference, x-default, and target
+    consistency
+  catalog:
+    rule_id: GOOGLE-HREF-003
+    version: 1.0.0
+    title: Hreflang cluster includes a self-referencing entry
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: GOOGLE-HREF-003
+    version: 1.0.0
+    title: Hreflang cluster includes a self-referencing entry
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 28
+  planned_rule_id: GOOGLE-HREF-004
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #28 to the catalog title/fact/role mapping; do not swap meanings
+    by evaluator code'
+  planned_semantics: hreflang code, reciprocity, self-reference, x-default, and target
+    consistency
+  catalog:
+    rule_id: GOOGLE-HREF-004
+    version: 1.0.0
+    title: x-default hreflang entry is present for language-neutral fallback
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: diagnostic
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: diagnostic_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: GOOGLE-HREF-004
+    version: 1.0.0
+    title: x-default hreflang entry is present for language-neutral fallback
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: diagnostic
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: diagnostic_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 28
+  planned_rule_id: GOOGLE-HREF-005
+  classification: SEMANTIC_MISMATCH
+  disposition: 'rewrite #28 to the catalog title/fact/role mapping; do not swap meanings
+    by evaluator code'
+  planned_semantics: hreflang code, reciprocity, self-reference, x-default, and target
+    consistency
+  catalog:
+    rule_id: GOOGLE-HREF-005
+    version: 1.0.0
+    title: Hreflang target URLs are canonical and not blocked from indexing
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: GOOGLE-HREF-005
+    version: 1.0.0
+    title: Hreflang target URLs are canonical and not blocked from indexing
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: links
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 29
+  planned_rule_id: CORE-ROBOTS-004
+  classification: MISSING_FROM_CATALOG
+  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
+    catalog disposition
+  planned_semantics: robots blocking does not hide a noindex directive
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 29
+  planned_rule_id: CORE-SITEMAP-005
+  classification: MISSING_FROM_CATALOG
+  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
+    catalog disposition
+  planned_semantics: sitemap contains preferred/canonical URLs
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 29
+  planned_rule_id: CORE-SITEMAP-006
+  classification: MISSING_FROM_CATALOG
+  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
+    catalog disposition
+  planned_semantics: sitemap URLs are not redirect URLs
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 29
+  planned_rule_id: CORE-SITEMAP-007
+  classification: MISSING_FROM_CATALOG
+  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
+    catalog disposition
+  planned_semantics: sitemap URLs do not return 4xx/5xx
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 29
+  planned_rule_id: CORE-SITEMAP-008
+  classification: MISSING_FROM_CATALOG
+  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
+    catalog disposition
+  planned_semantics: sitemap preferred URLs are not marked noindex
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 29
+  planned_rule_id: CORE-ROBOTS-003
+  classification: MISSING_FROM_CATALOG
+  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
+    catalog disposition
+  planned_semantics: robots policy is consistent with explicit intent.indexability
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 30
+  planned_rule_id: CORE-LINK-002
+  classification: SEMANTIC_MISMATCH
+  disposition: keep blocked until intent.indexability is explicitly defined and the
+    catalog entry is reconciled
+  planned_semantics: intent-dependent link/indexability rule
+  catalog:
+    rule_id: CORE-LINK-002
+    version: 1.0.0
+    title: Core Links check 002
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    - family: page
+      min_schema_version: '1'
+    - family: resources
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: CORE-LINK-002
+    version: 1.0.0
+    title: Core Links check 002
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: links
+      min_schema_version: '1'
+    - family: page
+      min_schema_version: '1'
+    - family: resources
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 30
+  planned_rule_id: CORE-HTTP-002
+  classification: MISSING_FROM_CATALOG
+  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  planned_semantics: HTTP/indexability consistency is evaluated only with explicit
+    intent.indexability
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 30
+  planned_rule_id: CORE-ROBOTS-003
+  classification: MISSING_FROM_CATALOG
+  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  planned_semantics: robots policy is consistent with explicit intent.indexability
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 30
+  planned_rule_id: GOOGLE-IDX-001
+  classification: MISSING_FROM_CATALOG
+  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  planned_semantics: 'Google indexability intent-dependent rule from issue #30'
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 30
+  planned_rule_id: GOOGLE-IDX-002
+  classification: MISSING_FROM_CATALOG
+  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  planned_semantics: Google indexability outcome rule requiring explicit intent provenance
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 30
+  planned_rule_id: YANDEX-IDX-001
+  classification: MISSING_FROM_CATALOG
+  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  planned_semantics: 'Yandex indexability intent-dependent rule from issue #30'
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 30
+  planned_rule_id: YANDEX-IDX-002
+  classification: MISSING_FROM_CATALOG
+  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  planned_semantics: Yandex indexability outcome rule requiring explicit intent provenance
+  catalog: null
+  effective_contract: null
+  resolution_status: blocked_missing_catalog
+- issue: 31
+  planned_rule_id: GOOGLE-DESC-001
+  classification: SEMANTIC_MISMATCH
+  disposition: accept the catalog-defined role/facts exactly; legacy observation-only
+    and content.main-gated semantics are not binding here
+  planned_semantics: catalog-authoritative exact per-rule contract
+  catalog:
+    rule_id: GOOGLE-DESC-001
+    version: 1.0.0
+    title: Meta description is present and within recommended length
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: structured-data
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: GOOGLE-DESC-001
+    version: 1.0.0
+    title: Meta description is present and within recommended length
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    - family: structured-data
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 31
+  planned_rule_id: GOOGLE-TITLE-001
+  classification: SEMANTIC_MISMATCH
+  disposition: accept the catalog-defined role/facts exactly; legacy observation-only
+    and content.main-gated semantics are not binding here
+  planned_semantics: catalog-authoritative exact per-rule contract
+  catalog:
+    rule_id: GOOGLE-TITLE-001
+    version: 1.0.0
+    title: Title tag is present and within recommended length
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: GOOGLE-TITLE-001
+    version: 1.0.0
+    title: Title tag is present and within recommended length
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 32
+  planned_rule_id: GOOGLE-TITLE-001
+  classification: SEMANTIC_MISMATCH
+  disposition: accept the catalog-defined title contract exactly; do not add an unrecorded
+    content.main prerequisite
+  planned_semantics: catalog-authoritative exact per-rule contract
+  catalog:
+    rule_id: GOOGLE-TITLE-001
+    version: 1.0.0
+    title: Title tag is present and within recommended length
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: GOOGLE-TITLE-001
+    version: 1.0.0
+    title: Title tag is present and within recommended length
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
+- issue: 33
+  planned_rule_id: GOOGLE-TITLE-001
+  classification: SEMANTIC_MISMATCH
+  disposition: accept the catalog-defined title contract exactly; legacy length-threshold
+    wording is not binding
+  planned_semantics: catalog-authoritative exact per-rule contract
+  catalog:
+    rule_id: GOOGLE-TITLE-001
+    version: 1.0.0
+    title: Title tag is present and within recommended length
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  effective_contract:
+    rule_id: GOOGLE-TITLE-001
+    version: 1.0.0
+    title: Title tag is present and within recommended length
+    scope: html-page
+    applicability_condition: applies whenever a html-page subject was collected for
+      the run
+    fact_requirements:
+    - family: page
+      min_schema_version: '1'
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+  resolution_status: resolved_catalog_authoritative
