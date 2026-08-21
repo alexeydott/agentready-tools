@@ -60,5 +60,10 @@ until this reconciliation is accepted. In particular:
 - current/legacy checks remain available through the typed compatibility
   crosswalk until a later golden cutover.
 
+The global matrix remains blocked while future plans contain unresolved or
+missing IDs. A future implementation may call
+`stage_e_binding_is_blocked(matrix, issue=22, rule_id="CORE-COVERAGE-001")`
+after that specific row has an accepted effective catalog contract; unresolved
+future rows must not prevent an already-reconciled canary from proceeding.
 The next phase is #22 only after this issue's exact-HEAD gate and formal review
 accept the matrix and the amended dependent issue contracts.

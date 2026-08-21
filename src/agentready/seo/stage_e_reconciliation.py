@@ -218,14 +218,9 @@ def build_stage_e_reconciliation_matrix(
             reference.planned_semantics,
         )
         if entry is not None:
-            planned_semantics = (
-                "catalog-authoritative exact contract: "
-                f"{entry.title}; scope={entry.scope}; condition={entry.condition}; "
-                f"facts={','.join(req.family + '@' + req.min_schema_version for req in entry.fact_requirements)}; "
-                f"score_role={entry.score_role}; failure_policy={entry.failure_policy}; "
-                f"mechanism={entry.mechanism}; rule_kind={entry.rule_kind}; "
-                f"automation_mode={entry.automation_mode}; version={entry.version}"
-            )
+            resolution_status = "resolved_catalog_authoritative"
+        else:
+            resolution_status = "blocked_missing_catalog"
         row: dict[str, object] = {
             "issue": reference.issue,
             "planned_rule_id": reference.planned_rule_id,
@@ -233,6 +228,8 @@ def build_stage_e_reconciliation_matrix(
             "disposition": reference.disposition,
             "planned_semantics": planned_semantics,
             "catalog": _catalog_entry(entry) if entry is not None else None,
+            "effective_contract": _catalog_entry(entry) if entry is not None else None,
+            "resolution_status": resolution_status,
         }
         rows.append(row)
     return {
@@ -261,6 +258,9 @@ def build_stage_e_reconciliation_matrix(
 
 def stage_e_binding_is_blocked(
     matrix: Mapping[str, object] | None = None,
+    *,
+    issue: int | None = None,
+    rule_id: str | None = None,
 ) -> bool:
     """Return the fail-closed pre-binding state required by issue #42.
 
@@ -276,19 +276,30 @@ def stage_e_binding_is_blocked(
     rows = matrix.get("rows")
     if not isinstance(rows, list) or not rows:
         return True
+    if issue is not None:
+        rows = [row for row in rows if isinstance(row, Mapping) and row.get("issue") == issue]
+        dispositions = [
+            item for item in matrix.get("issue_dispositions", [])
+            if isinstance(item, Mapping) and item.get("issue") == issue
+        ]
+    else:
+        dispositions = matrix.get("issue_dispositions", [])
+    if rule_id is not None:
+        rows = [row for row in rows if row.get("planned_rule_id") == rule_id]
+    if not rows:
+        return True
     if any(
         not isinstance(row, Mapping)
-        or row.get("classification") != ReconciliationClassification.MATCH
-        or not isinstance(row.get("catalog"), Mapping)
-        or not row["catalog"].get("version")
-        or not row["catalog"].get("applicability_condition")
+        or row.get("resolution_status") != "resolved_catalog_authoritative"
+        or not isinstance(row.get("effective_contract"), Mapping)
+        or not row["effective_contract"].get("version")
+        or not row["effective_contract"].get("applicability_condition")
         for row in rows
     ):
         return True
-    dispositions = matrix.get("issue_dispositions", [])
     if not isinstance(dispositions, list) or any(
         not isinstance(item, Mapping)
-        or item.get("classification") != ReconciliationClassification.MATCH
+        or item.get("classification") == ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE
         for item in dispositions
     ):
         return True
