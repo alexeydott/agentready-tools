@@ -67,7 +67,7 @@ try {
     $results.artifact_inspection = "passed"
     foreach ($archive in $archives) {
         if ($archive.Extension -eq ".whl" -or $archive.Extension -eq ".zip" -or $archive.Name.EndsWith(".tar.gz")) {
-            & $Python -c "import sys, tarfile, zipfile; p=sys.argv[1]; n=tarfile.open(p).getnames() if p.endswith('.tar.gz') else zipfile.ZipFile(p).namelist(); forbidden={'.ai-factory','.agents','.codex','.agentready.yml','.git'}; assert not any(x in forbidden for y in n for x in y.replace('\\','/').split('/')); assert (not p.endswith('-source.zip')) or any(y.endswith('schemas/agentready.audit.v2.schema.json') for y in n)" $archive.FullName
+            & $Python -c "import sys, tarfile, zipfile; p=sys.argv[1]; n=tarfile.open(p).getnames() if p.endswith('.tar.gz') else zipfile.ZipFile(p).namelist(); forbidden={'.ai-factory','.agents','.codex','.agentready.yml','.git'}; assert not any(x in forbidden for y in n for x in y.replace('\\','/').split('/')); assert (not p.endswith('-source.zip')) or any(y.endswith('schemas/agentready.audit.v2.schema.json') for y in n); assert any(y.replace('\\','/').endswith('agentready/seo/rules/catalog/agentready.rule-catalog.v2.yaml') for y in n); assert any(y.replace('\\','/').endswith('agentready/seo/rules/catalog/agentready.rule-catalog.v2.schema.json') for y in n)" $archive.FullName
         }
     }
     $smokeRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("agentready-smoke-" + [guid]::NewGuid().ToString("N"))

@@ -1,1 +1,2 @@
 recursive-include schemas *.json
+recursive-include src/agentready/seo/rules/catalog *.yaml *.json
