@@ -617,3 +617,97 @@ def test_crawler_persists_transport_facts_for_replay_without_fake_dns_tls(tmp_pa
         assert replayed["https://example.test/fail"].fetch_error_kind == "protocol"
     finally:
         store.close()
+
+
+def test_crawler_replays_redirect_chains_per_request_with_hop_metadata(tmp_path) -> None:
+    from agentready.fetcher import FetchResult, RedirectHop
+
+    class FakeFetcher:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, request, *, use_cache=True):
+            if request.url.endswith("/a"):
+                return FetchResult(
+                    url="https://other.test/final-a",
+                    status_code=200,
+                    headers={"content-type": "text/html"},
+                    body=b"<title>A</title>",
+                    redirects=("https://example.test/a",),
+                    elapsed_ms=3,
+                    redirect_records=(
+                        RedirectHop(
+                            from_url="https://example.test/a",
+                            status_code=302,
+                            location_raw="https://other.test/final-a",
+                            to_url="https://other.test/final-a",
+                            cross_origin=True,
+                            downgrade_https_to_http=False,
+                        ),
+                    ),
+                )
+            return FetchResult(
+                url="http://example.test/final-b",
+                status_code=200,
+                headers={"content-type": "text/html"},
+                body=b"<title>B</title>",
+                redirects=("https://example.test/b",),
+                elapsed_ms=4,
+                redirect_records=(
+                    RedirectHop(
+                        from_url="https://example.test/b",
+                        status_code=301,
+                        location_raw="http://example.test/final-b",
+                        to_url="http://example.test/final-b",
+                        cross_origin=False,
+                        downgrade_https_to_http=True,
+                    ),
+                ),
+            )
+
+    async def run(store) -> None:
+        context = AuditRunContext.create(
+            "https://example.test/",
+            {"max_pages": 2},
+            tool_version="test",
+            rule_catalog_version="rules-1",
+            run_id="run-redirect-replay",
+        )
+        await AsyncCrawler(
+            CrawlScope(
+                ("https://example.test/a", "https://example.test/b"),
+                allowed_origins=("https://example.test",),
+                follow_links=False,
+            ),
+            config=CrawlConfig(max_pages=2, min_request_interval_ms=0),
+            policy=EgressPolicy(allowed_origins=frozenset({"https://example.test"})),
+            fetcher_factory=FakeFetcher,
+            store=store,
+            run_context=context,
+        ).crawl()
+
+    from agentready.audit_core.collection import replay_collected_pages
+    from agentready.audit_core.store import ContentRetention, SQLiteSiteStore
+
+    store = SQLiteSiteStore(tmp_path / "redirect-replay.sqlite", retention=ContentRetention.METADATA_ONLY)
+    try:
+        asyncio.run(run(store))
+        redirects = tuple(store.iter_redirects("run-redirect-replay"))
+        assert {(item.request_url, item.cross_origin, item.downgrade_https_to_http) for item in redirects} == {
+            ("https://example.test/a", True, False),
+            ("https://example.test/b", False, True),
+        }
+
+        replayed = {page.requested_url: page for page in replay_collected_pages(store, "run-redirect-replay")}
+        assert len(replayed["https://example.test/a"].redirect_records) == 1
+        assert replayed["https://example.test/a"].redirect_records[0].cross_origin is True
+        assert len(replayed["https://example.test/b"].redirect_records) == 1
+        assert replayed["https://example.test/b"].redirect_records[0].downgrade_https_to_http is True
+    finally:
+        store.close()

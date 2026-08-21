@@ -21,7 +21,7 @@ from agentready.security import SecretRedactor
 from .urls import UrlIdentity
 
 logger = logging.getLogger(__name__)
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 13
 EVIDENCE_CLAIM_STALE_SECONDS = 3600.0
 
 
@@ -345,6 +345,7 @@ class RepresentationRecord:
     parser_backend: str | None = None
     error: str | None = None
     body: bytes | None = None
+    facts: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -369,6 +370,11 @@ class RedirectFact:
     to_url: str | None
     status_code: int
     location_raw: str
+    request_url: str = ""
+    fetch_id: str = ""
+    hop_index: int = 0
+    cross_origin: bool = False
+    downgrade_https_to_http: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -507,7 +513,7 @@ class MemorySiteStore:
         self._representations: dict[tuple[str, str, str, str], RepresentationRecord] = {}
         self._run_facts: dict[tuple[str, str, str, str], RunFactRecord] = {}
         self._urls: dict[str, UrlIdentity] = {}
-        self._redirects: dict[tuple[str, str, str], RedirectFact] = {}
+        self._redirects: dict[tuple[str, ...], RedirectFact] = {}
         self._links: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._link_occurrences: dict[tuple[str, str, str, int], LinkOccurrenceRecord] = {}
         self._resource_occurrences: dict[tuple[str, str, str, int], ResourceOccurrenceRecord] = {}
@@ -642,7 +648,7 @@ class MemorySiteStore:
 
     def put_representation(self, representation: RepresentationRecord) -> None:
         body = _retained_bytes(representation.body, self.retention)
-        stored = RepresentationRecord(**{**asdict(representation), "body": body})
+        stored = RepresentationRecord(**{**asdict(representation), "body": body, "facts": dict(representation.facts or {}) or None})
         self._representations.setdefault(
             (stored.run_id, stored.url_key, stored.source, stored.representation_id),
             stored,
@@ -675,7 +681,17 @@ class MemorySiteStore:
         self._urls.setdefault(identity.normalized(), identity)
 
     def put_redirect(self, redirect: RedirectFact) -> None:
-        self._redirects.setdefault((redirect.run_id, redirect.from_url, redirect.to_url or ""), redirect)
+        key = (
+            redirect.run_id,
+            redirect.request_url,
+            redirect.fetch_id,
+            str(redirect.hop_index),
+            redirect.from_url,
+            str(redirect.status_code),
+            redirect.to_url or "",
+            redirect.location_raw,
+        )
+        self._redirects.setdefault(key, redirect)
 
     def put_page(self, page: PageRecord) -> None:
         content = _retained_content(page.content, self.retention)
@@ -820,8 +836,9 @@ class MemorySiteStore:
 
     def iter_redirects(self, run_id: str) -> Iterator[RedirectFact]:
         yield from sorted(
-            (redirect for (redirect_run, _, _), redirect in self._redirects.items() if redirect_run == run_id),
+            (redirect for key, redirect in self._redirects.items() if key[0] == run_id),
             key=lambda redirect: (
+                redirect.request_url or "", redirect.fetch_id or "", redirect.hop_index,
                 redirect.from_url, redirect.status_code, redirect.to_url is not None,
                 redirect.to_url or "", redirect.location_raw,
             ),
@@ -957,6 +974,7 @@ class SQLiteSiteStore:
             self._connection.executescript(_MIGRATION_10)
             self._connection.executescript(_MIGRATION_11)
             self._migrate_run_identity_columns()
+            self._migrate_stagec_columns()
             self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             self._connection.execute("PRAGMA optimize")
 
@@ -979,6 +997,53 @@ class SQLiteSiteStore:
                 "UPDATE runs SET rule_catalog_digest=? WHERE id=?",
                 (digest, row["id"]),
             )
+
+    def _migrate_stagec_columns(self) -> None:
+        representation_columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(representations)")}
+        if "facts" not in representation_columns:
+            self._connection.execute("ALTER TABLE representations ADD COLUMN facts TEXT")
+        redirect_columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(redirects)")}
+        additions = {
+            "request_url": "TEXT NOT NULL DEFAULT ''",
+            "fetch_id": "TEXT NOT NULL DEFAULT ''",
+            "hop_index": "INTEGER NOT NULL DEFAULT 0",
+            "cross_origin": "INTEGER NOT NULL DEFAULT 0",
+            "downgrade_https_to_http": "INTEGER NOT NULL DEFAULT 0",
+        }
+        for name, declaration in additions.items():
+            if name not in redirect_columns:
+                self._connection.execute(f"ALTER TABLE redirects ADD COLUMN {name} {declaration}")
+        redirect_schema = self._connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='redirects'"
+        ).fetchone()
+        redirect_sql = str(redirect_schema["sql"] if redirect_schema else "")
+        expected_pk = "PRIMARY KEY(run_id, request_url, fetch_id, hop_index, from_url, status_code, to_url, location_raw)"
+        if expected_pk not in redirect_sql:
+            self._connection.execute(
+                """CREATE TABLE redirects_new (
+                    run_id TEXT NOT NULL REFERENCES runs(id),
+                    request_url TEXT NOT NULL DEFAULT '',
+                    fetch_id TEXT NOT NULL DEFAULT '',
+                    hop_index INTEGER NOT NULL DEFAULT 0,
+                    from_url TEXT NOT NULL,
+                    to_url TEXT NOT NULL DEFAULT '',
+                    status_code INTEGER NOT NULL,
+                    location_raw TEXT NOT NULL,
+                    cross_origin INTEGER NOT NULL DEFAULT 0,
+                    downgrade_https_to_http INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(run_id, request_url, fetch_id, hop_index, from_url, status_code, to_url, location_raw)
+                ) WITHOUT ROWID"""
+            )
+            self._connection.execute(
+                """INSERT OR IGNORE INTO redirects_new
+                (run_id, request_url, fetch_id, hop_index, from_url, to_url, status_code,
+                 location_raw, cross_origin, downgrade_https_to_http)
+                SELECT run_id, request_url, fetch_id, hop_index, from_url, COALESCE(to_url, ''),
+                       status_code, location_raw, cross_origin, downgrade_https_to_http
+                FROM redirects"""
+            )
+            self._connection.execute("DROP TABLE redirects")
+            self._connection.execute("ALTER TABLE redirects_new RENAME TO redirects")
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
@@ -1181,8 +1246,8 @@ class SQLiteSiteStore:
             self._connection.execute(
                 """INSERT OR REPLACE INTO representations
                 (run_id, url_key, representation_id, source, content_type, body_hash, byte_size,
-                 observed_at, parser_backend, error, body)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                 observed_at, parser_backend, error, body, facts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     representation.run_id,
                     representation.url_key,
@@ -1195,6 +1260,7 @@ class SQLiteSiteStore:
                     representation.parser_backend,
                     representation.error,
                     body,
+                    json.dumps(dict(representation.facts), sort_keys=True, separators=(",", ":")) if representation.facts is not None else None,
                 ),
             )
 
@@ -1269,8 +1335,22 @@ class SQLiteSiteStore:
         self._write_guard()
         with self._transaction():
             self._connection.execute(
-                "INSERT OR IGNORE INTO redirects(run_id, from_url, to_url, status_code, location_raw) VALUES (?, ?, ?, ?, ?)",
-                (redirect.run_id, redirect.from_url, redirect.to_url, redirect.status_code, redirect.location_raw),
+                """INSERT OR IGNORE INTO redirects
+                (run_id, request_url, fetch_id, hop_index, from_url, to_url, status_code,
+                 location_raw, cross_origin, downgrade_https_to_http)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    redirect.run_id,
+                    redirect.request_url,
+                    redirect.fetch_id,
+                    redirect.hop_index,
+                    redirect.from_url,
+                    redirect.to_url or "",
+                    redirect.status_code,
+                    redirect.location_raw,
+                    int(redirect.cross_origin),
+                    int(redirect.downgrade_https_to_http),
+                ),
             )
 
     def put_page(self, page: PageRecord) -> None:
@@ -1523,13 +1603,16 @@ class SQLiteSiteStore:
 
     def iter_redirects(self, run_id: str) -> Iterator[RedirectFact]:
         rows = self._connection.execute(
-            "SELECT * FROM redirects WHERE run_id=? ORDER BY from_url, status_code, to_url, location_raw",
+            "SELECT * FROM redirects WHERE run_id=? ORDER BY request_url, hop_index, from_url, status_code, to_url, location_raw",
             (run_id,),
         )
         for row in rows:
             yield RedirectFact(
                 run_id=row["run_id"], from_url=row["from_url"], to_url=row["to_url"],
                 status_code=row["status_code"], location_raw=row["location_raw"],
+                request_url=row["request_url"], fetch_id=row["fetch_id"],
+                hop_index=row["hop_index"], cross_origin=bool(row["cross_origin"]),
+                downgrade_https_to_http=bool(row["downgrade_https_to_http"]),
             )
 
     def iter_findings(self, run_id: str) -> Iterator[FindingRecord]:
@@ -1815,6 +1898,7 @@ def _representation_from_row(row: sqlite3.Row) -> RepresentationRecord:
         parser_backend=row["parser_backend"],
         error=row["error"],
         body=row["body"],
+        facts=json.loads(row["facts"]) if row["facts"] is not None else None,
     )
 
 
@@ -1831,7 +1915,13 @@ def _metric_from_row(row: sqlite3.Row) -> MetricRecord:
 
 
 def _redirect_from_row(row: sqlite3.Row) -> RedirectFact:
-    return RedirectFact(run_id=row["run_id"], from_url=row["from_url"], to_url=row["to_url"], status_code=row["status_code"], location_raw=row["location_raw"])
+    return RedirectFact(
+        run_id=row["run_id"], from_url=row["from_url"], to_url=row["to_url"],
+        status_code=row["status_code"], location_raw=row["location_raw"],
+        request_url=row["request_url"], fetch_id=row["fetch_id"],
+        hop_index=row["hop_index"], cross_origin=bool(row["cross_origin"]),
+        downgrade_https_to_http=bool(row["downgrade_https_to_http"]),
+    )
 
 
 def _link_storage_position(row: LinkOccurrenceRecord, sort_key: str) -> tuple[Any, ...]:
@@ -1892,6 +1982,7 @@ CREATE TABLE IF NOT EXISTS representations (
     parser_backend TEXT,
     error TEXT,
     body BLOB,
+    facts TEXT,
     PRIMARY KEY(run_id, url_key, source, representation_id)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS run_facts (
@@ -1969,11 +2060,16 @@ CREATE TABLE IF NOT EXISTS link_occurrences (
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS redirects (
     run_id TEXT NOT NULL REFERENCES runs(id),
+    request_url TEXT NOT NULL DEFAULT '',
+    fetch_id TEXT NOT NULL DEFAULT '',
+    hop_index INTEGER NOT NULL DEFAULT 0,
     from_url TEXT NOT NULL,
-    to_url TEXT,
+    to_url TEXT NOT NULL DEFAULT '',
     status_code INTEGER NOT NULL,
     location_raw TEXT NOT NULL,
-    PRIMARY KEY(run_id, from_url, to_url)
+    cross_origin INTEGER NOT NULL DEFAULT 0,
+    downgrade_https_to_http INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(run_id, request_url, fetch_id, hop_index, from_url, status_code, to_url, location_raw)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS resources (
     run_id TEXT NOT NULL REFERENCES runs(id),
@@ -2221,6 +2317,7 @@ CREATE TABLE IF NOT EXISTS representations (
     parser_backend TEXT,
     error TEXT,
     body BLOB,
+    facts TEXT,
     PRIMARY KEY(run_id, url_key, source, representation_id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_representations_run_url ON representations(run_id, url_key);
@@ -2238,4 +2335,7 @@ CREATE TABLE IF NOT EXISTS run_facts (
     PRIMARY KEY(run_id, family, scope, subject)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_run_facts_run_family ON run_facts(run_id, family);
+"""
+
+_MIGRATION_12 = """
 """

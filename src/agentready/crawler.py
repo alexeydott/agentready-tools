@@ -36,7 +36,7 @@ from .browser_pool import (
     BrowserPoolFactory,
     CapabilityUnavailableError,
 )
-from .audit_core.collection import RepresentationObservation
+from .audit_core.collection import RepresentationObservation, parsed_facts_to_dict
 from .egress import EgressPolicy
 from .egress import PassivePublicContext, TrustedLocalCredentialContext
 from .fetcher import (
@@ -478,7 +478,8 @@ class AsyncCrawler:
                             _safe_log_url(item.url),
                             len(response.redirect_records),
                         )
-                        for hop in response.redirect_records:
+                        fetch_id = f"{run_id}:{item.url}"
+                        for hop_index, hop in enumerate(response.redirect_records):
                             self.store.put_redirect(
                                 RedirectFact(
                                     run_id,
@@ -486,6 +487,11 @@ class AsyncCrawler:
                                     hop.to_url,
                                     hop.status_code,
                                     hop.location_raw,
+                                    request_url=item.url,
+                                    fetch_id=fetch_id,
+                                    hop_index=hop_index,
+                                    cross_origin=hop.cross_origin,
+                                    downgrade_https_to_http=hop.downgrade_https_to_http,
                                 )
                             )
                     parsed: ParsedPage | None = None
@@ -517,6 +523,7 @@ class AsyncCrawler:
                                     representation.observed_at,
                                     parsed.parser_backend,
                                     body=response.body,
+                                    facts=parsed_facts_to_dict(parsed.facts) if parsed.facts is not None else None,
                                 )
                             )
                         frontier.set_state(item.url, CrawlItemState.PARSED)
@@ -628,6 +635,11 @@ class AsyncCrawler:
                                             rendered_representation.observed_at,
                                             rendered_observation.parsed.parser_backend,
                                             body=rendered_body,
+                                            facts=(
+                                                parsed_facts_to_dict(rendered_observation.parsed.facts)
+                                                if rendered_observation.parsed.facts is not None
+                                                else None
+                                            ),
                                         )
                                     )
                                     rendered_facts = rendered_observation.parsed.facts

@@ -311,7 +311,11 @@ def test_pair_rendered_preserves_static_and_rendered_representations() -> None:
     assert pool.closed
 
 
-def test_pair_rendered_persists_replays_and_compares_representations(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "retention",
+    [ContentRetention.METADATA_ONLY, ContentRetention.SAMPLES, ContentRetention.FULL_CONTENT],
+)
+def test_pair_rendered_persists_replays_and_compares_representations(tmp_path: Path, retention: ContentRetention) -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
@@ -320,7 +324,7 @@ def test_pair_rendered_persists_replays_and_compares_representations(tmp_path: P
         )
 
     async def run() -> tuple[str, SQLiteSiteStore]:
-        store = SQLiteSiteStore(tmp_path / "paired-replay.sqlite", retention=ContentRetention.FULL_CONTENT)
+        store = SQLiteSiteStore(tmp_path / f"paired-replay-{retention.value}.sqlite", retention=retention)
         context = AuditRunContext.create(
             "https://example.test/",
             {"max_pages": 1, "pair_rendered": True},
@@ -345,7 +349,9 @@ def test_pair_rendered_persists_replays_and_compares_representations(tmp_path: P
     try:
         representations = tuple(store.iter_representations(run_id, "https://example.test/"))
         assert {item.source for item in representations} == {"static-html", "rendered-dom"}
-        assert all(item.body for item in representations)
+        if retention is ContentRetention.METADATA_ONLY:
+            assert all(item.body is None for item in representations)
+        assert all(item.facts for item in representations)
         occurrences = tuple(store.iter_link_occurrences(run_id))
         assert {item.representation_id for item in occurrences} == {item.representation_id for item in representations}
 

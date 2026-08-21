@@ -461,7 +461,7 @@ class QueryService:
         if hasattr(self.store, "query_redirects_storage"):
             storage_query = RedirectStorageQuery(query.run_id, limit=query.limit, from_url=query.from_url, to_url=query.to_url, status_code=query.status_code, sort_key=query.sort_by, descending=query.descending)
             if query.cursor:
-                storage_query = replace(storage_query, cursor=query.cursor)
+                storage_query = replace(storage_query, cursor=_rebind_cursor(query.cursor, query.run_id, _storage_query_hash(storage_query)))
             result = self.store.query_redirects_storage(storage_query)
             self._log_query("redirects", query, len(result.items), result.total or 0, started, from_url=query.from_url, status=query.status_code)
             return QueryPage(tuple(result.items), result.next_cursor, result.total)

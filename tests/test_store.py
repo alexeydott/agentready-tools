@@ -166,6 +166,7 @@ def test_fetch_and_representation_records_round_trip_with_retention(tmp_path: Pa
                 "2026-01-01T00:00:00+00:00",
                 "stdlib-htmlparser",
                 body=b"<title>Stored</title>",
+                facts={"titles": ["Stored"], "links": []},
             )
         )
 
@@ -173,6 +174,7 @@ def test_fetch_and_representation_records_round_trip_with_retention(tmp_path: Pa
         restored = next(store.iter_representations("run-representations", "https://example.test/"))
         assert restored.source == "static-html"
         assert restored.body == b"<title>Stored</title>"
+        assert restored.facts == {"titles": ["Stored"], "links": []}
     finally:
         store.close()
 
@@ -417,7 +419,7 @@ def test_sqlite_migration_is_idempotent_and_recovery_is_durable(tmp_path: Path):
     second = SQLiteSiteStore(path)
     try:
         assert second.recover_interrupted_runs() == 0
-        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 11
+        assert second._connection.execute("PRAGMA user_version").fetchone()[0] == 13
         assert second._connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 1
         assert second.resume_run("run-recovery").state == "running"
     finally:
@@ -444,7 +446,7 @@ def test_sqlite_v8_run_identity_migration_is_durable(tmp_path: Path):
         assert restored.rule_catalog_digest_kind == "synthetic"
         assert restored.score_model_id == "readiness-transparent-v2"
         assert restored.fact_schema_versions == ()
-        assert reopened._connection.execute("PRAGMA user_version").fetchone()[0] == 11
+        assert reopened._connection.execute("PRAGMA user_version").fetchone()[0] == 13
     finally:
         reopened.close()
 

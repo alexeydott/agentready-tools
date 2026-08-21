@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Protocol
 from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree
 
-from .fetcher import FetchRequest
+from .fetcher import FetchError, FetchRequest
 
 if TYPE_CHECKING:
     from .crawler import CrawlConfig, CrawlScope
@@ -266,6 +266,20 @@ class RobotsSitemapSource:
         *,
         limit: int = 1000,
     ) -> tuple[str, ...]:
+        collected = await self.collect_from_fetcher(fetcher, limit=limit)
+        errors = [document for document in collected.sitemap_documents if document.fetch_state not in {"available", "supplied"}]
+        if errors:
+            first = errors[0]
+            detail = f"HTTP {first.status_code}" if first.status_code is not None else first.error_kind or first.fetch_state
+            raise ValueError(f"sitemap fetch failed with {detail}")
+        return collected.urls
+
+    async def collect_from_fetcher(
+        self,
+        fetcher: FetcherBoundary,
+        *,
+        limit: int = 1000,
+    ) -> RobotsSitemapDiscoveryResult:
         _validate_limit(limit)
         if not self.base_url.strip():
             raise ValueError("robots base URL must not be empty")
@@ -273,13 +287,28 @@ class RobotsSitemapSource:
             raise ValueError("robots sitemap recursion limits are outside the allowed range")
         origin = _origin(self.base_url)
         robots_url = urljoin(self.base_url, "/robots.txt")
-        response = await fetcher.get(
-            FetchRequest(
-                robots_url,
-                purpose="discovery-robots",
-                cache_mode="run-deduplicate",
+        try:
+            response = await fetcher.get(
+                FetchRequest(
+                    robots_url,
+                    purpose="discovery-robots",
+                    cache_mode="run-deduplicate",
+                )
             )
-        )
+            robots_observation = RobotsDocumentObservation(
+                source_url=robots_url,
+                final_url=getattr(response, "url", robots_url),
+                status_code=response.status_code,
+                fetch_state=_fetch_state(response.status_code),
+                body=response.body,
+            )
+        except FetchError as exc:
+            robots_observation = RobotsDocumentObservation(
+                source_url=robots_url,
+                fetch_state="unreachable",
+                error_kind=exc.kind.value,
+            )
+            return RobotsSitemapDiscoveryResult(robots_observation, (), ())
         if response.status_code >= 400 and response.status_code != 404:
             raise ValueError(f"robots fetch failed with HTTP {response.status_code}")
         discovered_roots = [
@@ -293,16 +322,22 @@ class RobotsSitemapSource:
             if not self.same_origin_only or _same_origin(url, origin)
         )[: self.max_files]
         result: list[str] = []
+        documents: list[SitemapDocumentObservation] = []
         for root in roots:
             if len(result) >= limit:
                 break
-            source = SitemapSource("", root, self.same_origin_only, self.max_bytes)
-            for url in await source.discover_from_fetcher(
+            urls, observed = await _collect_sitemap_tree(
                 fetcher,
+                root,
+                origin=origin,
+                same_origin_only=self.same_origin_only,
+                max_bytes=self.max_bytes,
                 limit=limit - len(result),
                 max_depth=self.max_depth,
                 max_files=self.max_files,
-            ):
+            )
+            documents.extend(observed)
+            for url in urls:
                 if url not in result:
                     result.append(url)
         logger.info(
@@ -311,7 +346,105 @@ class RobotsSitemapSource:
             len(result),
             len(roots),
         )
-        return tuple(result[:limit])
+        return RobotsSitemapDiscoveryResult(robots_observation, tuple(documents), tuple(result[:limit]))
+
+
+@dataclass(frozen=True, slots=True)
+class RobotsDocumentObservation:
+    source_url: str
+    final_url: str | None = None
+    status_code: int | None = None
+    fetch_state: str = "not_fetched"
+    body: bytes | None = None
+    error_kind: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SitemapDocumentObservation:
+    source_url: str
+    source_kind: str
+    fetch_state: str
+    body: bytes | None = None
+    final_url: str | None = None
+    status_code: int | None = None
+    error_kind: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RobotsSitemapDiscoveryResult:
+    robots: RobotsDocumentObservation
+    sitemap_documents: tuple[SitemapDocumentObservation, ...]
+    urls: tuple[str, ...]
+
+
+async def _collect_sitemap_tree(
+    fetcher: FetcherBoundary,
+    root_url: str,
+    *,
+    origin: str,
+    same_origin_only: bool,
+    max_bytes: int,
+    limit: int,
+    max_depth: int,
+    max_files: int,
+) -> tuple[tuple[str, ...], tuple[SitemapDocumentObservation, ...]]:
+    pending: list[tuple[str, int, str]] = [(root_url, 0, "robots_declared")]
+    visited: set[str] = set()
+    result: list[str] = []
+    documents: list[SitemapDocumentObservation] = []
+    while pending and len(visited) < max_files and len(result) < limit:
+        url, depth, source_kind = pending.pop(0)
+        if url in visited or depth > max_depth:
+            continue
+        if same_origin_only and not _same_origin(url, origin):
+            continue
+        try:
+            response = await fetcher.get(FetchRequest(url, purpose="discovery-sitemap", cache_mode="run-deduplicate"))
+        except FetchError as exc:
+            visited.add(url)
+            documents.append(SitemapDocumentObservation(url, source_kind, "unreachable", error_kind=exc.kind.value))
+            continue
+        visited.add(url)
+        fetch_state = _fetch_state(response.status_code)
+        documents.append(
+            SitemapDocumentObservation(
+                url,
+                source_kind,
+                fetch_state,
+                body=response.body if fetch_state == "available" else None,
+                final_url=getattr(response, "url", url),
+                status_code=response.status_code,
+            )
+        )
+        if fetch_state != "available":
+            continue
+        compressed = "gzip" in response.headers.get("content-encoding", "").lower() or url.lower().endswith(".gz")
+        source = SitemapSource.from_bytes(
+            response.body,
+            url,
+            compressed=compressed,
+            same_origin_only=same_origin_only,
+            max_bytes=max_bytes,
+        )
+        root = ElementTree.fromstring(source.xml)
+        locations = source.discover(limit=limit - len(result))
+        if root.tag.rsplit("}", 1)[-1] == "sitemapindex" and depth < max_depth:
+            pending.extend((location, depth + 1, "sitemap_index") for location in locations)
+        else:
+            for location in locations:
+                if location not in result:
+                    result.append(location)
+    return tuple(result[:limit]), tuple(documents)
+
+
+def _fetch_state(status_code: int | None) -> str:
+    if status_code is None or status_code >= 500 or status_code == 429:
+        return "unreachable"
+    if status_code == 404:
+        return "not_found"
+    if 400 <= status_code < 500:
+        return "error"
+    return "available"
 
 
 @dataclass(frozen=True, slots=True)
