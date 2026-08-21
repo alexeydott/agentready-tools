@@ -8,6 +8,7 @@ import pytest
 
 from agentready.audit_service import AuditRequest, AuditService
 from agentready.crawler import CrawlCoverage, CrawlResult
+from agentready.audit_core import FactCompatibility, FactSchemaRegistry, FactSchemaRequirement
 from agentready.audit_core.store import MemorySiteStore
 from tests.fixtures.site_lab import SiteLabServer
 
@@ -134,6 +135,9 @@ def test_audit_service_applies_ruleset_to_saved_facts_without_extra_fetches():
         "score_model_id": persisted.score_model_id,
         "fact_schema_versions": dict(persisted.fact_schema_versions),
     }
+    replay_registry = FactSchemaRegistry(dict(persisted.fact_schema_versions))
+    assert replay_registry.check(FactSchemaRequirement("page", "1")).compatibility is FactCompatibility.COMPATIBLE
+    assert replay_registry.check(FactSchemaRequirement("links", "1")).compatibility is FactCompatibility.MISSING
 
 
 def test_audit_service_ignores_non_http_links_without_aborting_crawl():

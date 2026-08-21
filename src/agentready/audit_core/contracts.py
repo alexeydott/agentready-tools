@@ -142,7 +142,11 @@ class FindingContract:
             object.__setattr__(self, "outcome", outcome)
         if self.status is Status.ERROR and self.operational_state is OperationalState.NONE:
             object.__setattr__(self, "operational_state", OperationalState.ERROR)
-        if self.status in {Status.PASS, Status.FAIL} and self.completeness is not EvaluationCompleteness.COMPLETE:
+        if (
+            self.status in {Status.PASS, Status.FAIL}
+            and self.completeness is not EvaluationCompleteness.COMPLETE
+            and self.failure_policy is FailurePolicy.STRICT
+        ):
             raise ValueError("pass/fail findings require complete evaluation")
         if (
             self.completeness is not EvaluationCompleteness.COMPLETE

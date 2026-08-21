@@ -91,6 +91,26 @@ def test_finding_contract_rejects_incomplete_pass_fail_under_failure_policy():
         )
 
 
+def test_finding_contract_allows_explicit_partial_decision_policy():
+    key = FindingKey("metadata", "1", UrlIdentity.parse("https://example.test/"))
+    contract = FindingContract(
+        key=key,
+        state_hash=FindingStateHash("hash"),
+        status=Status.FAIL,
+        applicability=Applicability.APPLICABLE,
+        completeness=EvaluationCompleteness.PARTIAL,
+        severity=Severity.HIGH,
+        impact="high",
+        effort=Effort.MEDIUM,
+        priority=90,
+        failure_policy=FailurePolicy.PARTIAL_DECISION_ALLOWED,
+    )
+
+    assert contract.outcome is EvaluationOutcome.FAIL
+    assert contract.failure_policy is FailurePolicy.PARTIAL_DECISION_ALLOWED
+    assert contract.to_report_finding(title="Metadata", reason="partial but decisive").status.value == "fail"
+
+
 def test_finding_contract_allows_evidence_unknown_without_operational_failure():
     key = FindingKey("metadata", "1", UrlIdentity.parse("https://example.test/"))
     contract = FindingContract(
