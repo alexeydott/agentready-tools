@@ -67,6 +67,12 @@ def _minimal_valid_document() -> dict[str, object]:
                 "score_role": "scored",
                 "failure_policy": "block_on_missing_facts",
                 "summary": "Demo rule summary.",
+                "mechanism": "atomic_check",
+                "rule_kind": "scored_rule",
+                "automation_mode": "automated",
+                "profiles": ["default"],
+                "comparison_dimensions": ["page"],
+                "verification_plan": "Collect page fact(s) and evaluate the demo condition.",
             }
         ],
     }
@@ -301,6 +307,46 @@ def test_invalid_failure_policy_is_rejected():
     with pytest.raises(RuleCatalogValidationError) as excinfo:
         validate_catalog_document(document)
     assert any("failure_policy" in error for error in excinfo.value.errors)
+
+
+def test_malformed_rule_id_is_rejected():
+    document = _minimal_valid_document()
+    document["rules"][0]["rule_id"] = "not_a_valid_id"
+    with pytest.raises(RuleCatalogValidationError) as excinfo:
+        validate_catalog_document(document)
+    assert any("does not match required pattern" in error for error in excinfo.value.errors)
+
+
+def test_non_semver_version_is_rejected():
+    document = _minimal_valid_document()
+    document["rules"][0]["version"] = "1.0"
+    with pytest.raises(RuleCatalogValidationError) as excinfo:
+        validate_catalog_document(document)
+    assert any("does not match required" in error for error in excinfo.value.errors)
+
+
+def test_invalid_mechanism_is_rejected():
+    document = _minimal_valid_document()
+    document["rules"][0]["mechanism"] = "definitely-not-valid"
+    with pytest.raises(RuleCatalogValidationError) as excinfo:
+        validate_catalog_document(document)
+    assert any("mechanism" in error for error in excinfo.value.errors)
+
+
+def test_invalid_rule_kind_is_rejected():
+    document = _minimal_valid_document()
+    document["rules"][0]["rule_kind"] = "definitely-not-valid"
+    with pytest.raises(RuleCatalogValidationError) as excinfo:
+        validate_catalog_document(document)
+    assert any("rule_kind" in error for error in excinfo.value.errors)
+
+
+def test_invalid_automation_mode_is_rejected():
+    document = _minimal_valid_document()
+    document["rules"][0]["automation_mode"] = "definitely-not-valid"
+    with pytest.raises(RuleCatalogValidationError) as excinfo:
+        validate_catalog_document(document)
+    assert any("automation_mode" in error for error in excinfo.value.errors)
 
 
 def test_missing_top_level_key_is_rejected():

@@ -25,14 +25,12 @@ def snapshot():
 
 def test_full_live_id_coverage():
     """Every relevant live SEO check ID (current evaluator or Stage A legacy alias)
-    has a crosswalk record."""
-    legacy_ids = {mapping.legacy_id for mapping in SEO_COMPATIBILITY_MAPPINGS if mapping.evaluator_ids or True}
+    has an explicit crosswalk record -- exact equality, not a subset check, per
+    #20's full-coverage acceptance criterion."""
+    legacy_ids = {mapping.legacy_id for mapping in SEO_COMPATIBILITY_MAPPINGS}
     relevant_ids = CURRENT_SEO_EVALUATOR_IDS | legacy_ids
     covered = live_ids_with_crosswalk()
-    # Not every current evaluator ID needs its own record (some are only ever
-    # referenced as a mapping *target*, e.g. duplicate-metadata-site) but every
-    # ID this crosswalk claims to cover must itself be a known live ID.
-    assert covered <= relevant_ids | {"duplicate-metadata-site", "hreflang-reciprocity-site", "canonical-consistency-site"}
+    assert covered == relevant_ids
     # And the representative live IDs named in #20's work plan must be present.
     for expected in (
         "metadata",
@@ -147,6 +145,24 @@ def test_validate_crosswalk_rejects_stale_frozen_rule_reference():
     stale_snapshot = replace(snapshot, entries=stale_entries)
     with pytest.raises(ValueError, match="unknown frozen rule id"):
         validate_crosswalk_against_snapshot(stale_snapshot)
+
+
+def test_validate_crosswalk_rejects_stale_version_pin_on_unchanged_rule_id():
+    """A catalog rule that keeps its ID but bumps its version must invalidate
+    the crosswalk mapping pinned to the old version (#20/#21 version-aware
+    compatibility gate) -- not just a removed-ID check."""
+    from dataclasses import replace
+
+    snapshot = load_rule_catalog_snapshot()
+    entry = snapshot.entry("CORE-COVERAGE-001")
+    assert entry is not None
+    bumped_entry = replace(entry, version="2.0.0")
+    bumped_entries = tuple(
+        bumped_entry if e.rule_id == "CORE-COVERAGE-001" else e for e in snapshot.entries
+    )
+    bumped_snapshot = replace(snapshot, entries=bumped_entries)
+    with pytest.raises(ValueError, match="is stale and must be re-verified"):
+        validate_crosswalk_against_snapshot(bumped_snapshot)
 
 
 def test_resolve_frozen_rule_ids_and_unknown_live_id_rejection():

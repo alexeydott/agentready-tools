@@ -50,6 +50,11 @@ class CrosswalkRecord:
     frozen_rule_ids: tuple[str, ...]
     relation: CrosswalkRelation
     difference: str
+    # Exact frozen rule version(s) this mapping was authored/verified against,
+    # in the same order as ``frozen_rule_ids``. A catalog change that bumps a
+    # referenced rule's version without an accompanying crosswalk update is a
+    # stale mapping and must fail validate_crosswalk_against_snapshot() (#20/#21).
+    expected_frozen_rule_versions: tuple[str, ...] = ()
 
 
 # One live check may map to many frozen rules (COMPOSITE); a frozen rule may
@@ -60,6 +65,17 @@ class CrosswalkRecord:
 # frozen_rule_ids tuple and a concrete `difference` explaining why no
 # catalog rule is claimed as equivalent -- no relation defaults to
 # EQUIVALENT without an explicit, tested record here.
+#
+# Every record below has an explicit `expected_frozen_rule_versions` entry
+# matching each `frozen_rule_ids` entry (pinned to the version currently
+# published in the frozen catalog) so `validate_crosswalk_against_snapshot()`
+# can detect a version bump on a referenced rule ID as a stale mapping, not
+# just a missing rule_id (#20/#21).
+#
+# Coverage: this crosswalk has an explicit record for every ID in
+# `agentready.seo.compatibility.CURRENT_SEO_EVALUATOR_IDS` plus every
+# Stage A (#2) legacy alias ID, so `live_ids_with_crosswalk()` matches that
+# full relevant-ID set exactly (see test_full_live_id_coverage).
 SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
     CrosswalkRecord(
         "metadata",
@@ -68,6 +84,15 @@ SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
         "Current 'metadata' evaluator checks title+description+heading semantics "
         "together in one pass; the frozen catalog separates title and description "
         "into distinct rules with independent length/presence semantics.",
+        expected_frozen_rule_versions=("1.0.0", "1.0.0"),
+    ),
+    CrosswalkRecord(
+        "page-metadata",
+        ("GOOGLE-DESC-001", "GOOGLE-TITLE-001"),
+        CrosswalkRelation.COMPOSITE,
+        "Legacy alias resolving to 'metadata' (see #2); carries the identical "
+        "composite relation and frozen rule mapping as 'metadata' itself.",
+        expected_frozen_rule_versions=("1.0.0", "1.0.0"),
     ),
     CrosswalkRecord(
         "title-length",
@@ -75,6 +100,7 @@ SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
         CrosswalkRelation.PARTIAL_OVERLAP,
         "Current 'title-length' only checks length thresholds; GOOGLE-TITLE-001 also "
         "requires presence, so the frozen rule is strictly broader than the legacy check.",
+        expected_frozen_rule_versions=("1.0.0",),
     ),
     CrosswalkRecord(
         "page-available",
@@ -83,6 +109,7 @@ SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
         "Both current 'page-available' and CORE-COVERAGE-001 test the same "
         "underlying condition: the page is discoverable and returns a crawlable "
         "transport response, with no additional semantics on either side.",
+        expected_frozen_rule_versions=("1.0.0",),
     ),
     CrosswalkRecord(
         "indexability",
@@ -94,6 +121,13 @@ SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
         "indexability directive semantics, so no frozen successor is claimed here.",
     ),
     CrosswalkRecord(
+        "page-indexability",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Legacy alias resolving to 'indexability' (see #2); carries the identical "
+        "non-equivalent disposition as 'indexability' itself.",
+    ),
+    CrosswalkRecord(
         "canonical",
         ("CORE-CANON-001", "CORE-CANON-005"),
         CrosswalkRelation.PARTIAL_OVERLAP,
@@ -101,6 +135,7 @@ SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
         "primary success condition; the frozen catalog splits canonical presence "
         "(CORE-CANON-001) from self-canonical-for-paginated-pages strategy "
         "(CORE-CANON-005) as distinct rules with different failure semantics.",
+        expected_frozen_rule_versions=("1.0.0", "1.0.0"),
     ),
     CrosswalkRecord(
         "canonical-consistency-site",
@@ -109,6 +144,7 @@ SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
         "Current site-wide canonical-consistency check aggregates across the whole "
         "crawl; CORE-CANON-007 is scoped to cross-domain canonical targets "
         "specifically, a narrower condition than the legacy site-wide diagnostic.",
+        expected_frozen_rule_versions=("1.0.0",),
     ),
     CrosswalkRecord(
         "hreflang",
@@ -117,6 +153,7 @@ SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
         "Current 'hreflang' evaluator validates language-region codes and "
         "self-reference on one page; it does not check cross-page reciprocity, "
         "which the catalog splits into a separate site-wide rule.",
+        expected_frozen_rule_versions=("1.0.0", "1.0.0"),
     ),
     CrosswalkRecord(
         "hreflang-reciprocity-site",
@@ -125,6 +162,17 @@ SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
         "Current site-wide reciprocity check combines reciprocal-pair validation "
         "and x-default presence in one diagnostic; the catalog keeps these as two "
         "separate rules (GOOGLE-HREF-002 reciprocity, GOOGLE-HREF-004 x-default).",
+        expected_frozen_rule_versions=("1.0.0", "1.0.0"),
+    ),
+    CrosswalkRecord(
+        "jsonld",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current 'jsonld' checks for the presence of at least one syntactically "
+        "valid JSON-LD block. The draft catalog's SDATA-* rules test generic "
+        "structured-data presence/validity at a different granularity (schema.org "
+        "type-specific expectations); no single frozen rule matches the legacy "
+        "check's exact 'any valid JSON-LD present' semantics.",
     ),
     CrosswalkRecord(
         "duplicate-metadata-site",
@@ -135,12 +183,119 @@ SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
         "no rule with that fuzzy cross-page comparison semantics.",
     ),
     CrosswalkRecord(
+        "duplicate-metadata",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Legacy alias resolving to 'duplicate-metadata-site' (see #2); carries the "
+        "identical non-equivalent disposition.",
+    ),
+    CrosswalkRecord(
+        "duplicate-content-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current duplicate-content-site clusters near-duplicate page bodies "
+        "across the crawl using a content-similarity threshold; no draft catalog "
+        "rule encodes that cross-page fuzzy-comparison semantics.",
+    ),
+    CrosswalkRecord(
+        "thin-content-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current thin-content-site flags pages below a word-count/content-depth "
+        "threshold as a site-wide diagnostic; the draft catalog has no rule "
+        "encoding that heuristic.",
+    ),
+    CrosswalkRecord(
+        "heading-structure-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current heading-structure-site validates heading-level nesting/order "
+        "across the crawl as a site-wide diagnostic; no per-page draft rule in "
+        "this catalog encodes that cross-page structural heuristic.",
+    ),
+    CrosswalkRecord(
         "link-counts",
         (),
         CrosswalkRelation.NON_EQUIVALENT,
         "Legacy internal-link count thresholds are a raw numeric heuristic with no "
         "equivalent compatibility-only or scored frozen rule; the catalog's "
         "CORE-LINK-* rules test link presence/validity, not count thresholds.",
+    ),
+    CrosswalkRecord(
+        "link-architecture-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current link-architecture-site evaluates site-wide internal-linking "
+        "topology as one aggregate diagnostic; the draft catalog's CORE-LINK-* "
+        "rules are per-page atomic checks and do not encode that aggregate "
+        "topology semantics.",
+    ),
+    CrosswalkRecord(
+        "orphan-candidates-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current orphan-candidates-site flags pages with no discovered inbound "
+        "internal links as a site-wide diagnostic; no draft catalog rule encodes "
+        "that cross-page inbound-link-graph heuristic.",
+    ),
+    CrosswalkRecord(
+        "link-depth-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current link-depth-site measures click-depth from the crawl root as a "
+        "site-wide diagnostic; the draft catalog has no rule encoding that "
+        "graph-distance heuristic.",
+    ),
+    CrosswalkRecord(
+        "anchor-distribution-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current anchor-distribution-site analyzes anchor-text diversity across "
+        "the crawl as a site-wide diagnostic; no draft catalog rule encodes that "
+        "cross-page anchor-text heuristic.",
+    ),
+    CrosswalkRecord(
+        "internal-link-authority-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current internal-link-authority-site estimates relative internal "
+        "PageRank-style authority across the crawl; the draft catalog has no "
+        "rule encoding that graph-authority heuristic.",
+    ),
+    CrosswalkRecord(
+        "image-inventory-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current image-inventory-site aggregates alt-text/dimension coverage "
+        "across the crawl as a site-wide diagnostic; the draft catalog's IMG-* "
+        "rules are per-page atomic checks and do not encode that aggregate "
+        "inventory semantics.",
+    ),
+    CrosswalkRecord(
+        "sitemap-reconciliation-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current sitemap-reconciliation-site compares crawl coverage against a "
+        "supplied sitemap as a site-wide diagnostic; the draft catalog's "
+        "ROBOTS-SITEMAP-* rules are per-origin fetch/parse checks and do not "
+        "encode that crawl-vs-sitemap reconciliation semantics.",
+    ),
+    CrosswalkRecord(
+        "robots-reconciliation-site",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current robots-reconciliation-site simulates virtual robots policies "
+        "against observed crawl behavior as a site-wide diagnostic; the draft "
+        "catalog's ROBOTS-SITEMAP-* rules test the fetched policy directly and "
+        "do not encode that simulation-vs-observed-behavior semantics.",
+    ),
+    CrosswalkRecord(
+        "crawl-coverage",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current crawl-coverage reports the proportion of discovered URLs "
+        "actually crawled as a site-wide diagnostic; no draft catalog rule "
+        "encodes that aggregate coverage-ratio heuristic.",
     ),
     CrosswalkRecord(
         "insecure-links-pages",
@@ -173,6 +328,53 @@ SEO_CROSSWALK_RECORDS: tuple[CrosswalkRecord, ...] = (
         "Retained purely for selection-namespace compatibility (see #2); no "
         "catalog rule currently encodes internal-nofollow-link semantics.",
     ),
+    CrosswalkRecord(
+        "ga-no-traffic",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current ga-no-traffic is a Google Analytics provider-derived diagnostic "
+        "with no bearing on the draft catalog's collected-facts model; no frozen "
+        "rule encodes provider-analytics semantics in this draft.",
+    ),
+    CrosswalkRecord(
+        "ga-bounce-rate",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current ga-bounce-rate is a Google Analytics provider-derived "
+        "diagnostic; no frozen rule encodes provider-analytics semantics in "
+        "this draft.",
+    ),
+    CrosswalkRecord(
+        "ga-nonindexed-traffic",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current ga-nonindexed-traffic cross-references Analytics traffic "
+        "against indexability; no frozen rule encodes that provider-analytics "
+        "cross-reference semantics in this draft.",
+    ),
+    CrosswalkRecord(
+        "gsc-no-clicks",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current gsc-no-clicks is a Search Console provider-derived diagnostic; "
+        "no frozen rule encodes provider-search-console semantics in this draft.",
+    ),
+    CrosswalkRecord(
+        "gsc-no-impressions",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current gsc-no-impressions is a Search Console provider-derived "
+        "diagnostic; no frozen rule encodes provider-search-console semantics "
+        "in this draft.",
+    ),
+    CrosswalkRecord(
+        "gsc-nonindexed-impressions",
+        (),
+        CrosswalkRelation.NON_EQUIVALENT,
+        "Current gsc-nonindexed-impressions cross-references Search Console "
+        "impressions against indexability; no frozen rule encodes that "
+        "provider-cross-reference semantics in this draft.",
+    ),
 )
 
 _RECORDS_BY_LIVE_ID: dict[str, CrosswalkRecord] = {record.live_id: record for record in SEO_CROSSWALK_RECORDS}
@@ -186,6 +388,7 @@ def crosswalk_manifest() -> tuple[dict[str, object], ...]:
             "frozen_rule_ids": record.frozen_rule_ids,
             "relation": record.relation.value,
             "difference": record.difference,
+            "expected_frozen_rule_versions": record.expected_frozen_rule_versions,
         }
         for record in SEO_CROSSWALK_RECORDS
     )
@@ -239,6 +442,7 @@ def validate_crosswalk_against_snapshot(snapshot: RuleCatalogSnapshot | None = N
     """
     snapshot = snapshot or load_rule_catalog_snapshot()
     known_frozen_ids = {entry.rule_id for entry in snapshot.entries}
+    known_frozen_versions = {entry.rule_id: entry.version for entry in snapshot.entries}
     errors: list[str] = []
 
     seen_live_ids: set[str] = set()
@@ -280,6 +484,23 @@ def validate_crosswalk_against_snapshot(snapshot: RuleCatalogSnapshot | None = N
                 errors.append(
                     f"crosswalk live_id {record.live_id!r} references unknown frozen rule id {frozen_id!r}"
                 )
+
+        if record.frozen_rule_ids and len(record.expected_frozen_rule_versions) != len(record.frozen_rule_ids):
+            errors.append(
+                f"crosswalk live_id {record.live_id!r} must pin exactly one expected_frozen_rule_versions "
+                f"entry per frozen_rule_ids entry ({len(record.frozen_rule_ids)} expected, "
+                f"got {len(record.expected_frozen_rule_versions)})"
+            )
+        else:
+            for frozen_id, expected_version in zip(record.frozen_rule_ids, record.expected_frozen_rule_versions):
+                actual_version = known_frozen_versions.get(frozen_id)
+                if actual_version is not None and actual_version != expected_version:
+                    errors.append(
+                        f"crosswalk live_id {record.live_id!r} pins {frozen_id!r} at version "
+                        f"{expected_version!r}, but the catalog now publishes version "
+                        f"{actual_version!r} -- this mapping is stale and must be re-verified "
+                        "before it can be trusted at the new version"
+                    )
 
     if errors:
         raise ValueError("invalid SEO crosswalk:\n- " + "\n- ".join(errors))

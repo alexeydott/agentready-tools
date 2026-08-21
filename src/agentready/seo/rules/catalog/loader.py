@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.resources
+import re
 from dataclasses import dataclass
 from importlib.resources.abc import Traversable
 from typing import Mapping
@@ -22,6 +23,15 @@ _CATALOG_SCHEMA_NAME = "agentready.rule-catalog.v2.schema.json"
 
 _VALID_SCORE_ROLES = frozenset({"scored", "diagnostic", "observation_only"})
 _VALID_FAILURE_POLICIES = frozenset({"block_on_missing_facts", "unknown_on_missing_facts"})
+_VALID_MECHANISMS = frozenset({"atomic_check", "composite_check"})
+_VALID_RULE_KINDS = frozenset({"scored_rule", "diagnostic_rule", "observation_rule"})
+_VALID_AUTOMATION_MODES = frozenset({"automated", "manual", "hybrid"})
+
+# Mirrors the `rule_id`/`version` `pattern` constraints published in
+# agentready.rule-catalog.v2.schema.json. Kept in sync deliberately (see #21
+# integrity gate) rather than parsing the JSON Schema at runtime.
+_RULE_ID_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$")
+_SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 class RuleCatalogValidationError(ValueError):
@@ -51,6 +61,12 @@ class RuleCatalogRule:
     score_role: str
     failure_policy: str
     summary: str
+    mechanism: str
+    rule_kind: str
+    automation_mode: str
+    profiles: tuple[str, ...]
+    comparison_dimensions: tuple[str, ...]
+    verification_plan: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +188,11 @@ def validate_catalog_document(doc: Mapping[str, object]) -> None:
         rule_id = rule.get("rule_id")
         if not _is_nonempty_str(rule_id):
             errors.append(f"{prefix}: rule_id must be a non-empty string")
+        elif not _RULE_ID_PATTERN.match(str(rule_id)):
+            errors.append(
+                f"{prefix}: rule_id {rule_id!r} does not match required pattern "
+                f"{_RULE_ID_PATTERN.pattern!r}"
+            )
         else:
             if rule_id in seen_rule_ids:
                 errors.append(f"duplicate rule_id: {rule_id}")
@@ -180,6 +201,11 @@ def validate_catalog_document(doc: Mapping[str, object]) -> None:
         version = rule.get("version")
         if not _is_nonempty_str(version):
             errors.append(f"{prefix} ({rule_id}): version must be a non-empty string")
+        elif not _SEMVER_PATTERN.match(str(version)):
+            errors.append(
+                f"{prefix} ({rule_id}): version {version!r} does not match required "
+                f"pattern {_SEMVER_PATTERN.pattern!r} (x.y.z)"
+            )
 
         if not _is_nonempty_str(rule.get("title")):
             errors.append(f"{prefix} ({rule_id}): title must be a non-empty string")
@@ -231,6 +257,33 @@ def validate_catalog_document(doc: Mapping[str, object]) -> None:
         if not _is_nonempty_str(rule.get("summary")):
             errors.append(f"{prefix} ({rule_id}): summary must be a non-empty string")
 
+        mechanism = rule.get("mechanism")
+        if mechanism not in _VALID_MECHANISMS:
+            errors.append(f"{prefix} ({rule_id}): mechanism must be one of {sorted(_VALID_MECHANISMS)}")
+
+        rule_kind = rule.get("rule_kind")
+        if rule_kind not in _VALID_RULE_KINDS:
+            errors.append(f"{prefix} ({rule_id}): rule_kind must be one of {sorted(_VALID_RULE_KINDS)}")
+
+        automation_mode = rule.get("automation_mode")
+        if automation_mode not in _VALID_AUTOMATION_MODES:
+            errors.append(
+                f"{prefix} ({rule_id}): automation_mode must be one of {sorted(_VALID_AUTOMATION_MODES)}"
+            )
+
+        profiles = rule.get("profiles")
+        if not isinstance(profiles, list) or not all(_is_nonempty_str(item) for item in profiles):
+            errors.append(f"{prefix} ({rule_id}): profiles must be a list of non-empty strings")
+
+        comparison_dimensions = rule.get("comparison_dimensions")
+        if not isinstance(comparison_dimensions, list) or not all(
+            _is_nonempty_str(item) for item in comparison_dimensions
+        ):
+            errors.append(f"{prefix} ({rule_id}): comparison_dimensions must be a list of non-empty strings")
+
+        if not _is_nonempty_str(rule.get("verification_plan")):
+            errors.append(f"{prefix} ({rule_id}): verification_plan must be a non-empty string")
+
     if isinstance(rule_count, int) and not isinstance(rule_count, bool) and rule_count != len(rules):
         errors.append(f"rule_count {rule_count} does not match number of rules {len(rules)}")
 
@@ -273,6 +326,12 @@ def _build_rule(entry: Mapping[str, object]) -> RuleCatalogRule:
         score_role=str(entry["score_role"]),
         failure_policy=str(entry["failure_policy"]),
         summary=str(entry["summary"]),
+        mechanism=str(entry["mechanism"]),
+        rule_kind=str(entry["rule_kind"]),
+        automation_mode=str(entry["automation_mode"]),
+        profiles=tuple(str(item) for item in entry["profiles"]),  # type: ignore[union-attr]
+        comparison_dimensions=tuple(str(item) for item in entry["comparison_dimensions"]),  # type: ignore[union-attr]
+        verification_plan=str(entry["verification_plan"]),
     )
 
 

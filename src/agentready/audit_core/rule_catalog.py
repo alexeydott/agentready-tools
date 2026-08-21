@@ -16,6 +16,7 @@ former; it never reads or writes custom ruleset state.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Mapping
 
 from agentready.seo.rules.catalog import (
@@ -54,15 +55,12 @@ class RuleCatalogFactRequirementView:
 class RuleCatalogEntry:
     """Immutable runtime view of a single frozen catalog rule.
 
-    Fields map directly onto the packaged catalog document. A small number
-    of fields (``mechanism``, ``rule_kind``, ``automation_mode``,
-    ``profiles``, ``comparison_dimensions``, ``verification_plan``) are
-    normalized *projections* derived from the current #17 catalog content
-    (module/score_role/summary) rather than independently-authored catalog
-    fields, because the #17 artifact does not yet carry that vocabulary
-    separately. They are exposed here so #19 (runtime projection) and #20
-    (compatibility crosswalk) have a stable place to read/refine them
-    without re-parsing the catalog document themselves.
+    All fields map directly onto authored catalog document content (see
+    ``agentready.rule-catalog.v2.yaml`` / ``.schema.json``). None of
+    ``mechanism``, ``rule_kind``, ``automation_mode``, ``profiles``,
+    ``comparison_dimensions``, or ``verification_plan`` are synthesized by
+    this module; they are read as-authored from the packaged catalog, which
+    now carries them as first-class, schema-validated fields (#17/#18).
     """
 
     rule_id: str
@@ -84,13 +82,6 @@ class RuleCatalogEntry:
     verification_plan: str
 
 
-_RULE_KIND_BY_SCORE_ROLE: Mapping[str, str] = {
-    "scored": "scored_rule",
-    "diagnostic": "diagnostic_rule",
-    "observation_only": "observation_rule",
-}
-
-
 def _project_entry(rule: RuleCatalogRule, source_registry: Mapping[str, Mapping[str, str]]) -> RuleCatalogEntry:
     sources = tuple(
         RuleCatalogSourceRef(
@@ -104,7 +95,6 @@ def _project_entry(rule: RuleCatalogRule, source_registry: Mapping[str, Mapping[
         RuleCatalogFactRequirementView(family=req.family, min_schema_version=req.min_schema_version)
         for req in rule.fact_requirements
     )
-    rule_kind = _RULE_KIND_BY_SCORE_ROLE.get(rule.score_role, "scored_rule")
     return RuleCatalogEntry(
         rule_id=rule.rule_id,
         version=rule.version,
@@ -117,12 +107,12 @@ def _project_entry(rule: RuleCatalogRule, source_registry: Mapping[str, Mapping[
         score_role=rule.score_role,
         failure_policy=rule.failure_policy,
         summary=rule.summary,
-        mechanism="atomic-check",
-        rule_kind=rule_kind,
-        automation_mode="automated",
-        profiles=(),
-        comparison_dimensions=(),
-        verification_plan=rule.summary,
+        mechanism=rule.mechanism,
+        rule_kind=rule.rule_kind,
+        automation_mode=rule.automation_mode,
+        profiles=rule.profiles,
+        comparison_dimensions=rule.comparison_dimensions,
+        verification_plan=rule.verification_plan,
     )
 
 
@@ -149,7 +139,11 @@ class RuleCatalogSnapshot:
 
 def _build_snapshot(artifact: RuleCatalogArtifact) -> RuleCatalogSnapshot:
     entries = tuple(_project_entry(rule, artifact.source_registry) for rule in artifact.rules)
-    module_counts: Mapping[str, int] = dict(artifact.module_counts)
+    # MappingProxyType over a private copy: read-only view that cannot be
+    # mutated in place by callers, unlike a plain dict (see #18 immutability
+    # requirement -- module_counts must not be writable through the
+    # otherwise-frozen RuleCatalogSnapshot).
+    module_counts: Mapping[str, int] = MappingProxyType(dict(artifact.module_counts))
     return RuleCatalogSnapshot(
         schema=artifact.schema,
         catalog_version=artifact.catalog_version,

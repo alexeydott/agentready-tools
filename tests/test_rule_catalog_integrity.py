@@ -51,6 +51,12 @@ def _valid_document() -> dict[str, object]:
                 "score_role": "scored",
                 "failure_policy": "block_on_missing_facts",
                 "summary": "Demo rule one summary.",
+                "mechanism": "atomic_check",
+                "rule_kind": "scored_rule",
+                "automation_mode": "automated",
+                "profiles": ["default"],
+                "comparison_dimensions": ["page"],
+                "verification_plan": "Collect page fact(s) and evaluate demo rule one.",
             },
             {
                 "rule_id": "DEMO-002",
@@ -63,6 +69,12 @@ def _valid_document() -> dict[str, object]:
                 "score_role": "scored",
                 "failure_policy": "block_on_missing_facts",
                 "summary": "Demo rule two summary.",
+                "mechanism": "atomic_check",
+                "rule_kind": "scored_rule",
+                "automation_mode": "automated",
+                "profiles": ["default"],
+                "comparison_dimensions": ["page"],
+                "verification_plan": "Collect page fact(s) and evaluate demo rule two.",
             },
         ],
     }
@@ -77,6 +89,20 @@ def test_negative_fixture_duplicate_rule_id():
     document = _valid_document()
     document["rules"][1]["rule_id"] = "DEMO-001"  # type: ignore[index]
     with pytest.raises(RuleCatalogValidationError, match="duplicate rule_id"):
+        validate_catalog_document(document)
+
+
+def test_negative_fixture_malformed_rule_id_pattern():
+    document = _valid_document()
+    document["rules"][0]["rule_id"] = "demo-lowercase-not-allowed"  # type: ignore[index]
+    with pytest.raises(RuleCatalogValidationError, match="does not match required pattern"):
+        validate_catalog_document(document)
+
+
+def test_negative_fixture_malformed_version_not_semver():
+    document = _valid_document()
+    document["rules"][0]["version"] = "v1"  # type: ignore[index]
+    with pytest.raises(RuleCatalogValidationError, match="does not match required"):
         validate_catalog_document(document)
 
 
@@ -119,6 +145,27 @@ def test_negative_fixture_invalid_failure_policy():
     document = _valid_document()
     document["rules"][0]["failure_policy"] = "not-a-real-policy"  # type: ignore[index]
     with pytest.raises(RuleCatalogValidationError, match="failure_policy must be one of"):
+        validate_catalog_document(document)
+
+
+def test_negative_fixture_invalid_mechanism():
+    document = _valid_document()
+    document["rules"][0]["mechanism"] = "not-a-real-mechanism"  # type: ignore[index]
+    with pytest.raises(RuleCatalogValidationError, match="mechanism must be one of"):
+        validate_catalog_document(document)
+
+
+def test_negative_fixture_invalid_rule_kind():
+    document = _valid_document()
+    document["rules"][0]["rule_kind"] = "not-a-real-kind"  # type: ignore[index]
+    with pytest.raises(RuleCatalogValidationError, match="rule_kind must be one of"):
+        validate_catalog_document(document)
+
+
+def test_negative_fixture_invalid_automation_mode():
+    document = _valid_document()
+    document["rules"][0]["automation_mode"] = "not-a-real-mode"  # type: ignore[index]
+    with pytest.raises(RuleCatalogValidationError, match="automation_mode must be one of"):
         validate_catalog_document(document)
 
 

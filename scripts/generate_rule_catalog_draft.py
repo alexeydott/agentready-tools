@@ -164,12 +164,34 @@ FAILURE_POLICY_BY_ROLE = {
     "diagnostic": "unknown_on_missing_facts",
     "observation_only": "unknown_on_missing_facts",
 }
+RULE_KIND_BY_SCORE_ROLE = {
+    "scored": "scored_rule",
+    "diagnostic": "diagnostic_rule",
+    "observation_only": "observation_rule",
+}
+# Only module CORE-COVERAGE/CORE-CANON/GOOGLE-HREF/ROBOTS-SITEMAP/SDATA
+# combine more than one underlying fact family per rule in this draft, which
+# is treated as a `composite_check`; all other rules test one condition
+# against one primary fact family (`atomic_check`).
+COMPOSITE_MODULES = frozenset({"core-canonical", "google-hreflang", "robots-sitemap", "structured-data"})
+# Applicable execution profile(s) for this draft: every rule currently
+# targets the default readiness/seo audit profile; module-specific profile
+# refinement is left to future catalog governance, not synthesized here.
+DEFAULT_PROFILES = ("default",)
 
 
 def _rule_summary(module_id: str, prefix: str, index: int, title: str) -> str:
     return (
         f"{title}. Draft engineering-candidate rule in the {module_id} module of the "
         f"frozen v2.1.0-draft.1 catalog (id {prefix}-{index:03d})."
+    )
+
+
+def _verification_plan(module_id: str, applies_to: str, families: tuple[str, ...]) -> str:
+    return (
+        f"Collect {', '.join(families)} fact(s) for the {applies_to} subject, then evaluate "
+        f"this {module_id} rule's condition against those facts; no browser/network access is "
+        "performed by the rule itself (facts are pre-collected upstream)."
     )
 
 
@@ -196,6 +218,7 @@ def build_rules() -> list[dict[str, object]]:
                 {"family": family, "min_schema_version": "1"}
                 for family in families[: 1 + (i % len(families))]
             ]
+            mechanism = "composite_check" if (module_id in COMPOSITE_MODULES and len(fact_requirements) > 1) else "atomic_check"
             rules.append(
                 {
                     "rule_id": rule_id,
@@ -211,6 +234,14 @@ def build_rules() -> list[dict[str, object]]:
                     "score_role": role,
                     "failure_policy": FAILURE_POLICY_BY_ROLE[role],
                     "summary": _rule_summary(module_id, prefix, i, title),
+                    "mechanism": mechanism,
+                    "rule_kind": RULE_KIND_BY_SCORE_ROLE[role],
+                    "automation_mode": "automated",
+                    "profiles": list(DEFAULT_PROFILES),
+                    "comparison_dimensions": [family for family in families[: 1 + (i % len(families))]],
+                    "verification_plan": _verification_plan(
+                        module_id, applies_to, tuple(f["family"] for f in fact_requirements)
+                    ),
                 }
             )
     return rules

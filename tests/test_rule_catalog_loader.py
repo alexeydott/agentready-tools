@@ -69,6 +69,17 @@ def test_snapshot_entries_tuple_cannot_be_appended_to():
         snapshot.entries.append(snapshot.entries[0])  # type: ignore[attr-defined]
 
 
+def test_snapshot_module_counts_cannot_be_mutated_in_place():
+    """#18 requires true immutability, not just a frozen dataclass wrapper:
+    module_counts must reject item assignment/deletion even though the
+    dataclass field itself only holds a reference to the mapping."""
+    snapshot = load_rule_catalog_snapshot()
+    with pytest.raises(TypeError):
+        snapshot.module_counts["core-coverage"] = 0  # type: ignore[index]
+    with pytest.raises(TypeError):
+        del snapshot.module_counts["core-coverage"]  # type: ignore[attr-defined]
+
+
 def test_entry_lookup_helpers():
     snapshot = load_rule_catalog_snapshot()
     entry = snapshot.entry("CORE-COVERAGE-001")
