@@ -6,13 +6,18 @@ These tests enforce, deterministically and offline, that the reconciliation
 matrix stays consistent with the frozen catalog snapshot and with the real
 produced-fact contract at the accepted base:
 
-* exact wave coverage and per-row identity against the live snapshot;
+* exact wave coverage and per-row identity against the live snapshot,
+  including the exact applicability contract (scope AND condition);
 * catalog digest/version equality (no catalog byte changed by #50);
-* structural completeness and enum validity of every row;
+* structural completeness, enum validity, and per-evidence-token provenance;
+* declared-family evidence admissibility: any evidence token outside the
+  rule's declared families must be explicitly wired to a governing issue;
 * separation of catalog-authored semantics from proposed conditions
-  (unaccepted semantics cannot bind authoritatively);
-* absence of emitters for the unproducible fact families, so gaps stay
-  explicit instead of being synthesized by evaluators.
+  (unaccepted semantics cannot bind authoritatively; this PR is not an
+  acceptance mechanism);
+* absence of emitters for the unproducible fact families via an AST scan of
+  pipeline modules plus an assignment-form regex lock, with the documented
+  adapter boundary checked against reality.
 
 Targeted exact-HEAD suite (gate 11):
 
@@ -22,6 +27,7 @@ Targeted exact-HEAD suite (gate 11):
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -34,6 +40,7 @@ from agentready.audit_core.collection import (
 )
 from agentready.audit_core.fact_schema import DEFAULT_FACT_SCHEMA_VERSIONS
 from agentready.audit_core.rule_catalog import RuleCatalogEntry, load_rule_catalog_snapshot
+from agentready.audit_core import run_facts as run_facts_module
 
 MATRIX_RELPATH = Path("docs") / "stage-e-wave1-reconciliation.yaml"
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -65,6 +72,7 @@ REQUIRED_ROW_KEYS = (
     "module",
     "catalog_title",
     "scope",
+    "applicability_condition",
     "fact_requirements",
     "score_role",
     "failure_policy",
@@ -76,6 +84,7 @@ REQUIRED_ROW_KEYS = (
     "missing_behavior",
     "match_status",
     "disposition",
+    "paths",
     "disposition_detail",
     "required_change",
     "owning_ref",
@@ -97,6 +106,19 @@ EXECUTABLE_CONDITION_SURFACE = (
     "params",
     "assertions",
 )
+
+# Evidence token prefixes that are identity inputs rather than observations.
+IDENTITY_PREFIXES = {"subject"}
+PIPELINE_MODULES = ("collection.py", "crawler.py", "discovery.py", "run_facts.py", "store.py")
+
+
+def _evidence_tokens(row: dict) -> set[str]:
+    tokens: set[str] = set()
+    for block_key in ("authoritative_executable_condition", "proposed_executable_condition"):
+        block = row.get(block_key)
+        if isinstance(block, dict):
+            tokens.update(block.get("evidence_fields") or ())
+    return tokens
 
 
 def _load_matrix() -> dict:
@@ -134,6 +156,30 @@ def test_matrix_identity_matches_live_snapshot(matrix, snapshot) -> None:
     assert re.fullmatch(r"[0-9a-f]{40}", matrix["accepted_base"])
 
 
+def test_rows_record_exact_applicability_contract(rules, snapshot) -> None:
+    """P0: scope and applicability condition must match the snapshot exactly."""
+    for rule_id, row in rules.items():
+        entry = snapshot.entry(rule_id)
+        assert row["scope"] == entry.scope, rule_id
+        assert row["applicability_condition"] == entry.condition, rule_id
+
+
+def test_followup_issues_are_wired(matrix) -> None:
+    followups = matrix["followup_issues"]
+    for key in (
+        "gov_canonical",
+        "gov_links",
+        "gov_google_desc",
+        "gov_google_title",
+        "fact_transport",
+        "fact_projections_resources",
+    ):
+        assert re.fullmatch(r"#\d+", followups[key]), key
+    authority = matrix["authority"]
+    assert authority["this_pr_is_not_an_acceptance_mechanism"] is True
+    assert authority["declared_family_evidence_rule"] is True
+
+
 def test_rows_are_structurally_complete_and_synced(rules, snapshot) -> None:
     for rule_id, row in rules.items():
         for key in REQUIRED_ROW_KEYS:
@@ -155,6 +201,9 @@ def test_row_enums_are_valid(rules) -> None:
     for rule_id, row in rules.items():
         assert row["match_status"] in MATCH_STATUS_VALUES, rule_id
         assert row["disposition"] in DISPOSITION_VALUES, rule_id
+        assert row["paths"], rule_id
+        for path in row["paths"]:
+            assert path[0] in DISPOSITION_VALUES or path.startswith(("A-", "D-")), (rule_id, path)
 
 
 def test_gate6_no_hidden_thresholds_outside_governance(rules) -> None:
@@ -176,16 +225,18 @@ def test_gate6_no_hidden_thresholds_outside_governance(rules) -> None:
             ), rule_id
 
 
-def test_canon008_is_the_only_catalog_derived_condition(rules) -> None:
+def test_canon008_is_deferred_not_path_a(rules) -> None:
+    """P0: semantic MATCH stands but binding readiness is blocked -> Path D."""
+    row = rules["CORE-CANON-008"]
+    assert row["match_status"] == "MATCH"
+    assert row["disposition"] == "D"
+    assert "blocked" in row["binding_readiness"]
     derived = {
         rule_id
-        for rule_id, row in rules.items()
-        if row["authoritative_executable_condition"] is not None
+        for rule_id, item in rules.items()
+        if item["authoritative_executable_condition"] is not None
     }
     assert derived == {"CORE-CANON-008"}
-    block = rules["CORE-CANON-008"]["authoritative_executable_condition"]
-    assert block["governance_status"] == "catalog_derived"
-    assert "title" in block["source"]
 
 
 def test_proposed_link_contracts_define_decision_space(rules) -> None:
@@ -198,6 +249,35 @@ def test_proposed_link_contracts_define_decision_space(rules) -> None:
         assert ("negative" in proposed) or ("warn" in proposed), rule_id
         assert "indeterminate" in proposed, rule_id
         assert proposed.get("evidence_fields"), rule_id
+
+
+def test_every_evidence_token_has_provenance(rules) -> None:
+    """P0: producers must cover every consumed evidence field, LINK rows included."""
+    for rule_id, row in rules.items():
+        producers = row["producers"]
+        assert producers, f"{rule_id}: empty provenance"
+        for token in _evidence_tokens(row):
+            assert token in producers, f"{rule_id}: no provenance for {token}"
+            entry = producers[token]
+            assert "producer" in entry and "scoping" in entry, (rule_id, token)
+
+
+def test_declared_family_evidence_consistency(rules) -> None:
+    """P0: evidence outside declared families requires explicit governance wiring."""
+    for rule_id, row in rules.items():
+        declared = {req["family"] for req in row["fact_requirements"]}
+        non_declared = row.get("non_declared_evidence") or {}
+        has_gap_note = bool(row.get("declared_surface_gap"))
+        paths = set(row["paths"])
+        for token in _evidence_tokens(row):
+            prefix = token.split("[")[0].split(".")[0]
+            if prefix in declared or prefix in IDENTITY_PREFIXES or token == "subject_origin":
+                continue
+            wired = token in non_declared or prefix in non_declared
+            assert wired, f"{rule_id}: undeclared evidence {token} not wired"
+            if row["disposition"] != "D":
+                assert has_gap_note, f"{rule_id}: missing declared_surface_gap"
+                assert "C" in paths, f"{rule_id}: requirement amendment path missing"
 
 
 def test_gate7_unaccepted_semantics_cannot_bind_authoritatively(rules, matrix) -> None:
@@ -215,7 +295,59 @@ def test_gate7_unaccepted_semantics_cannot_bind_authoritatively(rules, matrix) -
     assert authority["binding_requires_accepted_governance_path"] is True
 
 
-def test_gate8_unproducible_family_emitters_stay_absent() -> None:
+def _envelope_emitter_ast_offenders() -> list[str]:
+    """AST detection of envelope-kind constructions for the four families.
+
+    Flags only emitter-shaped nodes — assignments to schema_family/kind,
+    keywords named schema_family/kind, and dict literals keyed schema_family/
+    kind whose value is a family-name constant. Payload-field access such as
+    ``payload.get("links")`` inside the legitimate page@1 adapter is NOT an
+    emitter and must stay unflagged.
+    """
+    families = {"links", "transport", "resources", "structured-data"}
+    kind_names = {"schema_family", "kind"}
+    offenders: list[str] = []
+    src_root = REPO_ROOT / "src" / "agentready"
+    for path in sorted(src_root.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        rel = str(path.relative_to(REPO_ROOT))
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id in kind_names for t in node.targets)
+                and isinstance(node.value, ast.Constant)
+                and node.value.value in families
+            ):
+                offenders.append(f"{rel}:{node.lineno}")
+            if isinstance(node, ast.keyword) and node.arg in kind_names:
+                if isinstance(node.value, ast.Constant) and node.value.value in families:
+                    offenders.append(f"{rel}:{getattr(node.value, 'lineno', node.lineno)}")
+            if isinstance(node, ast.Dict):
+                for key, value in zip(node.keys, node.values):
+                    if (
+                        isinstance(key, ast.Constant)
+                        and key.value in kind_names
+                        and isinstance(value, ast.Constant)
+                        and value.value in families
+                    ):
+                        offenders.append(f"{rel}:{key.lineno}")
+        if offenders:
+            break
+    return offenders
+
+
+def test_gate8_pipeline_modules_never_construct_wave_family_envelopes() -> None:
+    """P0/P1: AST-level lock over emitter-shaped constructions repo-wide.
+
+    Catches keyword/dict/assignment constructions that a plain regex could
+    miss, while ignoring payload-field access in the page@1 adapter.
+    """
+    assert _envelope_emitter_ast_offenders() == []
+
+
+def test_gate8_no_assignment_form_emitters_anywhere_in_src() -> None:
     families = ("links", "transport", "resources", "structured-data")
     for family in families:
         assert DEFAULT_FACT_SCHEMA_VERSIONS.get(family) == "1"
@@ -223,12 +355,27 @@ def test_gate8_unproducible_family_emitters_stay_absent() -> None:
         r"\b(?:schema_family|kind)\s*(:|=)(?!=)\s*[\"'](?:" + "|".join(families) + r")[\"']"
     )
     offenders: list[str] = []
-    for path in (REPO_ROOT / "src" / "agentready").rglob("*.py"):
+    src_root = REPO_ROOT / "src" / "agentready"
+    for path in src_root.rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
         if pattern.search(path.read_text(encoding="utf-8")):
             offenders.append(str(path.relative_to(REPO_ROOT)))
     assert offenders == [], "unexpected envelope emitters for unproducible families"
+
+
+def test_adapter_boundary_documented_and_real(matrix) -> None:
+    emitters = {item["family"]: item["adapter"] for item in matrix["adapter_boundary"]["emitters"]}
+    assert set(emitters) == {"page", "representation", "robots.fetch|robots.parsed|robots.policy|sitemap.*"}
+    persist_functions = {
+        name
+        for name in dir(run_facts_module)
+        if name.startswith("persist_") and callable(getattr(run_facts_module, name))
+    }
+    robots_or_sitemap = [n for n in persist_functions if "robots" in n or "sitemap" in n]
+    assert robots_or_sitemap, "run_facts emitters disappeared"
+    non_emitted = set(matrix["adapter_boundary"]["non_emitted_registered_families"])
+    assert non_emitted == {"links", "transport", "resources", "structured-data"}
 
 
 def test_gate4_page_producer_roundtrip_preserves_wave_evidence_fields() -> None:
