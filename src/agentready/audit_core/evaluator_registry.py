@@ -42,6 +42,7 @@ __all__ = [
     "EvaluatorResult",
     "EvaluatorBinding",
     "EvaluatorRegistry",
+    "ExpectedContract",
     "ExpectedRuleContract",
     "FrozenRuleBindingError",
     "UnregisteredRuleError",
@@ -133,6 +134,27 @@ class EvaluatorBinding:
     evaluator: Evaluator
 
 
+@dataclass(frozen=True, slots=True)
+class ExpectedContract:
+    """Table-driven catalog contract expectation for one frozen rule target.
+
+    Each registry validates its own expected contracts against the packaged
+    catalog before a binding is returned; the canary keeps its exact E0
+    contract, and other families declare their own rows.
+    """
+
+    rule_id: str
+    version: str
+    scope: str
+    condition: str
+    facts: tuple[tuple[str, str], ...]
+    score_role: str
+    failure_policy: str
+    mechanism: str
+    rule_kind: str
+    automation_mode: str
+
+
 class EvaluatorRegistry:
     """Explicit evaluator allowlist; catalog rows are never auto-registered."""
 
@@ -141,11 +163,15 @@ class EvaluatorRegistry:
         bindings: Iterable[tuple[str, str, Evaluator]] = (),
         *,
         allowlist: Iterable[tuple[str, str]] | None = None,
+        expected_contracts: Mapping[tuple[str, str], ExpectedContract] | None = None,
     ) -> None:
         self._allowlist: frozenset[tuple[str, str]] = (
             frozenset(allowlist)
             if allowlist is not None
             else frozenset({(CORE_COVERAGE_RULE_ID, CORE_COVERAGE_RULE_VERSION)})
+        )
+        self._expected_contracts: dict[tuple[str, str], ExpectedContract] = dict(
+            expected_contracts or {}
         )
         self._bindings: dict[tuple[str, str], Evaluator] = {}
         for rule_id, version, evaluator in bindings:
@@ -263,7 +289,28 @@ def bind_frozen_rule(
             f"catalog target version is stale: requested {rule_id}@{version}, found {entry.version}"
         )
     evaluator = registry.resolve(rule_id, version)
-    _validate_canary_contract(entry)
+    if getattr(registry, "_expected_contracts", None):
+        expected = registry._expected_contracts.get((entry.rule_id, entry.version))
+        facts = tuple(
+            (item.family, item.min_schema_version) for item in entry.fact_requirements
+        )
+        if (
+            expected is None
+            or entry.scope != expected.scope
+            or entry.condition != expected.condition
+            or facts != expected.facts
+            or entry.score_role != expected.score_role
+            or entry.failure_policy != expected.failure_policy
+            or entry.mechanism != expected.mechanism
+            or entry.rule_kind != expected.rule_kind
+            or entry.automation_mode != expected.automation_mode
+        ):
+            raise FrozenRuleBindingError(
+                f"catalog contract does not match the accepted frozen contract: "
+                f"{entry.rule_id}@{entry.version}"
+            )
+    else:
+        _validate_canary_contract(entry)
     return EvaluatorBinding(rule_id, version, entry.title, project_entry(entry), evaluator)
 
 
