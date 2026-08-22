@@ -1,0 +1,518 @@
+# Stage E wave 1 — executable rule semantics and produced fact payload
+# reconciliation matrix (GitHub issue #50, E2-PREP).
+#
+# Authority model:
+#   * Authoritative today = frozen catalog metadata only (title,
+#     fact_requirements, score_role, failure_policy, mechanism, rule_kind,
+#     automation_mode, applicability) plus repository fact contracts that are
+#     actually produced by the shared collection/store/replay path at the
+#     accepted base.
+#   * Every `executable_condition` block carries `governance_status`.
+#     `proposed` conditions are NOT authoritative; they become binding only
+#     after the recorded governance path is accepted.
+#   * This matrix changes no catalog bytes: catalog digest below must equal
+#     the live snapshot digest (enforced by
+#     tests/test_stage_e_wave1_reconciliation.py).
+schema: agentready.stage-e-wave1-reconciliation.v1
+wave: stage-e-wave-1
+accepted_base: 54135bedeedf5b94f731f416c208cd3937214cff
+authority:
+  catalog_authored_is_authoritative: true
+  catalog_authored_fields: [title, fact_requirements, score_role, failure_policy, mechanism, rule_kind, automation_mode, applicability]
+  proposed_conditions_are_not_authoritative: true
+  binding_requires_accepted_governance_path: true
+rule_catalog:
+  name: agentready.rule-catalog.v2
+  version: 2.1.0-draft.1
+  digest: a1507f064f95248d6ee21a1a2123f3b09f4f138012f10d3dd310654a72b62f17
+  digest_basis: sha256 over packaged agentready.rule-catalog.v2.yaml bytes
+produced_fact_contract_at_base:
+  page@1:
+    producer: audit_core.collection ParsedFacts via parse_page on collected representations
+    fields:
+      - titles
+      - descriptions
+      - headings
+      - meta_robots
+      - canonicals
+      - hreflang
+      - base_href
+      - lang
+      - links[] (raw_href, resolved_url, rel, element, anchor_text, source_representation_id, ordinal)
+      - images[]
+      - jsonld_markers / jsonld_nodes / jsonld_errors / jsonld_block_count
+    persisted_and_replayed: true (SiteStore records + replay_collected_pages)
+  robots.fetch|robots.parsed|robots.policy|sitemap.*:
+    producer: audit_core.run_facts persist_* helpers
+    persisted_and_replayed: true
+  links@1:
+    producer: NONE — family registered in DEFAULT_FACT_SCHEMA_VERSIONS but no envelope emitter exists
+  transport@1:
+    producer: NONE — family registered, no emitter exists
+  resources@1:
+    producer: NONE — family registered, no emitter exists
+  structured-data@1:
+    producer: NO standalone envelope — structured-data content is nested inside page@1 (jsonld_*)
+match_status_enum: [MATCH, SEMANTIC_MISMATCH, MISSING_PRODUCED_FIELD, UNGOVERNED_THRESHOLD, BLOCKED]
+disposition_enum:
+  A: existing contract sufficient
+  B: fact-contract change required
+  C: rule semantic/catalog governance change required
+  D: rule cannot yet be bound
+rules:
+  - rule_id: CORE-CANON-002
+    version: 1.0.0
+    module: core-canonical
+    catalog_title: "Canonical URL uses the same scheme/host as the audited origin"
+    scope: html-page; applies whenever a html-page subject was collected for the run
+    fact_requirements: [{family: page, min_schema_version: "1"}, {family: links, min_schema_version: "1"}, {family: transport, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      verdicts:
+        UNKNOWN: canonical declaration count != 1
+        PASS: urlsplit(page.canonicals[0]).scheme and host == transport.origin scheme/host (case-insensitive host, default-port normalized away)
+        FAIL: otherwise
+      evidence_fields: [page.canonicals, transport.origin]
+    producers:
+      page.canonicals: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
+      transport.origin: {producer: NONE, representation: absent, scoping: absent, replayed: false}
+    missing_behavior: block_on_missing_facts -> evaluator not invoked; finding UNAVAILABLE while any required family is unproducible
+    match_status: MISSING_PRODUCED_FIELD
+    disposition: B
+    disposition_detail: >
+      Evaluator decision (scheme/host equality) is well defined, but its
+      required input transport.origin has no producer in the shared pipeline;
+      PR #46 supplies it only through synthetic test envelopes.
+    required_change: produce transport@1 (origin, final_url, redirect_chain) at the bounded Fetcher/collection boundary with schema versioning and replay persistence; switch tests to real producer-shaped payloads
+    owning_ref: "#46 (correction) + follow-up fact-contract PR"
+  - rule_id: CORE-CANON-003
+    version: 1.0.0
+    module: core-canonical
+    catalog_title: "Canonical URL is not blocked by robots directives"
+    scope: html-page; applies whenever a html-page subject was collected for the run
+    fact_requirements: [{family: page, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      verdicts:
+        FAIL: effective robot directive set contains noindex or none (canonical target excluded from indexing); nofollow deliberately NOT blocking because it governs link crawling, not indexation
+        PASS: otherwise
+        UNKNOWN: meta_robots unparsable
+      evidence_fields: [page.meta_robots]
+      open_questions_for_governance: [exact token set, case normalization, combined directives e.g. noindex,follow]
+    producers:
+      page.meta_robots: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
+    missing_behavior: block_on_missing_facts -> UNAVAILABLE when page@1 missing
+    match_status: SEMANTIC_MISMATCH
+    disposition: C
+    disposition_detail: >
+      Blocking token set is evaluator-authored ({noindex, none}); the branch
+      docstring claims nofollow is included while code omits it. No accepted
+      contract defines the token semantics.
+    required_change: author explicit token-level semantic contract through governance; align implementation and docstrings to the accepted text
+    owning_ref: "#24 / PR #46 correction + catalog semantic-contract governance"
+  - rule_id: CORE-CANON-004
+    version: 1.0.0
+    module: core-canonical
+    catalog_title: "Canonical URL does not point to a redirect chain"
+    scope: html-page
+    fact_requirements: [{family: page, min_schema_version: "1"}, {family: links, min_schema_version: "1"}]
+    score_role: diagnostic
+    failure_policy: unknown_on_missing_facts
+    mechanism: composite_check
+    rule_kind: diagnostic_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      verdicts:
+        UNKNOWN: canonical count != 1 or transport.redirect_chain unavailable
+        FAIL: canonical URL equals a non-initial hop of transport.redirect_chain
+        PASS: otherwise
+      evidence_fields: [page.canonicals, transport.redirect_chain]
+      note: redirect_chain belongs to the transport family, not links as wired in PR #46
+    producers:
+      transport.redirect_chain: {producer: NONE, representation: absent, scoping: subject/request-scoped, replayed: false}
+    missing_behavior: unknown_on_missing_facts -> UNKNOWN
+    match_status: MISSING_PRODUCED_FIELD
+    disposition: B
+    disposition_detail: redirect history is request-scoped transport evidence; PR #46 reads it from a links envelope that no producer emits
+    required_change: same transport@1 production as CORE-CANON-002; move evidence read from links envelope to transport envelope
+    owning_ref: "#24 / PR #46 correction + follow-up fact-contract PR"
+  - rule_id: CORE-CANON-005
+    version: 1.0.0
+    module: core-canonical
+    catalog_title: "Self-referencing canonical matches the requested URL for paginated pages"
+    scope: html-page
+    fact_requirements: [{family: page, min_schema_version: "1"}, {family: links, min_schema_version: "1"}, {family: transport, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      verdicts:
+        UNKNOWN: canonical count != 1
+        NOT_APPLICABLE: no pagination signal observed
+        PASS: paginated AND canonical == transport.final_url
+        FAIL: paginated AND canonical != transport.final_url
+      pagination_signal: lowercase rel tokens of page.links[] intersect {next, prev} — derivable from already-produced page@1 LinkOccurrence.rel
+      evidence_fields: [page.canonicals, 'page.links[].rel', transport.final_url]
+    producers:
+      'page.links[].rel': {producer: collection.ParsedFacts, representation: per-link string, scoping: document/subject, replayed: true}
+      transport.final_url: {producer: NONE, representation: absent, scoping: absent, replayed: false}
+    missing_behavior: block_on_missing_facts -> UNAVAILABLE while families unproducible
+    match_status: MISSING_PRODUCED_FIELD
+    disposition: B
+    disposition_detail: PR #48-style synthetic rel_values/links-envelope not needed — rel is produced inside page@1; only transport.final_url requires new production
+    required_change: transport@1 production; re-point evaluator at page.links[].rel instead of synthetic links.rel_values
+    owning_ref: "#24 / PR #46 correction + follow-up fact-contract PR"
+  - rule_id: CORE-CANON-006
+    version: 1.0.0
+    module: core-canonical
+    catalog_title: "Canonical URL avoids parameter-only duplicate variants"
+    scope: html-page
+    fact_requirements: [{family: page, min_schema_version: "1"}]
+    score_role: observation_only
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: observation_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      verdicts:
+        UNKNOWN: canonical count != 1 or variant inventory unavailable
+        FAIL: any observed variant shares canonical scheme+host+path AND has non-empty query
+        PASS: otherwise
+      evidence_fields: [page.canonicals, run.parameter_variants (projection)]
+    producers:
+      run.parameter_variants: {producer: NONE — requires run-scoped projection over collected URL inventory, representation: absent, scoping: run, replayed: false}
+    missing_behavior: unknown_on_missing_facts -> UNKNOWN
+    match_status: MISSING_PRODUCED_FIELD
+    disposition: B
+    disposition_detail: parameter-only duplicates are a run-scoped view over the collected URL inventory; no producer exposes it to the evaluator today
+    required_change: define projection-produced run-scoped variant inventory in the shared projection contract; evaluator consumes it without local synthesis
+    owning_ref: "#24 / PR #46 correction + follow-up fact-contract PR"
+  - rule_id: CORE-CANON-007
+    version: 1.0.0
+    module: core-canonical
+    catalog_title: "Cross-domain canonical targets are consistent across the crawl"
+    scope: html-page evaluated against run-scoped cross-subject projection
+    fact_requirements: [{family: page, min_schema_version: "1"}, {family: links, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      verdicts:
+        UNKNOWN: canonical count != 1 or projection unavailable
+        PASS: canonical on audited origin (trivial consistency)
+        FAIL: distinct off-origin canonical target set across subjects has cardinality > 1
+      evidence_fields: [page.canonicals, run.cross_domain_targets (projection)]
+      note: links.origin from PR #46 is redundant once transport.origin/subject origin exists
+    producers:
+      run.cross_domain_targets: {producer: NONE — requires run-scoped projection, representation: absent, scoping: run, replayed: false}
+    missing_behavior: block_on_missing_facts -> UNAVAILABLE
+    match_status: MISSING_PRODUCED_FIELD
+    disposition: B
+    disposition_detail: cross-crawl consistency needs a run-scoped projection of off-origin canonical targets; the evaluator currently reads synthetic links.cross_domain_targets/links.origin
+    required_change: projection-produced run-scoped cross-domain target inventory; drop evaluator-local links.origin reads
+    owning_ref: "#24 / PR #46 correction + follow-up fact-contract PR"
+  - rule_id: CORE-CANON-008
+    version: 1.0.0
+    module: core-canonical
+    catalog_title: "Canonical URL is declared exactly once per page"
+    scope: html-page
+    fact_requirements: [{family: page, min_schema_version: "1"}, {family: links, min_schema_version: "1"}, {family: transport, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: composite_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition:
+      governance_status: catalog_derived
+      source: title + score_rule semantics ("declared exactly once")
+      verdicts:
+        PASS: len(page.canonicals) == 1
+        FAIL: len(page.canonicals) != 1 (zero declarations violate "exactly once"; >1 ambiguous)
+      evidence_fields: [page.canonicals]
+    proposed_executable_condition: null
+    producers:
+      page.canonicals: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
+    missing_behavior: block_on_missing_facts applies to missing facts, not to zero declarations
+    match_status: MATCH
+    binding_readiness: blocked — declared links@1/transport@1 requirements are unproducible although the condition never reads them
+    disposition: A
+    disposition_detail: implementation logic matches the catalog-derived condition; fixtures must switch to real producer-shaped payloads
+    required_change: either produce the declared families (shared transport/links work) or amend this row's fact_requirements through catalog governance; until then the rule cannot reach READY on the normal pipeline
+    owning_ref: "#24 / PR #46 correction + catalog governance follow-up"
+  - rule_id: CORE-LINK-001
+    version: 1.0.0
+    module: core-links
+    catalog_title: "Core Links check 001"
+    scope: html-page
+    fact_requirements: [{family: links, min_schema_version: "1"}, {family: page, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      intent: page exposes resolvable internal hyperlinks
+      positive: at least one observed link resolves under the audited origin AND page is an HTML success response
+      negative: zero internal-resolvable links while page is HTML success
+      indeterminate: page status/content-type outside HTML-success envelope
+      evidence_fields: ['page.links[].resolved_url', page.status_code, page.content_type, subject origin]
+      note: counts derived inside the condition from governed page@1 links; no internal_count field introduced
+    producers: {}
+    missing_behavior: block_on_missing_facts -> UNAVAILABLE while links@1 unproducible
+    match_status: BLOCKED
+    disposition: C
+    disposition_detail: >
+      Catalog rows are engineering-candidate placeholders ("Core Links check NNN");
+      PR #47 derives semantics from position-in-family, making the evaluator the
+      normative source — incompatible with catalog-authoritative execution.
+    required_change: accept explicit per-rule semantic contracts via governance; then correct implementation to match verbatim
+    owning_ref: "#27 / PR #47 correction + catalog semantic-contract governance"
+  - rule_id: CORE-LINK-002
+    version: 1.0.0
+    module: core-links
+    catalog_title: "Core Links check 002"
+    scope: html-page
+    fact_requirements: [{family: links, min_schema_version: "1"}, {family: page, min_schema_version: "1"}, {family: resources, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      intent: declared resource URLs referenced by links resolve consistently
+      positive: every link whose raw_href matches a declared resource URL resolves to that resource's resolved_url
+      negative: at least one such link resolves elsewhere; or no link references any declared resource URL
+      indeterminate: resources inventory unavailable
+      evidence_fields: ['page.links[].raw_href/.resolved_url', resources inventory]
+    producers: {}
+    missing_behavior: block_on_missing_facts -> UNAVAILABLE
+    match_status: BLOCKED
+    disposition: C
+    disposition_detail: additionally depends on an unproducible resources@1 family
+    required_change: governance-accepted contract AND resources@1 production decision (produce or re-scope requirement)
+    owning_ref: "#27 / PR #47 correction + catalog semantic-contract governance + fact-contract decision"
+  - rule_id: CORE-LINK-003
+    version: 1.0.0
+    module: core-links
+    catalog_title: "Core Links check 003"
+    scope: html-page
+    fact_requirements: [{family: links, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      intent: page declares at least one hyperlink
+      positive: len(page.links) >= 1
+      negative: len(page.links) == 0 on a parsed HTML document
+      indeterminate: none (empty list is decisive)
+      evidence_fields: [page.links]
+    producers: {}
+    missing_behavior: block_on_missing_facts -> UNAVAILABLE
+    match_status: BLOCKED
+    disposition: C
+    disposition_detail: position-derived semantics plus an unproducible links@1 family make the rule doubly unbondable
+    required_change: governance-accepted contract; condition expressible over already-produced page@1 links if requirement is re-scoped
+    owning_ref: "#27 / PR #47 correction + catalog governance"
+  - rule_id: CORE-LINK-004
+    version: 1.0.0
+    module: core-links
+    catalog_title: "Core Links check 004"
+    scope: html-page
+    fact_requirements: [{family: links, min_schema_version: "1"}, {family: page, min_schema_version: "1"}]
+    score_role: diagnostic
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: diagnostic_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      intent: internal link availability diagnostic
+      positive: internal-resolvable links exist AND page is HTML success
+      warn: otherwise (diagnostic role — never FAIL)
+      indeterminate: internal link computation impossible
+      evidence_fields: ['page.links[]', page.status_code, page.content_type, subject origin]
+    producers: {}
+    missing_behavior: unknown_on_missing_facts -> UNKNOWN
+    match_status: BLOCKED
+    disposition: C
+    disposition_detail: WARN-vs-FAIL split is evaluator-authored; diagnostic role constrains but does not define the condition
+    required_change: governance-accepted contract
+    owning_ref: "#27 / PR #47 correction + catalog governance"
+  - rule_id: CORE-LINK-005
+    version: 1.0.0
+    module: core-links
+    catalog_title: "Core Links check 005"
+    scope: html-page
+    fact_requirements: [{family: links, min_schema_version: "1"}, {family: page, min_schema_version: "1"}, {family: resources, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      intent: internal resource orphan detection
+      positive: every declared resource URL is referenced by at least one internal link
+      negative: at least one declared resource is never referenced; or references exist but resources inventory empty
+      indeterminate: neither side observable
+      evidence_fields: [resources inventory, 'page.links[].raw_href']
+    producers: {}
+    missing_behavior: block_on_missing_facts -> UNAVAILABLE
+    match_status: BLOCKED
+    disposition: C
+    disposition_detail: orphan detection joins two inventories whose production and join semantics are both ungoverned today
+    required_change: governance-accepted contract AND resources@1 production decision
+    owning_ref: "#27 / PR #47 correction + catalog governance + fact-contract decision"
+  - rule_id: CORE-LINK-006
+    version: 1.0.0
+    module: core-links
+    catalog_title: "Core Links check 006"
+    scope: html-page
+    fact_requirements: [{family: links, min_schema_version: "1"}]
+    score_role: observation_only
+    failure_policy: unknown_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: observation_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      intent: external link census
+      positive_or_census: always PASS with external-link count as observation; count derived from governed page.links[] resolution, no external_count field
+      negative: "not applicable - observation rule records the census and never fails"
+      indeterminate: link resolution unavailable
+      evidence_fields: ['page.links[].resolved_url', subject origin]
+    producers: {}
+    missing_behavior: unknown_on_missing_facts -> UNKNOWN
+    match_status: BLOCKED
+    disposition: C
+    disposition_detail: always-pass census is evaluator-authored framing; even observation rules require an explicitly governed decision space
+    required_change: governance-accepted contract
+    owning_ref: "#27 / PR #47 correction + catalog governance"
+  - rule_id: GOOGLE-DESC-001
+    version: 1.0.0
+    module: google-metadata
+    catalog_title: "Meta description is present and within recommended length"
+    scope: html-page
+    fact_requirements: [{family: page, min_schema_version: "1"}, {family: structured-data, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      structural_part:
+        FAIL: no description / whitespace-only / more than one distinct non-empty description
+        PASS: exactly one non-empty description
+      length_band_part:
+        threshold_source: external Google guidance prose — explicitly NOT runtime evidence until governed
+        band: 120 <= collapsed-length <= 160 inclusive
+        FAIL_below: "too short (below band)"
+        FAIL_above: "too long (above band)"
+      measurement: whitespace-collapsed character length of page.descriptions[0]
+      evidence_fields: [page.descriptions]
+    producers:
+      page.descriptions: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
+      structured-data@1 envelope: {producer: NONE, representation: absent, scoping: absent, replayed: false}
+    missing_behavior: block_on_missing_facts -> UNAVAILABLE while structured-data@1 unproducible
+    match_status: UNGOVERNED_THRESHOLD
+    disposition: C
+    disposition_detail: >
+      Issue #31 forbids importing a fixed-length threshold unless the catalog is
+      separately changed; PR #48 turns 120..160 into a scored boundary sourced
+      only from a docstring. The declared structured-data@'1' family is also
+      unproducible (content nested in page@1 jsonld_*), so readiness fails
+      independently of the threshold question.
+    required_change: catalog governance accepting the exact numeric/structural boundary with provenance; separately decide structured-data@1 production vs requirement amendment
+    owning_ref: "#31 / PR #48 correction + catalog governance"
+    catalog_defects_observed: [summary embeds stale id GOOGLE-META-001 — record only; fixing changes digest and follows its own governance]
+  - rule_id: GOOGLE-TITLE-001
+    version: 1.0.0
+    module: google-metadata
+    catalog_title: "Title tag is present and within recommended length"
+    scope: html-page
+    fact_requirements: [{family: page, min_schema_version: "1"}]
+    score_role: scored
+    failure_policy: block_on_missing_facts
+    mechanism: atomic_check
+    rule_kind: scored_rule
+    automation_mode: automated
+    authoritative_executable_condition: null
+    proposed_executable_condition:
+      governance_status: proposed
+      structural_part:
+        FAIL: no title / whitespace-only after strip / more than one non-empty title
+        PASS_structural: exactly one non-empty title
+      length_band_part:
+        threshold_source: legacy SEO engine heuristic prose — explicitly NOT runtime evidence until governed
+        band: 30 <= stripped-length <= 65 inclusive
+      measurement: str.strip() character length of page.titles[0]
+      evidence_fields: [page.titles]
+    producers:
+      page.titles: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
+    missing_behavior: block_on_missing_facts -> UNAVAILABLE when page@1 missing
+    match_status: UNGOVERNED_THRESHOLD
+    disposition: C
+    disposition_detail: issue #33 supersedes the old fixed title-length plan; PR #49 authors 30..65 in evaluator constants with no accepted contract basis
+    required_change: catalog governance accepting the numeric boundary (or re-scoring structural-only semantics) before binding
+    owning_ref: "#33 / PR #49 correction + catalog governance"
+    catalog_defects_observed: [summary embeds stale id GOOGLE-META-002 — record only]
+verification_gates:
+  gate1_matrix_coverage: enforced by tests/test_stage_e_wave1_reconciliation.py::test_matrix_covers_exactly_the_wave_rules
+  gate2_decision_authority: every row separates catalog-authored metadata from proposed conditions (governance_status)
+  gate3_field_provenance: produced_fact_contract_at_base + per-rule producers sections state exact producer/persistence/scoping
+  gate4_replay: page@1 fields marked replayed:true via SiteStore + replay_collected_pages; unproduced fields marked replayed:false
+  gate5_no_evaluator_local_synthesis: rows with MISSING_PRODUCED_FIELD stay unbonded; corrections must consume shared projections only
+  gate6_no_hidden_thresholds: GOOGLE-DESC-001/GOOGLE-TITLE-001 carry authoritative_executable_condition:null until governance accepts bands
+  gate7_negative_unaccepted_semantics: test asserts snapshot exposes no executable-condition surface and matrix marks proposed blocks non-authoritative
+  gate8_negative_missing_fields: test locks absence of links/transport/resources/structured-data emitters at the accepted base so gaps stay explicit
+  gate9_crosswalk_identity: no catalog byte changed here; digest equality asserted; crosswalk untouched
+  gate10_no_cutover: no current/legacy cutover performed
+  gate11_targeted_tests_exact_head: targeted suite listed in tests/test_stage_e_wave1_reconciliation.py docstring; run before formal review
+  gate12_independent_review: pending — this issue closes only after APPROVED review
+pr_disposition_while_open:
+  "#46": BLOCKED — canonical payload/semantics reconciled here; corrections reference this matrix
+  "#47": BLOCKED — link semantics require governance acceptance of proposed contracts
+  "#48": BLOCKED — 120..160 remains evaluator-authored until catalog governance accepts it
+  "#49": BLOCKED — 30..65 remains evaluator-authored until catalog governance accepts it
+non_goals_acknowledged:
+  - no broad cutover (#34)
+  - no silent rewrite of stale summary ids
+  - no new crawler/HTTP stack/SiteStore/generic finding model
+  - no AI-generated evidence or runtime semantics
