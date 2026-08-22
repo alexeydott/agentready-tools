@@ -1,11 +1,9 @@
 """Catalog-bound, side-effect-free frozen rule evaluation.
 
-Catalog discovery and runtime authorization are separate concerns: loading a
-frozen catalog never makes a rule executable.  Each :class:`EvaluatorRegistry`
-is an explicit allowlist of frozen ``(rule_id, version)`` targets; the default
-allowlist remains the single E0 canary target, and additional frozen evaluators
-(such as the Stage E google-metadata rules) opt in with their own registries
-and expected-contract rows.
+The registry is deliberately target-specific for the E0 canary.  Catalog
+discovery and runtime authorization are separate concerns: loading a frozen
+catalog never makes a rule executable, and this registry exposes exactly one
+allowlisted binding.
 """
 from __future__ import annotations
 
@@ -44,6 +42,8 @@ __all__ = [
     "EvaluatorResult",
     "EvaluatorBinding",
     "EvaluatorRegistry",
+    "ExpectedContract",
+    "ExpectedRuleContract",
     "FrozenRuleBindingError",
     "UnregisteredRuleError",
     "UnresolvedCatalogTargetError",
@@ -57,29 +57,50 @@ __all__ = [
 
 CORE_COVERAGE_RULE_ID = "CORE-COVERAGE-001"
 CORE_COVERAGE_RULE_VERSION = "1.0.0"
-_EXPECTED_SCOPE = "html-page"
-_EXPECTED_CONDITION = "applies whenever a html-page subject was collected for the run"
-_EXPECTED_SCORE_ROLE = "scored"
-_EXPECTED_FAILURE_POLICY = "block_on_missing_facts"
-_EXPECTED_MECHANISM = "atomic_check"
-_EXPECTED_RULE_KIND = "scored_rule"
-_EXPECTED_AUTOMATION = "automated"
 
-# Table-driven expected contracts for allowlisted frozen evaluator targets.
-# Each row pins the exact catalog contract a binding must match; the canary
-# row preserves the historical E0 behavior exactly.
-_EXPECTED_CONTRACTS: dict[tuple[str, str], dict[str, Any]] = {
-    (CORE_COVERAGE_RULE_ID, CORE_COVERAGE_RULE_VERSION): {
-        "scope": _EXPECTED_SCOPE,
-        "condition": _EXPECTED_CONDITION,
-        "facts": (("page", "1"), ("robots.policy", "1")),
-        "score_role": _EXPECTED_SCORE_ROLE,
-        "failure_policy": _EXPECTED_FAILURE_POLICY,
-        "mechanism": _EXPECTED_MECHANISM,
-        "rule_kind": _EXPECTED_RULE_KIND,
-        "automation_mode": _EXPECTED_AUTOMATION,
-    },
+
+@dataclass(frozen=True, slots=True)
+class ExpectedRuleContract:
+    """Accepted catalog contract for one frozen rule binding target."""
+
+    rule_id: str
+    version: str
+    scope: str
+    condition: str
+    facts: tuple[tuple[str, str], ...]
+    score_role: str
+    failure_policy: str
+    mechanism: str
+    rule_kind: str
+    automation_mode: str
+
+
+# Table-driven accepted contracts keyed by rule_id.  The E0 canary row is the
+# original behavior; additional frozen rules append their own explicit rows.
+_EXPECTED_CONTRACTS: dict[str, ExpectedRuleContract] = {
+    CORE_COVERAGE_RULE_ID: ExpectedRuleContract(
+        rule_id=CORE_COVERAGE_RULE_ID,
+        version=CORE_COVERAGE_RULE_VERSION,
+        scope="html-page",
+        condition="applies whenever a html-page subject was collected for the run",
+        facts=(("page", "1"), ("robots.policy", "1")),
+        score_role="scored",
+        failure_policy="block_on_missing_facts",
+        mechanism="atomic_check",
+        rule_kind="scored_rule",
+        automation_mode="automated",
+    ),
 }
+
+
+def register_expected_contract(contract: ExpectedRuleContract) -> None:
+    """Register the accepted catalog contract for one additional frozen rule."""
+    existing = _EXPECTED_CONTRACTS.get(contract.rule_id)
+    if existing is not None and existing != contract:
+        raise FrozenRuleBindingError(
+            f"accepted contract already registered for {contract.rule_id}"
+        )
+    _EXPECTED_CONTRACTS[contract.rule_id] = contract
 
 
 class FrozenRuleBindingError(ValueError):
@@ -113,21 +134,45 @@ class EvaluatorBinding:
     evaluator: Evaluator
 
 
-class EvaluatorRegistry:
-    """Explicit evaluator allowlist; catalog rows are never auto-registered.
+@dataclass(frozen=True, slots=True)
+class ExpectedContract:
+    """Table-driven catalog contract expectation for one frozen rule target.
 
-    The allowlist defaults to the E0 canary target.  A registry for another
-    frozen rule must declare its exact ``(rule_id, version)`` targets via
-    ``allowlist``; registering any other target is rejected.
+    Each registry validates its own expected contracts against the packaged
+    catalog before a binding is returned; the canary keeps its exact E0
+    contract, and other families declare their own rows.
     """
+
+    rule_id: str
+    version: str
+    scope: str
+    condition: str
+    facts: tuple[tuple[str, str], ...]
+    score_role: str
+    failure_policy: str
+    mechanism: str
+    rule_kind: str
+    automation_mode: str
+
+
+class EvaluatorRegistry:
+    """Explicit evaluator allowlist; catalog rows are never auto-registered."""
 
     def __init__(
         self,
         bindings: Iterable[tuple[str, str, Evaluator]] = (),
         *,
-        allowlist: Iterable[tuple[str, str]] = ((CORE_COVERAGE_RULE_ID, CORE_COVERAGE_RULE_VERSION),),
+        allowlist: Iterable[tuple[str, str]] | None = None,
+        expected_contracts: Mapping[tuple[str, str], ExpectedContract] | None = None,
     ) -> None:
-        self._allowlist = frozenset(allowlist)
+        self._allowlist: frozenset[tuple[str, str]] = (
+            frozenset(allowlist)
+            if allowlist is not None
+            else frozenset({(CORE_COVERAGE_RULE_ID, CORE_COVERAGE_RULE_VERSION)})
+        )
+        self._expected_contracts: dict[tuple[str, str], ExpectedContract] = dict(
+            expected_contracts or {}
+        )
         self._bindings: dict[tuple[str, str], Evaluator] = {}
         for rule_id, version, evaluator in bindings:
             self.register(rule_id, version, evaluator)
@@ -199,58 +244,41 @@ CANARY_EVALUATOR_REGISTRY = EvaluatorRegistry(
 
 
 def _validate_canary_contract(entry: "RuleCatalogEntry") -> None:
-    """Validate one catalog entry against its allowlisted expected contract.
-
-    Table-driven by ``rule_id``; the canary row preserves the historical E0
-    validation behavior exactly.
-    """
-    expected = _EXPECTED_CONTRACTS.get((entry.rule_id, entry.version))
-    if expected is None:
+    """Validate a catalog entry against its accepted frozen-rule contract row."""
+    expected = _EXPECTED_CONTRACTS.get(entry.rule_id)
+    if expected is None or entry.version != expected.version:
         raise FrozenRuleBindingError(
-            f"catalog contract is not the accepted frozen evaluator contract: "
+            f"catalog contract is not an accepted frozen-rule contract: "
             f"{entry.rule_id}@{entry.version}"
         )
     facts = tuple((item.family, item.min_schema_version) for item in entry.fact_requirements)
     if (
-        entry.scope != expected["scope"]
-        or entry.condition != expected["condition"]
-        or facts != expected["facts"]
-        or entry.score_role != expected["score_role"]
-        or entry.failure_policy != expected["failure_policy"]
-        or entry.mechanism != expected["mechanism"]
-        or entry.rule_kind != expected["rule_kind"]
-        or entry.automation_mode != expected["automation_mode"]
+        entry.rule_id != expected.rule_id
+        or entry.scope != expected.scope
+        or entry.condition != expected.condition
+        or facts != expected.facts
+        or entry.score_role != expected.score_role
+        or entry.failure_policy != expected.failure_policy
+        or entry.mechanism != expected.mechanism
+        or entry.rule_kind != expected.rule_kind
+        or entry.automation_mode != expected.automation_mode
     ):
         raise FrozenRuleBindingError(
-            f"catalog contract is not the accepted frozen evaluator contract: "
+            f"catalog contract is not the accepted frozen-rule contract: "
             f"{entry.rule_id}@{entry.version}"
         )
 
 
 def bind_frozen_rule(
-    rule_id: str | None = None,
-    version: str | None = None,
+    rule_id: str = CORE_COVERAGE_RULE_ID,
+    version: str = CORE_COVERAGE_RULE_VERSION,
     *,
     snapshot: "RuleCatalogSnapshot | None" = None,
     registry: EvaluatorRegistry = CANARY_EVALUATOR_REGISTRY,
 ) -> EvaluatorBinding:
-    """Resolve one exact catalog target and one explicit evaluator binding.
-
-    When no explicit target is requested, the single registered target of the
-    supplied registry is used; this preserves the historical E0 canary call
-    signature exactly while allowing other single-target frozen registries.
-    """
+    """Resolve one exact catalog target and one explicit evaluator binding."""
     from .rule_catalog import load_rule_catalog_snapshot
     from .rule_projection import project_entry
-
-    if rule_id is None or version is None:
-        targets = registry.registered_targets
-        if len(targets) != 1:
-            raise FrozenRuleBindingError(
-                "registry must expose exactly one frozen target to bind implicitly"
-            )
-        rule_id = rule_id or targets[0][0]
-        version = version or targets[0][1]
 
     snapshot = snapshot or load_rule_catalog_snapshot()
     entry = snapshot.entry(rule_id)
@@ -261,34 +289,29 @@ def bind_frozen_rule(
             f"catalog target version is stale: requested {rule_id}@{version}, found {entry.version}"
         )
     evaluator = registry.resolve(rule_id, version)
-    _validate_canary_contract(entry)
+    if getattr(registry, "_expected_contracts", None):
+        expected = registry._expected_contracts.get((entry.rule_id, entry.version))
+        facts = tuple(
+            (item.family, item.min_schema_version) for item in entry.fact_requirements
+        )
+        if (
+            expected is None
+            or entry.scope != expected.scope
+            or entry.condition != expected.condition
+            or facts != expected.facts
+            or entry.score_role != expected.score_role
+            or entry.failure_policy != expected.failure_policy
+            or entry.mechanism != expected.mechanism
+            or entry.rule_kind != expected.rule_kind
+            or entry.automation_mode != expected.automation_mode
+        ):
+            raise FrozenRuleBindingError(
+                f"catalog contract does not match the accepted frozen contract: "
+                f"{entry.rule_id}@{entry.version}"
+            )
+    else:
+        _validate_canary_contract(entry)
     return EvaluatorBinding(rule_id, version, entry.title, project_entry(entry), evaluator)
-
-
-def register_expected_contract(
-    rule_id: str,
-    version: str,
-    *,
-    scope: str = _EXPECTED_SCOPE,
-    condition: str = _EXPECTED_CONDITION,
-    facts: tuple[tuple[str, str], ...],
-    score_role: str = _EXPECTED_SCORE_ROLE,
-    failure_policy: str = _EXPECTED_FAILURE_POLICY,
-    mechanism: str = _EXPECTED_MECHANISM,
-    rule_kind: str = _EXPECTED_RULE_KIND,
-    automation_mode: str = _EXPECTED_AUTOMATION,
-) -> None:
-    """Declare the exact catalog contract accepted for one frozen target."""
-    _EXPECTED_CONTRACTS[(rule_id, version)] = {
-        "scope": scope,
-        "condition": condition,
-        "facts": tuple(facts),
-        "score_role": score_role,
-        "failure_policy": failure_policy,
-        "mechanism": mechanism,
-        "rule_kind": rule_kind,
-        "automation_mode": automation_mode,
-    }
 
 
 def _finding(
@@ -373,12 +396,12 @@ def evaluate_frozen_rule(
     target: str,
     facts: Iterable[object],
     *,
-    rule_id: str = CORE_COVERAGE_RULE_ID,
-    version: str = CORE_COVERAGE_RULE_VERSION,
-    subject_kind: str = _EXPECTED_SCOPE,
+    subject_kind: str = "html-page",
     snapshot: "RuleCatalogSnapshot | None" = None,
     registry: EvaluatorRegistry = CANARY_EVALUATOR_REGISTRY,
     fact_registry: FactSchemaRegistry | None = None,
+    rule_id: str = CORE_COVERAGE_RULE_ID,
+    rule_version: str = CORE_COVERAGE_RULE_VERSION,
     run_id: str | None = None,
     score_model_id: str = "readiness-transparent-v2",
     coverage_classification: str | None = None,
@@ -386,7 +409,7 @@ def evaluate_frozen_rule(
     urls_fetched: int | None = None,
     max_pages_hit: bool | None = None,
 ) -> CanaryEvaluation:
-    """Run the E0 path from catalog projection through a canonical report."""
+    """Run the frozen-rule path from catalog projection through a canonical report."""
     from .rule_catalog import load_rule_catalog_snapshot
     from .rule_projection import (
         ApplicabilityContext,
@@ -394,7 +417,7 @@ def evaluate_frozen_rule(
     )
 
     snapshot = snapshot or load_rule_catalog_snapshot()
-    binding = bind_frozen_rule(rule_id, version, snapshot=snapshot, registry=registry)
+    binding = bind_frozen_rule(rule_id, rule_version, snapshot=snapshot, registry=registry)
     fact_bundle = _build_fact_bundle(target, facts)
     schema_registry = _build_fact_schema_registry(fact_bundle, fact_registry)
     readiness = resolve_evaluation_readiness(
