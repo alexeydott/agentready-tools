@@ -47,7 +47,7 @@ followup_issues:
 rule_catalog:
   name: agentready.rule-catalog.v2
   version: 2.1.0-draft.2
-  digest: acdb4a5814899f6d8ebf543ef8e656caedfa92b3938dffdd58a3d288cfaec909
+  digest: d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f
   digest_basis: sha256 over packaged agentready.rule-catalog.v2.yaml bytes
 adapter_boundary:
   description: 'How shared collection objects become evaluation fact envelopes. The registry matches envelopes

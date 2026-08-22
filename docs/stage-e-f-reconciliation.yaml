@@ -4,7 +4,7 @@ binding_allowed: false
 catalog:
   schema: agentready.rule-catalog.v2
   catalog_version: 2.1.0-draft.2
-  rule_catalog_digest: acdb4a5814899f6d8ebf543ef8e656caedfa92b3938dffdd58a3d288cfaec909
+  rule_catalog_digest: d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f
 issues:
 - 22
 - 23
