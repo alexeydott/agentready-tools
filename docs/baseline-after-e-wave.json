@@ -1,0 +1,309 @@
+{
+  "commit": "bf9f79404dd89bb6a786d82623ca8c957ffc0666",
+  "deferred_declared_not_produced": [
+    {
+      "reason": "resources@1 pending production (Option B)",
+      "rule_id": "CORE-LINK-002"
+    },
+    {
+      "reason": "resources@1 pending production (Option B)",
+      "rule_id": "CORE-LINK-005"
+    }
+  ],
+  "frozen_bindings": {
+    "CORE-CANON-002": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Canonical URL uses the same scheme/host as the audited origin",
+      "version": "1.0.0"
+    },
+    "CORE-CANON-003": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Canonical URL is not blocked by robots directives",
+      "version": "1.0.0"
+    },
+    "CORE-CANON-004": {
+      "failure_policy": "unknown_on_missing_facts",
+      "score_role": "diagnostic",
+      "title": "Canonical URL does not point to a redirect chain",
+      "version": "1.0.0"
+    },
+    "CORE-CANON-005": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Self-referencing canonical matches the requested URL for paginated pages",
+      "version": "1.0.0"
+    },
+    "CORE-CANON-006": {
+      "failure_policy": "unknown_on_missing_facts",
+      "score_role": "observation_only",
+      "title": "Canonical URL avoids parameter-only duplicate variants",
+      "version": "1.0.0"
+    },
+    "CORE-CANON-007": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Cross-domain canonical targets are consistent across the crawl",
+      "version": "1.0.0"
+    },
+    "CORE-CANON-008": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Canonical URL is declared exactly once per page",
+      "version": "1.0.0"
+    },
+    "CORE-COVERAGE-001": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Page is discoverable and returns a crawlable response",
+      "version": "1.0.0"
+    },
+    "CORE-LINK-001": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Core Links check 001",
+      "version": "1.0.0"
+    },
+    "CORE-LINK-002": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Core Links check 002",
+      "version": "1.0.0"
+    },
+    "CORE-LINK-003": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Core Links check 003",
+      "version": "1.0.0"
+    },
+    "CORE-LINK-004": {
+      "failure_policy": "unknown_on_missing_facts",
+      "score_role": "diagnostic",
+      "title": "Core Links check 004",
+      "version": "1.0.0"
+    },
+    "CORE-LINK-005": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Core Links check 005",
+      "version": "1.0.0"
+    },
+    "CORE-LINK-006": {
+      "failure_policy": "unknown_on_missing_facts",
+      "score_role": "observation_only",
+      "title": "Core Links check 006",
+      "version": "1.0.0"
+    },
+    "GOOGLE-DESC-001": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Meta description is present and within recommended length",
+      "version": "1.0.0"
+    },
+    "GOOGLE-TITLE-001": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Title tag is present and within recommended length",
+      "version": "1.0.0"
+    }
+  },
+  "generated_at": "2026-08-22T23:27:45Z",
+  "package_version": "0.13.7",
+  "registered_evaluators": {
+    "CANARY": {
+      "scoped_contracts": null,
+      "targets": [
+        "CORE-COVERAGE-001@1.0.0"
+      ]
+    },
+    "CANON": {
+      "scoped_contracts": {
+        "('CORE-CANON-002', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "transport",
+            "1"
+          ]
+        ],
+        "('CORE-CANON-003', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ]
+        ],
+        "('CORE-CANON-004', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "transport",
+            "1"
+          ]
+        ],
+        "('CORE-CANON-005', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "transport",
+            "1"
+          ]
+        ],
+        "('CORE-CANON-006', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "run-projection",
+            "1"
+          ]
+        ],
+        "('CORE-CANON-007', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "run-projection",
+            "1"
+          ]
+        ],
+        "('CORE-CANON-008', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ]
+        ]
+      },
+      "targets": [
+        "CORE-CANON-002@1.0.0",
+        "CORE-CANON-003@1.0.0",
+        "CORE-CANON-004@1.0.0",
+        "CORE-CANON-005@1.0.0",
+        "CORE-CANON-006@1.0.0",
+        "CORE-CANON-007@1.0.0",
+        "CORE-CANON-008@1.0.0"
+      ]
+    },
+    "GOOGLE_DESC": {
+      "scoped_contracts": null,
+      "targets": [
+        "GOOGLE-DESC-001@1.0.0"
+      ]
+    },
+    "GOOGLE_TITLE": {
+      "scoped_contracts": {
+        "CORE-COVERAGE-001@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "robots.policy",
+            "1"
+          ]
+        ],
+        "GOOGLE-DESC-001@1.0.0": [
+          [
+            "page",
+            "1"
+          ]
+        ],
+        "GOOGLE-TITLE-001@1.0.0": [
+          [
+            "page",
+            "1"
+          ]
+        ]
+      },
+      "targets": [
+        "GOOGLE-TITLE-001@1.0.0"
+      ]
+    },
+    "LINK_BOUND": {
+      "scoped_contracts": {
+        "('CORE-LINK-001', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "representation",
+            "1"
+          ]
+        ],
+        "('CORE-LINK-002', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "resources",
+            "1"
+          ]
+        ],
+        "('CORE-LINK-003', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ]
+        ],
+        "('CORE-LINK-004', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "representation",
+            "1"
+          ]
+        ],
+        "('CORE-LINK-005', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "resources",
+            "1"
+          ]
+        ],
+        "('CORE-LINK-006', '1.0.0')@1.0.0": [
+          [
+            "page",
+            "1"
+          ]
+        ]
+      },
+      "targets": [
+        "CORE-LINK-001@1.0.0",
+        "CORE-LINK-003@1.0.0",
+        "CORE-LINK-004@1.0.0",
+        "CORE-LINK-006@1.0.0"
+      ]
+    }
+  },
+  "rule_catalog": {
+    "digest": "acdb4a5814899f6d8ebf543ef8e656caedfa92b3938dffdd58a3d288cfaec909",
+    "name": "agentready.rule-catalog.v2",
+    "rule_count": 200,
+    "version": "2.1.0-draft.2"
+  },
+  "schema": "agentready.baseline.after-e-wave.v1",
+  "score_projection": {
+    "note": "provider enrichment never enters core score; unavailable is not zero",
+    "score_model_id": "readiness-transparent-v2"
+  },
+  "semantics_artifact": {
+    "digest": "c4caaef0861f127eec04bb65d0036b15a5cbe9d991055da03487c08df6db369d",
+    "name": "agentready.rule-semantics.v2",
+    "version": "1.0.1"
+  }
+}
