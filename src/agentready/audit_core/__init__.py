@@ -103,6 +103,13 @@ from .evaluator_registry import (
     evaluate_core_coverage,
     evaluate_frozen_rule,
 )
+from .canon_evaluators import (
+    CANON_EVALUATOR_REGISTRY,
+    CANON_RULE_IDS,
+    CANON_RULE_VERSION,
+    CanonEvaluation,
+    evaluate_canon_rule,
+)
 from .google_title_evaluators import (
     GOOGLE_TITLE_EVALUATOR_REGISTRY,
     GOOGLE_TITLE_MAX_LENGTH,
@@ -120,6 +127,11 @@ __all__ = [
     "CORE_COVERAGE_RULE_ID",
     "CORE_COVERAGE_RULE_VERSION",
     "CanaryEvaluation",
+    "CANON_EVALUATOR_REGISTRY",
+    "CANON_RULE_IDS",
+    "CANON_RULE_VERSION",
+    "CanonEvaluation",
+    "evaluate_canon_rule",
     "EvaluatorBinding",
     "EvaluatorRegistry",
     "EvaluatorResult",

@@ -138,12 +138,22 @@ def _value(fact: Any, key: str) -> Any:
 register_expected_contract(
     GOOGLE_TITLE_RULE_ID,
     GOOGLE_TITLE_RULE_VERSION,
+    scope="html-page",
+    condition="applies whenever a html-page subject was collected for the run",
     facts=(("page", "1"),),
+    score_role="scored",
+    failure_policy="block_on_missing_facts",
+    mechanism="atomic_check",
+    rule_kind="scored_rule",
+    automation_mode="automated",
 )
+
+from .evaluator_registry import _EXPECTED_CONTRACTS
 
 GOOGLE_TITLE_EVALUATOR_REGISTRY = EvaluatorRegistry(
     ((GOOGLE_TITLE_RULE_ID, GOOGLE_TITLE_RULE_VERSION, _google_title_evaluator),),
     allowlist=((GOOGLE_TITLE_RULE_ID, GOOGLE_TITLE_RULE_VERSION),),
+    expected_contracts=dict(_EXPECTED_CONTRACTS),
 )
 
 
@@ -166,7 +176,7 @@ def evaluate_google_title(
     """Named Stage E9 convenience entry point over :func:`evaluate_frozen_rule`."""
     kwargs.setdefault("registry", GOOGLE_TITLE_EVALUATOR_REGISTRY)
     kwargs.setdefault("rule_id", GOOGLE_TITLE_RULE_ID)
-    kwargs.setdefault("version", GOOGLE_TITLE_RULE_VERSION)
+    kwargs.setdefault("rule_version", GOOGLE_TITLE_RULE_VERSION)
     return _evaluate_frozen_rule(
         target,
         facts,

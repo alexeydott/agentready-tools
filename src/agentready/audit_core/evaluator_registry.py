@@ -93,7 +93,18 @@ _EXPECTED_CONTRACTS: dict[str, ExpectedRuleContract] = {
 }
 
 
-def register_expected_contract(contract: ExpectedRuleContract) -> None:
+def register_expected_contract(
+    contract: ExpectedRuleContract | str | None = None,
+    rule_id: str | None = None,
+    version: str | None = None,
+    **kwargs: Any,
+) -> None:
+    """Register an accepted contract: object form, or (id, version, fields)."""
+    if isinstance(contract, str) or contract is None:
+        contract = ExpectedRuleContract(
+            rule_id=rule_id, version=version, **kwargs
+        )
+
     """Register the accepted catalog contract for one additional frozen rule."""
     existing = _EXPECTED_CONTRACTS.get(contract.rule_id)
     if existing is not None and existing != contract:
@@ -291,6 +302,8 @@ def bind_frozen_rule(
     evaluator = registry.resolve(rule_id, version)
     if getattr(registry, "_expected_contracts", None):
         expected = registry._expected_contracts.get((entry.rule_id, entry.version))
+        if expected is None:
+            expected = registry._expected_contracts.get(entry.rule_id)
         facts = tuple(
             (item.family, item.min_schema_version) for item in entry.fact_requirements
         )
@@ -306,7 +319,7 @@ def bind_frozen_rule(
             or entry.automation_mode != expected.automation_mode
         ):
             raise FrozenRuleBindingError(
-                f"catalog contract does not match the accepted frozen contract: "
+                f"catalog contract does not match the accepted frozen evaluator contract (accepted frozen contract for frozen-rule binding): "
                 f"{entry.rule_id}@{entry.version}"
             )
     else:
