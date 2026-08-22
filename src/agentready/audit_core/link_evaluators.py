@@ -81,6 +81,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from .contracts import EvidenceRef, EvaluationOutcome
+from .urls import UrlIdentity
 from .evaluator_registry import (
     EvaluatorRegistry,
     EvaluatorResult,
@@ -545,7 +546,6 @@ def evaluate_link_rule(
 ):
     """Evaluate one CORE-LINK rule through the shared frozen-rule path."""
     kwargs.setdefault("registry", LINK_EVALUATOR_REGISTRY)
-    kwargs.setdefault("expected_contracts", LINK_EXPECTED_CONTRACTS)
     kwargs.setdefault("rule_version", CORE_LINK_RULE_VERSION)
     return evaluate_frozen_rule(
         target,
