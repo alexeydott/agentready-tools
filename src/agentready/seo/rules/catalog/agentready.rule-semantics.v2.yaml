@@ -18,8 +18,8 @@ governance:
   google_title: '#55'
 catalog_pin:
   name: agentready.rule-catalog.v2
-  version: 2.1.0-draft.1
-  digest: a1507f064f95248d6ee21a1a2123f3b09f4f138012f10d3dd310654a72b62f17
+  version: 2.1.0-draft.2
+  digest: acdb4a5814899f6d8ebf543ef8e656caedfa92b3938dffdd58a3d288cfaec909
 requirement_amendments:
   - {rule_id: CORE-CANON-002, families: [page, transport]}
   - {rule_id: CORE-CANON-003, families: [page]}

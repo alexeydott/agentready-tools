@@ -3,8 +3,8 @@
 # Do not hand-edit without updating scripts/generate_rule_catalog_draft.py
 # and recording the change through explicit catalog governance.
 schema: agentready.rule-catalog.v2
-catalog_version: 2.1.0-draft.1
-generated_at: '2026-08-21T00:00:00Z'
+catalog_version: 2.1.0-draft.2
+generated_at: '2026-08-22T00:00:00Z'
 rule_count: 200
 modules:
 - id: core-coverage
@@ -766,8 +766,6 @@ rules:
   fact_requirements:
   - family: page
     min_schema_version: '1'
-  - family: links
-    min_schema_version: '1'
   - family: transport
     min_schema_version: '1'
   source_ids:
@@ -824,7 +822,7 @@ rules:
   fact_requirements:
   - family: page
     min_schema_version: '1'
-  - family: links
+  - family: transport
     min_schema_version: '1'
   source_ids:
   - google-search-central
@@ -852,8 +850,6 @@ rules:
     condition: applies whenever a html-page subject was collected for the run
   fact_requirements:
   - family: page
-    min_schema_version: '1'
-  - family: links
     min_schema_version: '1'
   - family: transport
     min_schema_version: '1'
@@ -885,6 +881,8 @@ rules:
   fact_requirements:
   - family: page
     min_schema_version: '1'
+  - family: run-projection
+    min_schema_version: '1'
   source_ids:
   - google-search-central
   score_role: observation_only
@@ -911,7 +909,7 @@ rules:
   fact_requirements:
   - family: page
     min_schema_version: '1'
-  - family: links
+  - family: run-projection
     min_schema_version: '1'
   source_ids:
   - google-search-central
@@ -939,10 +937,6 @@ rules:
     condition: applies whenever a html-page subject was collected for the run
   fact_requirements:
   - family: page
-    min_schema_version: '1'
-  - family: links
-    min_schema_version: '1'
-  - family: transport
     min_schema_version: '1'
   source_ids:
   - google-search-central
@@ -1318,9 +1312,9 @@ rules:
     applies_to: html-page
     condition: applies whenever a html-page subject was collected for the run
   fact_requirements:
-  - family: links
-    min_schema_version: '1'
   - family: page
+    min_schema_version: '1'
+  - family: representation
     min_schema_version: '1'
   source_ids:
   - google-search-central
@@ -1348,8 +1342,6 @@ rules:
     applies_to: html-page
     condition: applies whenever a html-page subject was collected for the run
   fact_requirements:
-  - family: links
-    min_schema_version: '1'
   - family: page
     min_schema_version: '1'
   - family: resources
@@ -1381,7 +1373,7 @@ rules:
     applies_to: html-page
     condition: applies whenever a html-page subject was collected for the run
   fact_requirements:
-  - family: links
+  - family: page
     min_schema_version: '1'
   source_ids:
   - google-search-central
@@ -1408,9 +1400,9 @@ rules:
     applies_to: html-page
     condition: applies whenever a html-page subject was collected for the run
   fact_requirements:
-  - family: links
-    min_schema_version: '1'
   - family: page
+    min_schema_version: '1'
+  - family: representation
     min_schema_version: '1'
   source_ids:
   - google-search-central
@@ -1438,8 +1430,6 @@ rules:
     applies_to: html-page
     condition: applies whenever a html-page subject was collected for the run
   fact_requirements:
-  - family: links
-    min_schema_version: '1'
   - family: page
     min_schema_version: '1'
   - family: resources
@@ -1471,7 +1461,7 @@ rules:
     applies_to: html-page
     condition: applies whenever a html-page subject was collected for the run
   fact_requirements:
-  - family: links
+  - family: page
     min_schema_version: '1'
   source_ids:
   - google-search-central
@@ -2197,8 +2187,6 @@ rules:
     condition: applies whenever a html-page subject was collected for the run
   fact_requirements:
   - family: page
-    min_schema_version: '1'
-  - family: structured-data
     min_schema_version: '1'
   source_ids:
   - google-search-central

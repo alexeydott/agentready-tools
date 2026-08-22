@@ -1,4 +1,4 @@
-"""Tests for the frozen v2.1.0-draft.1 rule catalog packaging and loader (#17).
+"""Tests for the frozen v2.1.0-draft.2 rule catalog packaging and loader (#17).
 
 These tests validate the packaged artifact itself, not rule execution:
 Issue #17 explicitly forbids registering or executing any frozen rule.
@@ -50,7 +50,7 @@ EXPECTED_MODULE_COUNTS = {
 def _minimal_valid_document() -> dict[str, object]:
     return {
         "schema": CATALOG_SCHEMA_ID,
-        "catalog_version": "2.1.0-draft.1",
+        "catalog_version": "2.1.0-draft.2",
         "generated_at": "2026-08-21T00:00:00Z",
         "rule_count": 1,
         "modules": [{"id": "demo", "count": 1}],
@@ -157,7 +157,7 @@ def test_wheel_and_sdist_contain_frozen_catalog_artifact(tmp_path):
 def test_frozen_catalog_loads_with_expected_identity():
     artifact = load_frozen_rule_catalog()
     assert artifact.schema == CATALOG_SCHEMA_ID
-    assert artifact.catalog_version == "2.1.0-draft.1"
+    assert artifact.catalog_version == "2.1.0-draft.2"
     assert artifact.rule_count == 200
     assert len(artifact.rules) == 200
 

@@ -231,12 +231,12 @@ def test_gate6_thresholds_are_normative_only_in_the_artifact(rules) -> None:
             ), rule_id
 
 
-def test_canon008_is_deferred_not_path_a(rules) -> None:
-    """P0: semantic MATCH stands but binding readiness is blocked -> Path D."""
+def test_canon008_path_a_applies_after_amendment(rules) -> None:
+    """Post-amendment: semantic MATCH + readiness resolved -> Path A end-to-end."""
     row = rules["CORE-CANON-008"]
     assert row["match_status"] == "MATCH"
-    assert row["disposition"] == "D"
-    assert "blocked" in row["binding_readiness"]
+    assert row["disposition"] == "A"
+    assert row["binding_readiness"] == "ready"
     derived = {
         rule_id
         for rule_id, item in rules.items()
