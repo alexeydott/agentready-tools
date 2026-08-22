@@ -416,7 +416,7 @@ def evaluate_canon_rule(
     """Generic bind/evaluate entry point for the core-canonical family."""
     kwargs.setdefault("rule_id", rule_id)
     kwargs.setdefault("registry", CANON_EVALUATOR_REGISTRY)
-    kwargs.setdefault("version", CANON_RULE_VERSION)
+    kwargs.setdefault("rule_version", CANON_RULE_VERSION)
     evaluation = evaluate_frozen_rule(target, facts, **kwargs)
     return CanonEvaluation(
         binding=evaluation.binding,
