@@ -42,6 +42,7 @@ __all__ = [
     "EvaluatorResult",
     "EvaluatorBinding",
     "EvaluatorRegistry",
+    "ExpectedRuleContract",
     "FrozenRuleBindingError",
     "UnregisteredRuleError",
     "UnresolvedCatalogTargetError",
@@ -50,18 +51,55 @@ __all__ = [
     "evaluate_frozen_rule",
     "evaluate_core_coverage",
     "build_canary_report",
+    "register_expected_contract",
 ]
 
 CORE_COVERAGE_RULE_ID = "CORE-COVERAGE-001"
 CORE_COVERAGE_RULE_VERSION = "1.0.0"
-_EXPECTED_SCOPE = "html-page"
-_EXPECTED_CONDITION = "applies whenever a html-page subject was collected for the run"
-_EXPECTED_FACTS = (("page", "1"), ("robots.policy", "1"))
-_EXPECTED_SCORE_ROLE = "scored"
-_EXPECTED_FAILURE_POLICY = "block_on_missing_facts"
-_EXPECTED_MECHANISM = "atomic_check"
-_EXPECTED_RULE_KIND = "scored_rule"
-_EXPECTED_AUTOMATION = "automated"
+
+
+@dataclass(frozen=True, slots=True)
+class ExpectedRuleContract:
+    """Accepted catalog contract for one frozen rule binding target."""
+
+    rule_id: str
+    version: str
+    scope: str
+    condition: str
+    facts: tuple[tuple[str, str], ...]
+    score_role: str
+    failure_policy: str
+    mechanism: str
+    rule_kind: str
+    automation_mode: str
+
+
+# Table-driven accepted contracts keyed by rule_id.  The E0 canary row is the
+# original behavior; additional frozen rules append their own explicit rows.
+_EXPECTED_CONTRACTS: dict[str, ExpectedRuleContract] = {
+    CORE_COVERAGE_RULE_ID: ExpectedRuleContract(
+        rule_id=CORE_COVERAGE_RULE_ID,
+        version=CORE_COVERAGE_RULE_VERSION,
+        scope="html-page",
+        condition="applies whenever a html-page subject was collected for the run",
+        facts=(("page", "1"), ("robots.policy", "1")),
+        score_role="scored",
+        failure_policy="block_on_missing_facts",
+        mechanism="atomic_check",
+        rule_kind="scored_rule",
+        automation_mode="automated",
+    ),
+}
+
+
+def register_expected_contract(contract: ExpectedRuleContract) -> None:
+    """Register the accepted catalog contract for one additional frozen rule."""
+    existing = _EXPECTED_CONTRACTS.get(contract.rule_id)
+    if existing is not None and existing != contract:
+        raise FrozenRuleBindingError(
+            f"accepted contract already registered for {contract.rule_id}"
+        )
+    _EXPECTED_CONTRACTS[contract.rule_id] = contract
 
 
 class FrozenRuleBindingError(ValueError):
@@ -101,7 +139,14 @@ class EvaluatorRegistry:
     def __init__(
         self,
         bindings: Iterable[tuple[str, str, Evaluator]] = (),
+        *,
+        allowlist: Iterable[tuple[str, str]] | None = None,
     ) -> None:
+        self._allowlist: frozenset[tuple[str, str]] = (
+            frozenset(allowlist)
+            if allowlist is not None
+            else frozenset({(CORE_COVERAGE_RULE_ID, CORE_COVERAGE_RULE_VERSION)})
+        )
         self._bindings: dict[tuple[str, str], Evaluator] = {}
         for rule_id, version, evaluator in bindings:
             self.register(rule_id, version, evaluator)
@@ -112,7 +157,7 @@ class EvaluatorRegistry:
 
     def register(self, rule_id: str, version: str, evaluator: Evaluator) -> None:
         target = (rule_id, version)
-        if target != (CORE_COVERAGE_RULE_ID, CORE_COVERAGE_RULE_VERSION):
+        if target not in self._allowlist:
             raise UnregisteredRuleError(
                 f"frozen evaluator target is not allowlisted: {rule_id}@{version}"
             )
@@ -173,21 +218,27 @@ CANARY_EVALUATOR_REGISTRY = EvaluatorRegistry(
 
 
 def _validate_canary_contract(entry: "RuleCatalogEntry") -> None:
+    """Validate a catalog entry against its accepted frozen-rule contract row."""
+    expected = _EXPECTED_CONTRACTS.get(entry.rule_id)
+    if expected is None or entry.version != expected.version:
+        raise FrozenRuleBindingError(
+            f"catalog contract is not an accepted frozen-rule contract: "
+            f"{entry.rule_id}@{entry.version}"
+        )
     facts = tuple((item.family, item.min_schema_version) for item in entry.fact_requirements)
     if (
-        entry.rule_id != CORE_COVERAGE_RULE_ID
-        or entry.version != CORE_COVERAGE_RULE_VERSION
-        or entry.scope != _EXPECTED_SCOPE
-        or entry.condition != _EXPECTED_CONDITION
-        or facts != _EXPECTED_FACTS
-        or entry.score_role != _EXPECTED_SCORE_ROLE
-        or entry.failure_policy != _EXPECTED_FAILURE_POLICY
-        or entry.mechanism != _EXPECTED_MECHANISM
-        or entry.rule_kind != _EXPECTED_RULE_KIND
-        or entry.automation_mode != _EXPECTED_AUTOMATION
+        entry.rule_id != expected.rule_id
+        or entry.scope != expected.scope
+        or entry.condition != expected.condition
+        or facts != expected.facts
+        or entry.score_role != expected.score_role
+        or entry.failure_policy != expected.failure_policy
+        or entry.mechanism != expected.mechanism
+        or entry.rule_kind != expected.rule_kind
+        or entry.automation_mode != expected.automation_mode
     ):
         raise FrozenRuleBindingError(
-            f"catalog contract is not the accepted E0 canary contract: "
+            f"catalog contract is not the accepted frozen-rule contract: "
             f"{entry.rule_id}@{entry.version}"
         )
 
@@ -298,10 +349,12 @@ def evaluate_frozen_rule(
     target: str,
     facts: Iterable[object],
     *,
-    subject_kind: str = _EXPECTED_SCOPE,
+    subject_kind: str = "html-page",
     snapshot: "RuleCatalogSnapshot | None" = None,
     registry: EvaluatorRegistry = CANARY_EVALUATOR_REGISTRY,
     fact_registry: FactSchemaRegistry | None = None,
+    rule_id: str = CORE_COVERAGE_RULE_ID,
+    rule_version: str = CORE_COVERAGE_RULE_VERSION,
     run_id: str | None = None,
     score_model_id: str = "readiness-transparent-v2",
     coverage_classification: str | None = None,
@@ -309,7 +362,7 @@ def evaluate_frozen_rule(
     urls_fetched: int | None = None,
     max_pages_hit: bool | None = None,
 ) -> CanaryEvaluation:
-    """Run the E0 path from catalog projection through a canonical report."""
+    """Run the frozen-rule path from catalog projection through a canonical report."""
     from .rule_catalog import load_rule_catalog_snapshot
     from .rule_projection import (
         ApplicabilityContext,
@@ -317,7 +370,7 @@ def evaluate_frozen_rule(
     )
 
     snapshot = snapshot or load_rule_catalog_snapshot()
-    binding = bind_frozen_rule(snapshot=snapshot, registry=registry)
+    binding = bind_frozen_rule(rule_id, rule_version, snapshot=snapshot, registry=registry)
     fact_bundle = _build_fact_bundle(target, facts)
     schema_registry = _build_fact_schema_registry(fact_bundle, fact_registry)
     readiness = resolve_evaluation_readiness(

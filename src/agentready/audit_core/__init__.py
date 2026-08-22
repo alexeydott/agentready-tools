@@ -95,6 +95,7 @@ from .evaluator_registry import (
     EvaluatorBinding,
     EvaluatorRegistry,
     EvaluatorResult,
+    ExpectedRuleContract,
     FrozenRuleBindingError,
     UnregisteredRuleError,
     UnresolvedCatalogTargetError,
@@ -102,6 +103,15 @@ from .evaluator_registry import (
     build_canary_report,
     evaluate_core_coverage,
     evaluate_frozen_rule,
+    register_expected_contract,
+)
+from .google_desc_evaluators import (
+    GOOGLE_DESC_EVALUATOR_REGISTRY,
+    GOOGLE_DESC_RULE_ID,
+    GOOGLE_DESC_RULE_VERSION,
+    MAX_DESCRIPTION_LENGTH,
+    MIN_DESCRIPTION_LENGTH,
+    evaluate_google_desc,
 )
 
 __all__ = [
@@ -114,6 +124,7 @@ __all__ = [
     "EvaluatorBinding",
     "EvaluatorRegistry",
     "EvaluatorResult",
+    "ExpectedRuleContract",
     "FrozenRuleBindingError",
     "UnregisteredRuleError",
     "UnresolvedCatalogTargetError",
@@ -121,6 +132,13 @@ __all__ = [
     "build_canary_report",
     "evaluate_core_coverage",
     "evaluate_frozen_rule",
+    "evaluate_google_desc",
+    "GOOGLE_DESC_EVALUATOR_REGISTRY",
+    "GOOGLE_DESC_RULE_ID",
+    "GOOGLE_DESC_RULE_VERSION",
+    "MAX_DESCRIPTION_LENGTH",
+    "MIN_DESCRIPTION_LENGTH",
+    "register_expected_contract",
     "AuditRunContext",
     "AuthorityLevel",
     "CollectedPage",
