@@ -6,6 +6,8 @@ import socket
 from dataclasses import replace
 from pathlib import Path
 
+import pathlib
+
 import pytest
 
 from agentready.audit_core import (
@@ -441,3 +443,37 @@ def test_evaluator_module_has_no_transport_collection_or_storage_imports():
         "urllib",
         "socket",
     }
+
+
+def _title_module_source() -> str:
+    return (
+        pathlib.Path(__file__).parents[1]
+        / "src"
+        / "agentready"
+        / "audit_core"
+        / "google_title_evaluators.py"
+    ).read_text(encoding="utf-8")
+
+
+def test_title_contract_is_page_only_with_typed_band():
+    """page@1 only; typed LengthBand 30..65 governed by the semantics artifact."""
+    from agentready.audit_core.rule_catalog import load_rule_semantics
+
+    src = _title_module_source()
+    assert '("structured-data", "1")' not in src
+    assert "content.main" not in src
+    assert "#32" not in src
+
+    band = load_rule_semantics().condition("GOOGLE-TITLE-001").length_band
+    assert (band.min, band.max, band.inclusive) == (30, 65, True)
+    assert GOOGLE_TITLE_MIN_LENGTH == 30 and GOOGLE_TITLE_MAX_LENGTH == 65
+
+
+def test_title_override_registry_cannot_downgrade_bundle_versions():
+    result = evaluate_google_title(
+        TARGET,
+        _facts(),
+        fact_registry=FactSchemaRegistry({"page": "0"}),
+    )
+
+    assert result.readiness.can_evaluate is True
