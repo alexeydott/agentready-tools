@@ -176,6 +176,51 @@ def test_incompatible_fact_version_blocks_confident_evaluation():
     assert result.report.findings[0].status is FindingStatus.UNAVAILABLE
 
 
+@pytest.mark.parametrize(
+    "facts,override",
+    [
+        (
+            _facts(page_version="0"),
+            FactSchemaRegistry({"page": "1", "robots.policy": "1"}),
+        ),
+        (
+            _facts(page_version="unknown"),
+            FactSchemaRegistry({"page": "1", "robots.policy": "1"}),
+        ),
+        (
+            _facts(robots_version="0"),
+            FactSchemaRegistry({"page": "1", "robots.policy": "1"}),
+        ),
+        (
+            _facts(robots_version="unknown"),
+            FactSchemaRegistry({"page": "1", "robots.policy": "1"}),
+        ),
+    ],
+)
+def test_override_registry_cannot_upgrade_old_or_unknown_bundle_versions(facts, override):
+    """The bundle-observed version stays authoritative over any caller override."""
+    result = evaluate_core_coverage(TARGET, facts, fact_registry=override)
+
+    assert result.readiness.can_evaluate is False
+    assert result.report.findings[0].status is FindingStatus.UNAVAILABLE
+    assert result.report.findings[0].outcome == "unknown"
+    assert result.report.coverage.complete_rules == 0
+
+
+def test_override_registry_can_only_add_incompatible_metadata_for_bundle_families():
+    result = evaluate_core_coverage(
+        TARGET,
+        _facts(),
+        fact_registry=FactSchemaRegistry(
+            {"page": "1", "robots.policy": "1"},
+            incompatible=frozenset({("page", "1")}),
+        ),
+    )
+
+    assert result.readiness.can_evaluate is False
+    assert result.report.findings[0].status is FindingStatus.UNAVAILABLE
+
+
 def test_applicability_is_resolved_before_evaluator_invocation():
     calls: list[str] = []
 

@@ -396,18 +396,20 @@ def _build_fact_schema_registry(
     fact_bundle: tuple[FactEnvelope, ...],
     override: FactSchemaRegistry | None,
 ) -> FactSchemaRegistry:
+    """Bundle-observed versions stay authoritative; overrides never upgrade them.
+
+    The caller-supplied registry may only contribute additional ``incompatible``
+    metadata for families actually present in the subject-scoped bundle.  It can
+    never raise or mask the schema version observed on a real envelope, so an
+    old/unknown mandatory fact cannot be promoted past the fail-closed gate.
+    """
     bundle_registry = FactSchemaRegistry.from_envelopes(fact_bundle)
     if override is None:
         return bundle_registry
-    versions = {
-        family: override.versions[family]
-        for family in bundle_registry.versions
-        if family in override.versions
-    }
     incompatible = frozenset(
-        item for item in override.incompatible if item[0] in versions
+        item for item in override.incompatible if item[0] in bundle_registry.versions
     )
-    return FactSchemaRegistry(versions, incompatible=incompatible)
+    return FactSchemaRegistry(dict(bundle_registry.versions), incompatible=incompatible)
 
 
 def _fact_value(envelopes: tuple[FactEnvelope, ...], family: str) -> Any:
