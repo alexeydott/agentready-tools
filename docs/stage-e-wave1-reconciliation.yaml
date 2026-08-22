@@ -49,7 +49,11 @@ adapter_boundary:
     accepted base.
   emitters:
     - family: page
-      adapter: audit_core.collection parsed_facts_to_dict over ParsedFacts built by parse_page from CollectedPage representations
+      adapter: >
+        audit_core.collection page_fact_envelope / load_page_fact_envelopes —
+        the sanctioned production constructors adapting replayed collected
+        pages (ParsedFacts payloads) into FactEnvelope objects with
+        deterministic ids; verified offline by tests/test_page_fact_adapter.py
     - family: robots.fetch|robots.parsed|robots.policy|sitemap.*
       adapter: audit_core.run_facts persist_* helpers writing SiteStore run facts
     - family: representation
@@ -70,6 +74,7 @@ produced_fact_contract_at_base:
       - images[]
       - jsonld_markers / jsonld_nodes / jsonld_errors / jsonld_block_count
     persisted_and_replayed: true (SiteStore records + replay_collected_pages)
+    evaluation_envelope_adapter: present — page_fact_envelope / load_page_fact_envelopes (production constructors; offline store replay verified)
   representation:
     persisted_and_replayed: true (PageRecord status_code/content_type surfaced through replay)
   links@1:
@@ -113,10 +118,11 @@ rules:
     missing_behavior: block_on_missing_facts -> UNAVAILABLE while required families are unproducible
     match_status: MISSING_PRODUCED_FIELD
     disposition: B
-    paths: [B]
-    disposition_detail: decision uses only declared surfaces; blocker is solely the missing transport@1 production
-    required_change: land #56 transport production; switch tests to real producer-shaped payloads
-    owning_ref: "#46 correction + #56"
+    paths: [B, C]
+    readiness_blocking_families: {links: '#52 amend-away (declared but unused by condition)', transport: '#56 produce'}
+    disposition_detail: decision uses only declared surfaces; transport@1 needs production (#56) while the unused links@1 requirement must be amended away (#52), otherwise the rule stays UNAVAILABLE after #56 alone
+    required_change: land #56 transport production AND amend links@1 requirement via #52; switch tests to real producer-shaped payloads
+    owning_ref: "#46 correction + #52 + #56"
   - rule_id: CORE-CANON-003
     version: 1.0.0
     module: core-canonical
@@ -178,6 +184,7 @@ rules:
       fact_requirements to {page, transport} via #52. Producing the value
       alone is insufficient.
     non_declared_evidence: {transport.redirect_chain: "#52/#56"}
+    readiness_blocking_families: {links: '#52 amend-away (unused by condition)', transport: '#56 produce'}
     missing_behavior: unknown_on_missing_facts -> UNKNOWN
     match_status: MISSING_PRODUCED_FIELD
     disposition: C
@@ -214,10 +221,11 @@ rules:
     missing_behavior: block_on_missing_facts -> UNAVAILABLE while families unproducible
     match_status: MISSING_PRODUCED_FIELD
     disposition: B
-    paths: [B]
-    disposition_detail: pagination signal is derivable from produced page@1 rel; synthetic links.rel_values envelopes are unnecessary
-    required_change: '#56 transport production; re-point evaluator at page.links[].rel'
-    owning_ref: "#24 correction + #56"
+    paths: [B, C]
+    readiness_blocking_families: {links: '#52 amend-away (unused by condition)', transport: '#56 produce'}
+    disposition_detail: pagination signal is derivable from produced page@1 rel; synthetic links.rel_values envelopes are unnecessary; unused links@1 requirement must be amended (#52) or the rule stays UNAVAILABLE after #56 alone
+    required_change: '#56 transport production + #52 links amendment; re-point evaluator at page.links[].rel'
+    owning_ref: "#24 correction + #52 + #56"
   - rule_id: CORE-CANON-006
     version: 1.0.0
     module: core-canonical
@@ -284,6 +292,7 @@ rules:
       versioned surface (#57) plus requirement amendment declaring it (#52).
       The earlier draft's links.origin reads were synthetic and are dropped.
     non_declared_evidence: {run.cross_domain_targets: "#52/#57"}
+    readiness_blocking_families: {links: '#52 amend-away (unused by condition)'}
     missing_behavior: block_on_missing_facts -> UNAVAILABLE
     match_status: MISSING_PRODUCED_FIELD
     disposition: C
@@ -318,8 +327,9 @@ rules:
     disposition: D
     paths: [A-semantics, D-binding, B-or-C-readiness]
     binding_readiness: blocked — declared links@1/transport@1 requirements are unproducible although the condition never reads them; Path A cannot be claimed while readiness fails
-    disposition_detail: semantic MATCH against the catalog-derived condition stands, but the rule cannot reach READY on the normal pipeline, so it stays unbonded
-    required_change: resolve readiness via #56 production of declared families OR amend requirements through #52; then Path A applies end-to-end
+    readiness_blocking_families: {links: '#52 amend-away (declared but unused)', transport: '#56 produce'}
+    disposition_detail: semantic MATCH against the catalog-derived condition stands, but the rule cannot reach READY on the normal pipeline, so it stays unbonded; after #56 alone the links@1 requirement would still block — amendment through #52 is required either way
+    required_change: resolve readiness via #56 production of transport AND #52 amendment dropping the unused links requirement (or produce links too); then Path A applies end-to-end
     owning_ref: "#24 correction + #52 + #56"
   - rule_id: CORE-LINK-001
     version: 1.0.0
@@ -352,6 +362,7 @@ rules:
       whether the HTML-success predicate stays (with requirement amendment)
       or is dropped is decided under #53.
     non_declared_evidence: {representation.status_code: "#53", representation.content_type: "#53"}
+    readiness_blocking_families: {links: '#53 decide produce-vs-rescope'}
     missing_behavior: block_on_missing_facts -> UNAVAILABLE while links@1 stays unproducible
     match_status: BLOCKED
     disposition: C
@@ -386,6 +397,7 @@ rules:
     match_status: BLOCKED
     disposition: C
     paths: [B, C]
+    readiness_blocking_families: {links: '#53 decide produce-vs-rescope', resources: '#57 decide produce-vs-rescope'}
     disposition_detail: depends on unproducible resources@1 and ungoverned join semantics
     required_change: '#53 accepted contract + #57 resources production decision'
     owning_ref: "#27 correction + #53 + #57"
@@ -413,6 +425,7 @@ rules:
       'page.links[]': {producer: collection.ParsedFacts links tuple, representation: sequence of LinkOccurrence, scoping: document/subject, replayed: true}
     declared_surface_gap: condition consumes page@1 while only links@1 is declared; whether to amend requirements or produce links@1 is decided under #53
     non_declared_evidence: {'page.links[]': "#53"}
+    readiness_blocking_families: {links: '#53 decide produce-vs-rescope'}
     missing_behavior: block_on_missing_facts -> UNAVAILABLE while links@1 stays unproducible
     match_status: BLOCKED
     disposition: C
@@ -447,6 +460,7 @@ rules:
       subject_origin: {producer: AuditRunContext subject identity (not an observation), representation: identity string, scoping: run/subject, replayed: n/a}
     declared_surface_gap: representation.* outside declared {links, page}; keep-with-amendment vs drop decided under #53
     non_declared_evidence: {representation.status_code: "#53", representation.content_type: "#53"}
+    readiness_blocking_families: {links: '#53 decide produce-vs-rescope'}
     missing_behavior: unknown_on_missing_facts -> UNKNOWN
     match_status: BLOCKED
     disposition: C
@@ -481,6 +495,7 @@ rules:
     match_status: BLOCKED
     disposition: C
     paths: [B, C]
+    readiness_blocking_families: {links: '#53 decide produce-vs-rescope', resources: '#57 decide produce-vs-rescope'}
     disposition_detail: orphan detection joins two inventories whose production and join semantics are both ungoverned today
     required_change: '#53 accepted contract + #57 resources production decision'
     owning_ref: "#27 correction + #53 + #57"
@@ -510,6 +525,7 @@ rules:
       subject_origin: {producer: AuditRunContext subject identity (not an observation), representation: identity string, scoping: run/subject, replayed: n/a}
     declared_surface_gap: condition consumes page@1 while only links@1 is declared; keep-with-amendment vs produce-links@1 decided under #53
     non_declared_evidence: {'page.links[]': "#53"}
+    readiness_blocking_families: {links: '#53 decide produce-vs-rescope'}
     missing_behavior: unknown_on_missing_facts -> UNKNOWN
     match_status: BLOCKED
     disposition: C
@@ -545,6 +561,7 @@ rules:
     producers:
       page.descriptions: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
     declared_surface_gap: declared structured-data@1 is unproducible (content nested in page@1 jsonld_*); produce-or-rescope decided under #54
+    readiness_blocking_families: {structured-data: '#54 decide produce-vs-rescope'}
     missing_behavior: block_on_missing_facts -> UNAVAILABLE while structured-data@1 unproducible
     match_status: UNGOVERNED_THRESHOLD
     disposition: C
@@ -590,7 +607,7 @@ verification_gates:
   gate1_matrix_coverage: enforced by tests/test_stage_e_wave1_reconciliation.py::test_matrix_covers_exactly_the_wave_rules
   gate2_decision_authority: authority separation enforced incl. declared-family evidence rule and follow-up issue wiring
   gate3_field_provenance: every evidence token has a producers entry with exact producer/persistence/scoping/replay status (test_enforced)
-  gate4_replay: page@1 roundtrip + representation record surfacing asserted; unproduced fields marked replayed:false
+  gate4_replay: page@1 roundtrip through the real production adapter asserted by tests/test_page_fact_adapter.py; representation record surfacing asserted; unproduced fields marked replayed:false
   gate5_no_evaluator_local_synthesis: rows with MISSING_PRODUCED_FIELD/BLOCKED stay unbonded; corrections consume shared production only
   gate6_no_hidden_thresholds: GOOGLE-DESC-001/GOOGLE-TITLE-001 carry authoritative_executable_condition:null until #54/#55 accept bands
   gate7_negative_unaccepted_semantics: snapshot exposes no executable-condition surface; proposed blocks marked non-authoritative; PR #51 explicitly not an acceptance mechanism

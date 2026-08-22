@@ -6,6 +6,8 @@ from .collection import (
     RepresentationComparison,
     RepresentationObservation,
     compare_representations,
+    load_page_fact_envelopes,
+    page_fact_envelope,
     parsed_facts_to_dict,
     replay_collected_pages,
 )
@@ -130,6 +132,8 @@ __all__ = [
     "RepresentationObservation",
     "RepresentationComparison",
     "compare_representations",
+    "load_page_fact_envelopes",
+    "page_fact_envelope",
     "parsed_facts_to_dict",
     "replay_collected_pages",
     "DEFAULT_FACT_SCHEMA_VERSIONS",

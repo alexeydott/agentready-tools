@@ -280,6 +280,36 @@ def test_declared_family_evidence_consistency(rules) -> None:
                 assert "C" in paths, f"{rule_id}: requirement amendment path missing"
 
 
+def test_unproducible_declared_families_have_explicit_resolution(rules, matrix) -> None:
+    """P0-B: every declared family without a producer needs a wired resolution.
+
+    Extra entries beyond declared families are allowed only when they are
+    evidence-driven requirements (family of some consumed/proposed evidence
+    token), e.g. transport for CORE-CANON-004's redirect-chain condition.
+    """
+    non_emitted = set(matrix["adapter_boundary"]["non_emitted_registered_families"])
+    for rule_id, row in rules.items():
+        declared = {req["family"] for req in row["fact_requirements"]}
+        tokens = _evidence_tokens(row)
+        token_families = {
+            re.split(r"[\[\].]", token)[0]
+            for token in tokens
+            if re.split(r"[\[\].]", token)[0] not in IDENTITY_PREFIXES
+            and token != "subject_origin"
+        }
+        blocking = sorted(declared & non_emitted)
+        recorded = row.get("readiness_blocking_families") or {}
+        assert set(blocking) <= set(recorded), (
+            f"{rule_id}: readiness_blocking_families must cover {blocking}"
+        )
+        for family in set(recorded) - set(blocking):
+            assert family in token_families or family in (row.get("non_declared_evidence") or {}), (
+                f"{rule_id}: unjustified extra readiness family {family}"
+            )
+        for family, ref in recorded.items():
+            assert re.search(r"#\d+", str(ref)), (rule_id, family)
+
+
 def test_gate7_unaccepted_semantics_cannot_bind_authoritatively(rules, matrix) -> None:
     entry_fields = set(RuleCatalogEntry.__dataclass_fields__)
     assert entry_fields.isdisjoint(EXECUTABLE_CONDITION_SURFACE)
