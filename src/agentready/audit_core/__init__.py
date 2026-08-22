@@ -105,6 +105,13 @@ from .evaluator_registry import (
     evaluate_frozen_rule,
     register_expected_contract,
 )
+from .canon_evaluators import (
+    CANON_EVALUATOR_REGISTRY,
+    CANON_RULE_IDS,
+    CANON_RULE_VERSION,
+    CanonEvaluation,
+    evaluate_canon_rule,
+)
 from .google_desc_evaluators import (
     GOOGLE_DESC_EVALUATOR_REGISTRY,
     GOOGLE_DESC_RULE_ID,
@@ -218,4 +225,9 @@ __all__ = [
     "StoreError",
     "UrlIdentity",
     "fingerprint",
+    "CANON_EVALUATOR_REGISTRY",
+    "CANON_RULE_IDS",
+    "CANON_RULE_VERSION",
+    "CanonEvaluation",
+    "evaluate_canon_rule",
 ]
