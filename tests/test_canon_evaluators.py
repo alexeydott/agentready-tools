@@ -7,6 +7,8 @@ from pathlib import Path
 
 import dataclasses
 
+import pathlib
+
 import pytest
 
 from agentready.audit_core import (
@@ -567,3 +569,60 @@ def test_canon_evaluator_module_has_no_transport_or_collection_io_imports():
         for alias in node.names
     )
     assert not imports & {"http", "httpx", "requests", "playwright", "sqlite3"}
+
+
+# ---------------------------------------------------------------------------
+# amended-family evidence checks (review 5000755011)
+# ---------------------------------------------------------------------------
+
+
+def _evaluator_source() -> str:
+    path = (
+        pathlib.Path(__file__).parents[1]
+        / "src"
+        / "agentready"
+        / "audit_core"
+        / "canon_evaluators.py"
+    )
+    return path.read_text(encoding="utf-8")
+
+
+def test_evaluator_evidence_reads_match_amended_families():
+    """Evidence must come from transport/run-projection/page.links only."""
+    src = _evaluator_source()
+    required = [
+        '_single(transport, "redirect_chain")',
+        '_single(facts["run-projection"], "parameter_variants")',
+        '_single(projection, "cross_domain_targets")',
+        'row.get("rel", "")',
+    ]
+    for needle in required:
+        assert needle in src, f"missing amended evidence read: {needle}"
+    forbidden = [
+        "_single(links,",
+        '"rel_values"',
+        '_single(page, "parameter_variants")',
+        '_single(links, "cross_domain_targets")',
+        '_single(links, "origin")',
+    ]
+    for needle in forbidden:
+        assert needle not in src, f"legacy evidence read still present: {needle}"
+
+
+def test_canon004_initial_redirect_hop_does_not_fail():
+    """Regression: canonical == requested URL is hop 1 and must not FAIL."""
+    result = evaluate_canon_rule(
+        "CORE-CANON-004", TARGET, _facts_for("CORE-CANON-004", redirect_chain=[TARGET])
+    )
+    assert result.readiness.can_evaluate is True
+    assert result.finding.status.value == "pass"
+
+
+def test_canon004_second_hop_still_fails():
+    result = evaluate_canon_rule(
+        "CORE-CANON-004",
+        TARGET,
+        _facts_for("CORE-CANON-004", redirect_chain=[TARGET, CANONICAL]),
+    )
+    assert result.readiness.can_evaluate is True
+    assert result.finding.status.value == "fail"
