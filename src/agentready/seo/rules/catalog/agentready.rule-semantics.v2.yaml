@@ -9,7 +9,7 @@
 # requirement_amendments record the agreed fact_requirements changes whose
 # application to the immutable catalog follows this acceptance.
 schema: agentready.rule-semantics.v2
-semantics_version: 1.0.0
+semantics_version: 1.0.1
 accepted_at: '2026-08-22'
 governance:
   canonical: '#52'
@@ -18,8 +18,8 @@ governance:
   google_title: '#55'
 catalog_pin:
   name: agentready.rule-catalog.v2
-  version: 2.1.0-draft.1
-  digest: a1507f064f95248d6ee21a1a2123f3b09f4f138012f10d3dd310654a72b62f17
+  version: 2.1.0-draft.2
+  digest: acdb4a5814899f6d8ebf543ef8e656caedfa92b3938dffdd58a3d288cfaec909
 requirement_amendments:
   - {rule_id: CORE-CANON-002, families: [page, transport]}
   - {rule_id: CORE-CANON-003, families: [page]}
@@ -28,10 +28,10 @@ requirement_amendments:
   - {rule_id: CORE-CANON-006, families: [page, run-projection]}
   - {rule_id: CORE-CANON-007, families: [page, run-projection]}
   - {rule_id: CORE-CANON-008, families: [page]}
-  - {rule_id: CORE-LINK-001, families: [page]}
+  - {rule_id: CORE-LINK-001, families: [page, representation]}
   - {rule_id: CORE-LINK-002, families: [page, resources]}
   - {rule_id: CORE-LINK-003, families: [page]}
-  - {rule_id: CORE-LINK-004, families: [page]}
+  - {rule_id: CORE-LINK-004, families: [page, representation]}
   - {rule_id: CORE-LINK-005, families: [page, resources]}
   - {rule_id: CORE-LINK-006, families: [page]}
   - {rule_id: GOOGLE-DESC-001, families: [page]}

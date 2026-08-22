@@ -34,7 +34,7 @@ SOURCE = ROOT / "src" / "agentready"
 def _valid_document() -> dict[str, object]:
     return {
         "schema": CATALOG_SCHEMA_ID,
-        "catalog_version": "2.1.0-draft.1",
+        "catalog_version": "2.1.0-draft.2",
         "generated_at": "2026-08-21T00:00:00Z",
         "rule_count": 2,
         "modules": [{"id": "demo", "count": 2}],
@@ -227,7 +227,7 @@ def test_current_packaged_catalog_passes_full_integrity_gate():
     supported enum values, crosswalk references, and applicability support."""
     snapshot = load_rule_catalog_snapshot()
     assert snapshot.schema == CATALOG_SCHEMA_ID
-    assert snapshot.catalog_version == "2.1.0-draft.1"
+    assert snapshot.catalog_version == "2.1.0-draft.2"
     assert snapshot.rule_count == 200
     assert sum(snapshot.module_counts.values()) == 200
 

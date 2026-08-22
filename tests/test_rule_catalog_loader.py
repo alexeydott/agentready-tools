@@ -34,7 +34,7 @@ def test_load_rule_catalog_snapshot_succeeds():
     snapshot = load_rule_catalog_snapshot()
     assert isinstance(snapshot, RuleCatalogSnapshot)
     assert snapshot.schema == CATALOG_SCHEMA_ID
-    assert snapshot.catalog_version == "2.1.0-draft.1"
+    assert snapshot.catalog_version == "2.1.0-draft.2"
     assert snapshot.rule_count == 200
     assert len(snapshot.entries) == 200
 
@@ -114,7 +114,7 @@ def test_entry_fact_requirements_reference_known_families():
 
 def test_catalog_identity_returns_version_and_digest():
     version, digest = catalog_identity()
-    assert version == "2.1.0-draft.1"
+    assert version == "2.1.0-draft.2"
     assert isinstance(digest, str) and len(digest) == 64  # sha256 hex
 
 

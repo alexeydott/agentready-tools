@@ -231,12 +231,12 @@ def test_gate6_thresholds_are_normative_only_in_the_artifact(rules) -> None:
             ), rule_id
 
 
-def test_canon008_is_deferred_not_path_a(rules) -> None:
-    """P0: semantic MATCH stands but binding readiness is blocked -> Path D."""
+def test_canon008_path_a_applies_after_amendment(rules) -> None:
+    """Post-amendment: semantic MATCH + readiness resolved -> Path A end-to-end."""
     row = rules["CORE-CANON-008"]
     assert row["match_status"] == "MATCH"
-    assert row["disposition"] == "D"
-    assert "blocked" in row["binding_readiness"]
+    assert row["disposition"] == "A"
+    assert row["binding_readiness"] == "ready"
     derived = {
         rule_id
         for rule_id, item in rules.items()
@@ -470,6 +470,25 @@ def _artifact_issue_for(rule_id: str, governance: dict[str, str]) -> str:
         return governance["google_desc"]
     assert rule_id == "GOOGLE-TITLE-001"
     return governance["google_title"]
+
+
+def test_yaml_roundtrip_preserves_governance_refs(matrix) -> None:
+    """P0 regression: unescaped ' #NN' must never truncate governance text."""
+    import yaml as _yaml
+
+    redumped = _yaml.safe_dump(matrix, sort_keys=False, allow_unicode=True)
+    reloaded = _yaml.safe_load(redumped)
+    assert reloaded == matrix
+    for row in matrix["rules"]:
+        block = row.get("proposed_executable_condition") or {}
+        accepted_via = block.get("accepted_via", "")
+        if accepted_via:
+            assert "#52-#55" in accepted_via, row["rule_id"]
+    transport = matrix["produced_fact_contract_at_base"]["transport@1"]
+    assert "#56 deviation recorded" in transport["persistence_contract_change_accepted"]
+    link2 = next(r for r in matrix["rules"] if r["rule_id"] == "CORE-LINK-002")
+    refs = " ".join(link2["readiness_blocking_families"].values())
+    assert "#53" in refs and "#57" in refs
 
 
 def test_matrix_conditions_are_backed_by_the_semantics_artifact(rules) -> None:
