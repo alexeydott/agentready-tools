@@ -7,6 +7,7 @@ allowlisted binding.
 """
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -16,6 +17,7 @@ from .contracts import (
     EvaluationCompleteness,
     EvaluationOutcome,
     EvidenceRef,
+    FactEnvelope,
     FindingContract,
     FindingKey,
     FindingStateHash,
@@ -316,8 +318,8 @@ def evaluate_frozen_rule(
 
     snapshot = snapshot or load_rule_catalog_snapshot()
     binding = bind_frozen_rule(snapshot=snapshot, registry=registry)
-    envelopes = tuple(facts)
-    schema_registry = fact_registry or FactSchemaRegistry.from_envelopes(envelopes)
+    fact_bundle = _build_fact_bundle(target, facts)
+    schema_registry = _build_fact_schema_registry(fact_bundle, fact_registry)
     readiness = resolve_evaluation_readiness(
         binding.projection,
         ApplicabilityContext(subject_kind=subject_kind),
@@ -326,7 +328,7 @@ def evaluate_frozen_rule(
     result = None
     if readiness.can_evaluate:
         values = {
-            requirement.family: _fact_value(envelopes, requirement.family)
+            requirement.family: _fact_value(fact_bundle, requirement.family)
             for requirement in binding.projection.fact_requirements
         }
         result = binding.evaluator(target, values)
@@ -366,7 +368,49 @@ def evaluate_frozen_rule(
     return CanaryEvaluation(binding, readiness, finding, report)
 
 
-def _fact_value(envelopes: tuple[object, ...], family: str) -> Any:
+def _build_fact_bundle(target: str, facts: Iterable[object]) -> tuple[FactEnvelope, ...]:
+    """Return a deterministic bundle of facts scoped to one requested URL."""
+    target_identity = UrlIdentity.parse(target)
+    scoped = [
+        envelope
+        for envelope in facts
+        if isinstance(envelope, FactEnvelope)
+        and envelope.target.normalized() == target_identity.normalized()
+    ]
+    return tuple(sorted(scoped, key=_fact_sort_key))
+
+
+def _fact_sort_key(envelope: FactEnvelope) -> tuple[str, ...]:
+    return (
+        envelope.schema_family or envelope.kind,
+        envelope.schema_version or "",
+        envelope.kind,
+        envelope.id,
+        envelope.observed_at,
+        envelope.representation_id or "",
+        json.dumps(envelope.value, sort_keys=True, separators=(",", ":"), default=str),
+    )
+
+
+def _build_fact_schema_registry(
+    fact_bundle: tuple[FactEnvelope, ...],
+    override: FactSchemaRegistry | None,
+) -> FactSchemaRegistry:
+    bundle_registry = FactSchemaRegistry.from_envelopes(fact_bundle)
+    if override is None:
+        return bundle_registry
+    versions = {
+        family: override.versions[family]
+        for family in bundle_registry.versions
+        if family in override.versions
+    }
+    incompatible = frozenset(
+        item for item in override.incompatible if item[0] in versions
+    )
+    return FactSchemaRegistry(versions, incompatible=incompatible)
+
+
+def _fact_value(envelopes: tuple[FactEnvelope, ...], family: str) -> Any:
     for envelope in envelopes:
         if getattr(envelope, "schema_family", None) == family:
             return getattr(envelope, "value", None)

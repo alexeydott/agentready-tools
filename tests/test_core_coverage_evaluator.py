@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import socket
 from dataclasses import replace
 from pathlib import Path
 
@@ -13,6 +14,9 @@ from agentready.audit_core import (
     FactEnvelope,
     FactSchemaRegistry,
     EvaluatorRegistry,
+    RunFactRecord,
+    RunRecord,
+    SQLiteSiteStore,
     UnregisteredRuleError,
     UnresolvedCatalogTargetError,
     bind_frozen_rule,
@@ -24,15 +28,22 @@ from agentready.report_v2 import FindingStatus, semantic_diff
 from agentready.seo.rule_crosswalk import resolve_frozen_rule_ids
 
 TARGET = "https://example.test/"
+OTHER_TARGET = "https://example.test/other"
 
 
-def _facts(*, page_version: str = "1", robots_version: str = "1", allowed: bool = True):
-    target = UrlIdentity.parse(TARGET)
+def _facts(
+    *,
+    target: str = TARGET,
+    page_version: str = "1",
+    robots_version: str = "1",
+    allowed: bool = True,
+):
+    target_identity = UrlIdentity.parse(target)
     return (
         FactEnvelope(
             "page-fact",
             "page",
-            target,
+            target_identity,
             {"status_code": 200, "content_type": "text/html"},
             "2026-08-22T00:00:00Z",
             schema_family="page",
@@ -41,7 +52,7 @@ def _facts(*, page_version: str = "1", robots_version: str = "1", allowed: bool 
         FactEnvelope(
             "robots-fact",
             "robots.policy",
-            target,
+            target_identity,
             {"root_allowed": allowed},
             "2026-08-22T00:00:00Z",
             schema_family="robots.policy",
@@ -90,6 +101,38 @@ def test_canary_evaluator_fails_when_robots_policy_blocks_the_root():
     assert result.readiness.can_evaluate is True
     assert result.report.findings[0].status is FindingStatus.FAIL
     assert result.report.score == 0
+
+
+def test_canary_uses_only_requested_target_facts_for_readiness_and_evaluation():
+    facts = _facts(target=OTHER_TARGET) + _facts(target=TARGET, allowed=False)
+
+    result = evaluate_core_coverage(TARGET, facts)
+
+    assert result.readiness.can_evaluate is True
+    assert result.report.findings[0].status is FindingStatus.FAIL
+    assert result.report.findings[0].reason == "robots.policy blocks the audited root"
+
+
+def test_canary_does_not_use_other_target_facts_to_satisfy_readiness():
+    facts = _facts(target=OTHER_TARGET) + (_facts(target=TARGET)[0],)
+
+    result = evaluate_core_coverage(TARGET, facts)
+
+    assert result.readiness.can_evaluate is False
+    assert result.report.findings[0].status is FindingStatus.UNAVAILABLE
+
+
+def test_canary_scopes_schema_override_to_the_requested_fact_bundle():
+    facts = _facts(target=OTHER_TARGET) + (_facts(target=TARGET)[0],)
+
+    result = evaluate_core_coverage(
+        TARGET,
+        facts,
+        fact_registry=FactSchemaRegistry({"page": "1", "robots.policy": "1"}),
+    )
+
+    assert result.readiness.can_evaluate is False
+    assert result.report.findings[0].status is FindingStatus.UNAVAILABLE
 
 
 @pytest.mark.parametrize("missing_family", ["page", "robots.policy"])
@@ -225,3 +268,64 @@ def test_evaluator_module_has_no_transport_or_collection_io_imports():
         for alias in node.names
     )
     assert not imports & {"http", "httpx", "requests", "playwright", "sqlite3"}
+
+
+def test_canary_replays_persisted_facts_with_network_disabled(tmp_path, monkeypatch):
+    run_id = "run-e0-replay"
+    original_facts = _facts()
+    original = evaluate_core_coverage(TARGET, original_facts, run_id=run_id)
+    path = tmp_path / "e0-replay.sqlite"
+    store = SQLiteSiteStore(path)
+    try:
+        store.begin_run(RunRecord(run_id, "config", "tool", "rules"))
+        for envelope in original_facts:
+            assert envelope.schema_family is not None
+            assert envelope.schema_version is not None
+            store.put_run_fact(
+                RunFactRecord(
+                    run_id,
+                    envelope.schema_family,
+                    envelope.schema_version,
+                    "url",
+                    envelope.target.normalized(),
+                    {
+                        "id": envelope.id,
+                        "kind": envelope.kind,
+                        "value": envelope.value,
+                        "representation_id": envelope.representation_id,
+                    },
+                    envelope.observed_at,
+                )
+            )
+    finally:
+        store.close()
+
+    replay_store = SQLiteSiteStore(path, read_only=True)
+    try:
+        replayed_facts = tuple(
+            FactEnvelope(
+                record.payload["id"],
+                record.payload["kind"],
+                UrlIdentity.parse(record.subject),
+                record.payload["value"],
+                record.observed_at,
+                representation_id=record.payload.get("representation_id"),
+                schema_family=record.family,
+                schema_version=record.schema_version,
+            )
+            for record in replay_store.iter_run_facts(run_id)
+        )
+    finally:
+        replay_store.close()
+
+    def fail_network(*args, **kwargs):
+        raise AssertionError("offline E0 replay attempted network access")
+
+    monkeypatch.setattr(socket, "create_connection", fail_network)
+    monkeypatch.setattr(socket.socket, "connect", fail_network)
+    replayed = evaluate_core_coverage(TARGET, replayed_facts, run_id=run_id)
+
+    assert replayed.finding.key == original.finding.key
+    assert replayed.finding.state_hash == original.finding.state_hash
+    assert replayed.report.findings[0].id == CORE_COVERAGE_RULE_ID
+    assert replayed.report.findings[0].status is FindingStatus.PASS

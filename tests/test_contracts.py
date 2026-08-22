@@ -91,6 +91,45 @@ def test_finding_contract_rejects_incomplete_pass_fail_under_failure_policy():
         )
 
 
+@pytest.mark.parametrize("status", [Status.PASS, Status.FAIL])
+def test_finding_contract_rejects_incomplete_block_on_missing_facts(status):
+    key = FindingKey("metadata", "1", UrlIdentity.parse("https://example.test/"))
+
+    with pytest.raises(ValueError, match="pass/fail findings require complete evaluation"):
+        FindingContract(
+            key=key,
+            state_hash=FindingStateHash("hash"),
+            status=status,
+            applicability=Applicability.APPLICABLE,
+            completeness=EvaluationCompleteness.PARTIAL,
+            severity=Severity.HIGH,
+            impact="high",
+            effort=Effort.MEDIUM,
+            priority=90,
+            failure_policy=FailurePolicy.BLOCK_ON_MISSING_FACTS,
+        )
+
+
+@pytest.mark.parametrize("outcome", [EvaluationOutcome.PASS, EvaluationOutcome.FAIL])
+def test_finding_contract_rejects_incomplete_block_on_missing_fact_outcomes(outcome):
+    key = FindingKey("metadata", "1", UrlIdentity.parse("https://example.test/"))
+
+    with pytest.raises(ValueError, match="strict failure policy rejects incomplete pass/fail outcomes"):
+        FindingContract(
+            key=key,
+            state_hash=FindingStateHash("hash"),
+            status=Status.WARN,
+            applicability=Applicability.APPLICABLE,
+            completeness=EvaluationCompleteness.PARTIAL,
+            severity=Severity.HIGH,
+            impact="high",
+            effort=Effort.MEDIUM,
+            priority=90,
+            outcome=outcome,
+            failure_policy=FailurePolicy.BLOCK_ON_MISSING_FACTS,
+        )
+
+
 def test_finding_contract_allows_explicit_partial_decision_policy():
     key = FindingKey("metadata", "1", UrlIdentity.parse("https://example.test/"))
     contract = FindingContract(
