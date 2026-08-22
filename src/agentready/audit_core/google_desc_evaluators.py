@@ -71,7 +71,7 @@ GOOGLE_DESC_RULE_VERSION = "1.0.0"
 
 # Explicit documented band derived from Google Search Central's ~120-160 char
 # meta-description guidance.  Both bounds are inclusive; see module docstring.
-from agentready.seo.rules.catalog import load_rule_semantics
+from .rule_catalog import load_rule_semantics
 
 _DESC_CONDITION = load_rule_semantics().condition("GOOGLE-DESC-001")
 assert _DESC_CONDITION is not None and _DESC_CONDITION.length_band is not None

@@ -154,6 +154,9 @@ def _build_snapshot(artifact: RuleCatalogArtifact) -> RuleCatalogSnapshot:
     )
 
 
+from agentready.seo.rules.catalog.rule_semantics import load_rule_semantics  # noqa: E402
+
+
 def load_rule_catalog_snapshot() -> RuleCatalogSnapshot:
     """Load, validate, and project the packaged frozen rule catalog.
 
