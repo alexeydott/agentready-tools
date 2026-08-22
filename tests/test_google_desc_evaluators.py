@@ -41,7 +41,6 @@ def _facts(
     *,
     target: str = TARGET,
     page_version: str = "1",
-    structured_version: str = "1",
     descriptions: list[str] | None = None,
 ):
     if descriptions is None:
@@ -61,15 +60,6 @@ def _facts(
             "2026-08-22T00:00:00Z",
             schema_family="page",
             schema_version=page_version,
-        ),
-        FactEnvelope(
-            "structured-data-fact",
-            "structured-data",
-            target_identity,
-            {"jsonld_nodes": [], "jsonld_errors": [], "block_count": 0},
-            "2026-08-22T00:00:00Z",
-            schema_family="structured-data",
-            schema_version=structured_version,
         ),
     )
 
@@ -145,7 +135,7 @@ def test_desc_band_boundaries_are_inclusive():
     assert above.outcome.value == "fail"
 
 
-@pytest.mark.parametrize("missing_family", ["page", "structured-data"])
+@pytest.mark.parametrize("missing_family", ["page"])
 def test_missing_mandatory_fact_blocks_confident_evaluation(missing_family):
     facts = tuple(item for item in _facts() if item.schema_family != missing_family)
 
@@ -162,8 +152,6 @@ def test_missing_mandatory_fact_blocks_confident_evaluation(missing_family):
     [
         _facts(page_version="0"),
         _facts(page_version="unknown"),
-        _facts(structured_version="0"),
-        _facts(structured_version="unknown"),
     ],
 )
 def test_old_or_unknown_fact_versions_block_confident_evaluation(facts):
@@ -179,11 +167,7 @@ def test_old_or_unknown_fact_versions_block_confident_evaluation(facts):
     [
         (
             _facts(page_version="0"),
-            FactSchemaRegistry({"page": "1", "structured-data": "1"}),
-        ),
-        (
-            _facts(structured_version="unknown"),
-            FactSchemaRegistry({"page": "1", "structured-data": "1"}),
+            FactSchemaRegistry({"page": "1"}),
         ),
     ],
 )
@@ -193,6 +177,12 @@ def test_override_registry_cannot_upgrade_old_or_unknown_bundle_versions(facts, 
     assert result.readiness.can_evaluate is False
     assert result.report.findings[0].status is FindingStatus.UNAVAILABLE
     assert result.report.coverage.complete_rules == 0
+
+
+def test_override_registry_cannot_downgrade_bundle_observed_versions():
+    result = evaluate_google_desc(TARGET, _facts(), fact_registry=FactSchemaRegistry({"page": "0"}))
+
+    assert result.readiness.can_evaluate is True
 
 
 def test_desc_uses_only_requested_target_facts():
@@ -208,7 +198,7 @@ def test_desc_uses_only_requested_target_facts():
 
 
 def test_desc_does_not_use_other_target_facts_to_satisfy_readiness():
-    facts = _facts(target=OTHER_TARGET) + (_facts(target=TARGET)[0],)
+    facts = _facts(target=OTHER_TARGET)
 
     result = evaluate_google_desc(TARGET, facts)
 
@@ -272,7 +262,7 @@ def test_desc_finding_participates_in_scoring_consistently():
     assert failing.finding.priority == 20
     assert failing.report.score == 0
 
-    unavailable = evaluate_google_desc(TARGET, _facts()[0:1])
+    unavailable = evaluate_google_desc(TARGET, ())
     assert unavailable.report.findings[0].status is FindingStatus.UNAVAILABLE
     assert unavailable.report.score == 100
 
