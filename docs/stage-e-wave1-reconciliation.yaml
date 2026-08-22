@@ -157,7 +157,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     verdicts:
       UNKNOWN: canonical declaration count != 1
       PASS: urlsplit(page.canonicals[0]).scheme and host equal transport.origin scheme/host (case-insensitive
@@ -203,7 +203,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     verdicts:
       FAIL: effective directive set contains noindex or none (nofollow excluded — it governs link crawling,
         not indexation)
@@ -250,7 +250,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     verdicts:
       UNKNOWN: canonical count != 1 or transport.redirect_chain unavailable
       FAIL: canonical equals a non-initial hop of transport.redirect_chain
@@ -297,7 +297,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     verdicts:
       UNKNOWN: canonical count != 1
       NOT_APPLICABLE: no pagination signal observed
@@ -351,7 +351,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     verdicts:
       UNKNOWN: canonical count != 1 or variant inventory unavailable
       FAIL: any observed variant shares canonical scheme+host+path AND has non-empty query
@@ -397,7 +397,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     verdicts:
       UNKNOWN: canonical count != 1 or projection unavailable
       PASS: canonical on audited origin (trivial consistency)
@@ -481,7 +481,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     intent: page exposes resolvable internal hyperlinks
     positive: at least one observed link resolves under subject_origin AND the collected record is an
       HTML success response
@@ -543,7 +543,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     intent: declared resource URLs referenced by links resolve consistently
     positive: every link whose raw_href matches a declared resource URL resolves to that resource resolved_url
     negative: at least one such link resolves elsewhere; or no link references any declared resource URL
@@ -589,7 +589,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     intent: page declares at least one hyperlink
     positive: len(page.links) >= 1
     negative: len(page.links) == 0 on a parsed HTML document
@@ -630,7 +630,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     intent: internal link availability diagnostic
     positive: internal-resolvable links exist AND the collected record is an HTML success response
     warn: otherwise (diagnostic role — never FAIL)
@@ -689,7 +689,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     intent: internal resource orphan detection
     positive: every declared resource URL is referenced by at least one internal link
     negative: at least one declared resource is never referenced; or references exist while resources
@@ -737,7 +737,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     intent: external link census
     positive_or_census: always PASS with external-link count derived from governed page links resolution
     negative: not applicable - observation rule records the census and never fails
@@ -782,7 +782,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     structural_part:
       FAIL: no description / whitespace-only / more than one distinct non-empty description
       PASS: exactly one non-empty description
@@ -827,7 +827,7 @@ rules:
   authoritative_executable_condition: null
   proposed_executable_condition:
     governance_status: accepted
-    accepted_via: agentready.rule-semantics.v2 (governance
+    accepted_via: "agentready.rule-semantics.v2 (governance #52-#55)"
     structural_part:
       FAIL: no title / whitespace-only after strip / more than one non-empty title
       PASS_structural: exactly one non-empty title

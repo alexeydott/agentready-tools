@@ -59,9 +59,12 @@ def semantics(snapshot):
 
 def test_document_loads_offline_with_stable_digest(semantics) -> None:
     assert semantics.schema == SEMANTICS_SCHEMA_ID
-    assert semantics.semantics_version == "1.0.0"
+    assert semantics.semantics_version == "1.0.1"
     assert semantics.digest == compute_semantics_digest()
     assert len(semantics.digest) == 64
+    amendments = {a.rule_id: a.families for a in semantics.amendments}
+    assert amendments["CORE-LINK-001"] == ("page", "representation")
+    assert amendments["CORE-LINK-004"] == ("page", "representation")
 
 
 def test_artifact_is_pinned_to_live_catalog(semantics, snapshot) -> None:

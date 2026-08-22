@@ -9,7 +9,7 @@
 # requirement_amendments record the agreed fact_requirements changes whose
 # application to the immutable catalog follows this acceptance.
 schema: agentready.rule-semantics.v2
-semantics_version: 1.0.0
+semantics_version: 1.0.1
 accepted_at: '2026-08-22'
 governance:
   canonical: '#52'
@@ -28,10 +28,10 @@ requirement_amendments:
   - {rule_id: CORE-CANON-006, families: [page, run-projection]}
   - {rule_id: CORE-CANON-007, families: [page, run-projection]}
   - {rule_id: CORE-CANON-008, families: [page]}
-  - {rule_id: CORE-LINK-001, families: [page]}
+  - {rule_id: CORE-LINK-001, families: [page, representation]}
   - {rule_id: CORE-LINK-002, families: [page, resources]}
   - {rule_id: CORE-LINK-003, families: [page]}
-  - {rule_id: CORE-LINK-004, families: [page]}
+  - {rule_id: CORE-LINK-004, families: [page, representation]}
   - {rule_id: CORE-LINK-005, families: [page, resources]}
   - {rule_id: CORE-LINK-006, families: [page]}
   - {rule_id: GOOGLE-DESC-001, families: [page]}
