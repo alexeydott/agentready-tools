@@ -81,7 +81,7 @@ _EXPECTED_AUTOMATION = "automated"
 _CONTRACT_ROWS: tuple[tuple[str, tuple[tuple[str, str], ...], str, str, str, str], ...] = (
     (
         "CORE-CANON-002",
-        (("page", "1"), ("links", "1"), ("transport", "1")),
+        (("page", "1"), ("transport", "1")),
         "scored",
         "block_on_missing_facts",
         "composite_check",
@@ -97,7 +97,7 @@ _CONTRACT_ROWS: tuple[tuple[str, tuple[tuple[str, str], ...], str, str, str, str
     ),
     (
         "CORE-CANON-004",
-        (("page", "1"), ("links", "1")),
+        (("page", "1"), ("transport", "1")),
         "diagnostic",
         "unknown_on_missing_facts",
         "composite_check",
@@ -105,7 +105,7 @@ _CONTRACT_ROWS: tuple[tuple[str, tuple[tuple[str, str], ...], str, str, str, str
     ),
     (
         "CORE-CANON-005",
-        (("page", "1"), ("links", "1"), ("transport", "1")),
+        (("page", "1"), ("transport", "1")),
         "scored",
         "block_on_missing_facts",
         "composite_check",
@@ -113,7 +113,7 @@ _CONTRACT_ROWS: tuple[tuple[str, tuple[tuple[str, str], ...], str, str, str, str
     ),
     (
         "CORE-CANON-006",
-        (("page", "1"),),
+        (("page", "1"), ("run-projection", "1")),
         "observation_only",
         "unknown_on_missing_facts",
         "atomic_check",
@@ -121,7 +121,7 @@ _CONTRACT_ROWS: tuple[tuple[str, tuple[tuple[str, str], ...], str, str, str, str
     ),
     (
         "CORE-CANON-007",
-        (("page", "1"), ("links", "1")),
+        (("page", "1"), ("run-projection", "1")),
         "scored",
         "block_on_missing_facts",
         "composite_check",
@@ -129,7 +129,7 @@ _CONTRACT_ROWS: tuple[tuple[str, tuple[tuple[str, str], ...], str, str, str, str
     ),
     (
         "CORE-CANON-008",
-        (("page", "1"), ("links", "1"), ("transport", "1")),
+        (("page", "1")),
         "scored",
         "block_on_missing_facts",
         "composite_check",
