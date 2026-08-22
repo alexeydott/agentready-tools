@@ -280,7 +280,11 @@ def _core_link_001(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
 
 
 def _core_link_002(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
-    """Resource URLs referenced by links resolve consistently."""
+    """Contract-preparation evaluator (CORE-LINK-002 is declared_not_produced).
+
+    Covered only by direct-invocation contract-preparation tests; this
+    function is NOT a registered frozen binding.
+    """
     page = _page_fact(facts)
     links = _links_fact(target, facts)
     resources = _resources_fact(facts)
@@ -417,7 +421,12 @@ def _is_internal_link(link: Mapping[str, Any], origin_prefix: str) -> bool:
 
 
 def _core_link_005(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
-    """Link/resource integrity: declared resources and internal link references agree exactly."""
+    """Contract-preparation evaluator (CORE-LINK-005 is declared_not_produced).
+
+    Covered only by direct-invocation contract-preparation tests; this
+    function is NOT a registered frozen binding.  Link/resource integrity:
+    all link references agree exactly.
+    """
     page = _page_fact(facts)
     links = _links_fact(target, facts)
     resources = _resources_fact(facts)

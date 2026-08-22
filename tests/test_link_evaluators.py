@@ -33,6 +33,7 @@ from agentready.audit_core.evaluator_registry import (
 from agentready.audit_core.link_evaluators import (
     CORE_LINK_RULE_VERSION,
     LINK_EVALUATOR_REGISTRY,
+    LINK_EXPECTED_CONTRACTS,
     _core_link_002,
     _core_link_005,
     bind_link_rule,
@@ -109,10 +110,28 @@ def _facts_for(rule_id, *, target=TARGET, rows=(INTERNAL,), rep=None):
 # ---------------------------------------------------------------------------
 
 
+def test_catalog_requirements_match_evaluator_contracts():
+    """Regression (review 5001208124): amended catalog rows == evaluator expectations."""
+    snapshot = load_rule_catalog_snapshot()
+    for rid in BOUND_RULES + DEFERRED_RULES:
+        entry = snapshot.entry(rid)
+        catalog = tuple(
+            (f.family, f.min_schema_version) for f in entry.fact_requirements
+        )
+        expected = tuple(LINK_EXPECTED_CONTRACTS[rid]["facts"])
+        assert catalog == expected, rid
+
+
 def test_registry_scoped_to_bound_rules_only():
     assert {rid for rid, _v in LINK_EVALUATOR_REGISTRY.registered_targets} == set(
         BOUND_RULES
     )
+
+
+def test_contract_prep_rules_are_not_registered_frozen_bindings():
+    """Direct-invocation coverage (contract preparation) must never leak into bindings."""
+    bound = {rid for rid, _v in LINK_EVALUATOR_REGISTRY.registered_targets}
+    assert set(DEFERRED_RULES).isdisjoint(bound)
 
 
 @pytest.mark.parametrize("rule_id", DEFERRED_RULES)
@@ -232,21 +251,21 @@ def _direct_002_facts(rows, resources):
     }
 
 
-def test_link002_direct_consistent_resolution_passes():
+def test_contract_prep_link002_consistent_resolution_passes():
     rows = [_row(0, "/a.css", f"{ORIGIN}/a.css")]
     resources = [{"url": "/a.css", "resolved_url": f"{ORIGIN}/a.css"}]
     result = _core_link_002(TARGET, _direct_002_facts(rows, resources))
     assert result.outcome.value == "pass"
 
 
-def test_link002_direct_mismatch_fails():
+def test_contract_prep_link002_mismatch_fails():
     rows = [_row(0, "/a.css", f"{ORIGIN}/other.css")]
     resources = [{"url": "/a.css", "resolved_url": f"{ORIGIN}/a.css"}]
     result = _core_link_002(TARGET, _direct_002_facts(rows, resources))
     assert result.outcome.value == "fail"
 
 
-def test_link005_direct_orphan_resource_fails():
+def test_contract_prep_link005_orphan_resource_fails():
     rows = []
     resources = [{"url": "/orphan.css", "resolved_url": f"{ORIGIN}/orphan.css"}]
     result = _core_link_005(TARGET, _direct_002_facts(rows, resources))
