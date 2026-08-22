@@ -206,22 +206,25 @@ def test_row_enums_are_valid(rules) -> None:
             assert path[0] in DISPOSITION_VALUES or path.startswith(("A-", "D-")), (rule_id, path)
 
 
-def test_gate6_no_hidden_thresholds_outside_governance(rules) -> None:
+def test_gate6_thresholds_are_normative_only_in_the_artifact(rules) -> None:
     ungoverned = {"GOOGLE-DESC-001", "GOOGLE-TITLE-001"}
     for rule_id, row in rules.items():
         authoritative = row["authoritative_executable_condition"]
         if rule_id in ungoverned:
             assert authoritative is None, rule_id
             proposed = row["proposed_executable_condition"]
-            assert proposed is not None and proposed["governance_status"] == "proposed", rule_id
+            assert proposed is not None and proposed["governance_status"] == "accepted", rule_id
             band = proposed.get("length_band_part")
             assert band is not None, rule_id
-            assert "NOT runtime evidence until governed" in band["threshold_source"], rule_id
+            assert (
+                "normative numbers live in agentready.rule-semantics.v2"
+                in band["threshold_source"]
+            ), rule_id
             continue
         if authoritative is None:
             assert row["proposed_executable_condition"] is not None, rule_id
             assert (
-                row["proposed_executable_condition"]["governance_status"] == "proposed"
+                row["proposed_executable_condition"]["governance_status"] == "accepted"
             ), rule_id
 
 
@@ -242,7 +245,7 @@ def test_canon008_is_deferred_not_path_a(rules) -> None:
 def test_proposed_link_contracts_define_decision_space(rules) -> None:
     for rule_id in sorted(r for r in EXPECTED_WAVE_IDS if r.startswith("CORE-LINK-")):
         proposed = rules[rule_id]["proposed_executable_condition"]
-        assert proposed["governance_status"] == "proposed", rule_id
+        assert proposed["governance_status"] == "accepted", rule_id
         assert "intent" in proposed, rule_id
         positive = proposed.get("positive") or proposed.get("positive_or_census")
         assert positive, rule_id
@@ -318,30 +321,28 @@ def test_gate7_unaccepted_semantics_cannot_bind_authoritatively(rules, matrix) -
         proposed = row["proposed_executable_condition"]
         if proposed is None:
             continue
-        assert proposed["governance_status"] == "proposed", rule_id
+        assert proposed["governance_status"] == "accepted", rule_id
     authority = matrix["authority"]
     assert authority["catalog_authored_is_authoritative"] is True
     assert authority["proposed_conditions_are_not_authoritative"] is True
     assert authority["binding_requires_accepted_governance_path"] is True
 
 
-def _envelope_emitter_ast_offenders() -> list[str]:
-    """AST detection of envelope-kind constructions for the four families.
+def test_gate8_pipeline_modules_never_construct_non_emitted_family_envelopes(matrix) -> None:
+    """P0/P1: AST-level lock over emitter-shaped constructions repo-wide.
 
-    Flags only emitter-shaped nodes — assignments to schema_family/kind,
-    keywords named schema_family/kind, and dict literals keyed schema_family/
-    kind whose value is a family-name constant. Payload-field access such as
-    ``payload.get("links")`` inside the legitimate page@1 adapter is NOT an
-    emitter and must stay unflagged.
+    Only families still recorded as non-emitted are forbidden; transport and
+    run-projection gained sanctioned adapters (#56/#57).
     """
-    families = {"links", "transport", "resources", "structured-data"}
+    families = set(matrix["adapter_boundary"]["non_emitted_registered_families"])
+    assert families == {"links", "resources", "structured-data"}
     kind_names = {"schema_family", "kind"}
     offenders: list[str] = []
     src_root = REPO_ROOT / "src" / "agentready"
     for path in sorted(src_root.rglob("*.py")):
         if "__pycache__" in path.parts:
             continue
-        rel = str(path.relative_to(REPO_ROOT))
+        rel = str(path.relative_to(REPO_ROOT)).replace("\\", "/")
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if (
@@ -365,24 +366,15 @@ def _envelope_emitter_ast_offenders() -> list[str]:
                         offenders.append(f"{rel}:{key.lineno}")
         if offenders:
             break
-    return offenders
+    assert offenders == []
 
 
-def test_gate8_pipeline_modules_never_construct_wave_family_envelopes() -> None:
-    """P0/P1: AST-level lock over emitter-shaped constructions repo-wide.
-
-    Catches keyword/dict/assignment constructions that a plain regex could
-    miss, while ignoring payload-field access in the page@1 adapter.
-    """
-    assert _envelope_emitter_ast_offenders() == []
-
-
-def test_gate8_no_assignment_form_emitters_anywhere_in_src() -> None:
-    families = ("links", "transport", "resources", "structured-data")
-    for family in families:
+def test_gate8_no_assignment_form_emitters_for_non_emitted_families(matrix) -> None:
+    non_emitted = tuple(matrix["adapter_boundary"]["non_emitted_registered_families"])
+    for family in non_emitted + ("transport", "run-projection"):
         assert DEFAULT_FACT_SCHEMA_VERSIONS.get(family) == "1"
     pattern = re.compile(
-        r"\b(?:schema_family|kind)\s*(:|=)(?!=)\s*[\"'](?:" + "|".join(families) + r")[\"']"
+        r"\b(?:schema_family|kind)\s*(:|=)(?!=)\s*[\"'](?:" + "|".join(non_emitted) + r")[\"']"
     )
     offenders: list[str] = []
     src_root = REPO_ROOT / "src" / "agentready"
@@ -391,12 +383,18 @@ def test_gate8_no_assignment_form_emitters_anywhere_in_src() -> None:
             continue
         if pattern.search(path.read_text(encoding="utf-8")):
             offenders.append(str(path.relative_to(REPO_ROOT)))
-    assert offenders == [], "unexpected envelope emitters for unproducible families"
+    assert offenders == [], "unexpected envelope emitters for non-emitted families"
 
 
 def test_adapter_boundary_documented_and_real(matrix) -> None:
     emitters = {item["family"]: item["adapter"] for item in matrix["adapter_boundary"]["emitters"]}
-    assert set(emitters) == {"page", "representation", "robots.fetch|robots.parsed|robots.policy|sitemap.*"}
+    assert set(emitters) == {
+        "page",
+        "representation",
+        "robots.fetch|robots.parsed|robots.policy|sitemap.*",
+        "transport",
+        "run-projection",
+    }
     persist_functions = {
         name
         for name in dir(run_facts_module)
@@ -405,7 +403,14 @@ def test_adapter_boundary_documented_and_real(matrix) -> None:
     robots_or_sitemap = [n for n in persist_functions if "robots" in n or "sitemap" in n]
     assert robots_or_sitemap, "run_facts emitters disappeared"
     non_emitted = set(matrix["adapter_boundary"]["non_emitted_registered_families"])
-    assert non_emitted == {"links", "transport", "resources", "structured-data"}
+    assert non_emitted == {"links", "resources", "structured-data"}
+    from agentready.audit_core.collection import (  # noqa: F401
+        canonical_projection_fact_envelopes as _cp,
+        load_transport_fact_envelopes as _lt,
+        transport_fact_envelope as _te,
+    )
+
+    assert callable(_te) and callable(_lt) and callable(_cp)
 
 
 def test_gate4_page_producer_roundtrip_preserves_wave_evidence_fields() -> None:
@@ -449,3 +454,35 @@ def test_verification_gates_are_recorded(matrix) -> None:
     gates = matrix["verification_gates"]
     for index in range(1, 13):
         assert any(key.startswith(f"gate{index}_") for key in gates), index
+
+
+def _artifact_issue_for(rule_id: str, governance: dict[str, str]) -> str:
+    if rule_id.startswith("CORE-CANON"):
+        return governance["canonical"]
+    if rule_id.startswith("CORE-LINK"):
+        return governance["links"]
+    if rule_id == "GOOGLE-DESC-001":
+        return governance["google_desc"]
+    assert rule_id == "GOOGLE-TITLE-001"
+    return governance["google_title"]
+
+
+def test_matrix_conditions_are_backed_by_the_semantics_artifact(rules) -> None:
+    """Accepted matrix conditions must exist verbatim-rule-wise in the artifact."""
+    from agentready.audit_core.rule_catalog import load_rule_catalog_snapshot
+    from agentready.seo.rules.catalog import load_rule_semantics
+
+    artifact = load_rule_semantics(load_rule_catalog_snapshot())
+    for rule_id, row in rules.items():
+        condition = artifact.condition(rule_id)
+        assert condition is not None, rule_id
+        expected_issue = _artifact_issue_for(rule_id, artifact.governance)
+        assert condition.source_issue == expected_issue, rule_id
+        block = row["proposed_executable_condition"]
+        if block is None:
+            # catalog-derived authoritative rows (CORE-CANON-008) need no
+            # acceptance flip; the artifact still records their condition.
+            assert row["authoritative_executable_condition"] is not None, rule_id
+            continue
+        assert block["governance_status"] == "accepted", rule_id
+        assert "agentready.rule-semantics.v2" in block.get("accepted_via", ""), rule_id

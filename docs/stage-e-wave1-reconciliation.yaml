@@ -62,7 +62,18 @@ adapter_boundary:
       adapter: audit_core.run_facts persist_* helpers writing SiteStore run facts
     - family: representation
       adapter: audit_core.collection replay_collected_pages surfacing SiteStore page records (status_code/content_type) alongside parsed payloads
-  non_emitted_registered_families: [links, transport, resources, structured-data]
+    - family: transport
+      adapter: >
+        audit_core.collection transport_fact_envelope / load_transport_fact_envelopes —
+        produced per #56 (origin, final_url, persisted redirect chain);
+        verified offline by tests/test_transport_projection_adapters.py
+    - family: run-projection
+      adapter: >
+        audit_core.collection run_projection_fact_envelope /
+        canonical_projection_fact_envelopes — produced per #57
+        (parameter_variants, cross_domain_targets over one run's inventory);
+        verified offline by tests/test_transport_projection_adapters.py
+  non_emitted_registered_families: [links, resources, structured-data]
 produced_fact_contract_at_base:
   page@1:
     fields:
@@ -82,13 +93,22 @@ produced_fact_contract_at_base:
   representation:
     persisted_and_replayed: true (PageRecord status_code/content_type surfaced through replay)
   links@1:
-    producer: NONE — registered in DEFAULT_FACT_SCHEMA_VERSIONS, no envelope emitter exists
+    producer: NONE — registered in DEFAULT_FACT_SCHEMA_VERSIONS, no envelope emitter exists; resolution is requirement amendment (#52), not production
   transport@1:
-    producer: NONE — registered, no emitter exists (#56)
+    producer: audit_core.collection transport adapter — PRODUCED per #56 (origin, final_url, redirect_chain); persisted/replayed via store records + replay
+    evaluation_envelope_adapter: present — transport_fact_envelope / load_transport_fact_envelopes
+  run-projection@1:
+    producer: audit_core.collection canonical projection — PRODUCED per #57 (parameter_variants, cross_domain_targets)
+    evaluation_envelope_adapter: present — run_projection_fact_envelope / canonical_projection_fact_envelopes
   resources@1:
-    producer: NONE — registered, no emitter exists (#57)
+    producer: NONE — registered, no emitter exists; produce-or-rescope decision recorded via #53/#57 follow-up
   structured-data@1:
-    producer: NO standalone envelope — content nested inside page@1 (jsonld_*); requirement decision tracked in #54
+    producer: NO standalone envelope — content nested inside page@1 (jsonld_*); requirement decision accepted in #54 (amendment drops the standalone requirement)
+  semantics_artifact:
+    name: agentready.rule-semantics.v2
+    version: '1.0.0'
+    role: normative source of accepted executable conditions and requirement amendments for this wave (#52–#55)
+    catalog_pin: must equal live snapshot version+digest (enforced by tests/test_rule_semantics.py)
 match_status_enum: [MATCH, SEMANTIC_MISMATCH, MISSING_PRODUCED_FIELD, UNGOVERNED_THRESHOLD, BLOCKED]
 disposition_enum:
   A: existing contract sufficient
@@ -110,7 +130,8 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       verdicts:
         UNKNOWN: canonical declaration count != 1
         PASS: urlsplit(page.canonicals[0]).scheme and host equal transport.origin scheme/host (case-insensitive host)
@@ -118,14 +139,14 @@ rules:
       evidence_fields: [page.canonicals, transport.origin]
     producers:
       page.canonicals: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
-      transport.origin: {producer: 'NONE pending #56', representation: absent, scoping: absent, replayed: false}
+      transport.origin: {producer: 'audit_core.collection transport adapter (#56)', representation: payload dict origin/final_url/redirect_chain, scoping: subject/run, replayed: true}
     missing_behavior: block_on_missing_facts -> UNAVAILABLE while required families are unproducible
     match_status: MISSING_PRODUCED_FIELD
     disposition: B
-    paths: [B, C]
-    readiness_blocking_families: {links: '#52 amend-away (declared but unused by condition)', transport: '#56 produce'}
-    disposition_detail: decision uses only declared surfaces; transport@1 needs production (#56) while the unused links@1 requirement must be amended away (#52), otherwise the rule stays UNAVAILABLE after #56 alone
-    required_change: land #56 transport production AND amend links@1 requirement via #52; switch tests to real producer-shaped payloads
+    paths: [C]
+    readiness_blocking_families: {links: '#52 amend-away (declared but unused by condition)'}
+    disposition_detail: decision uses only declared surfaces; transport@1 needs production (#56) while the unused links@1 requirement must be amended away (#52), otherwise the rule stays UNAVAILABLE after transport production alone
+    required_change: amend unused links@1 requirement via #52 (catalog regeneration); switch tests to real producer-shaped payloads
     owning_ref: "#46 correction + #52 + #56"
   - rule_id: CORE-CANON-003
     version: 1.0.0
@@ -141,7 +162,8 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       verdicts:
         FAIL: effective directive set contains noindex or none (nofollow excluded — it governs link crawling, not indexation)
         PASS: otherwise
@@ -171,7 +193,8 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       verdicts:
         UNKNOWN: canonical count != 1 or transport.redirect_chain unavailable
         FAIL: canonical equals a non-initial hop of transport.redirect_chain
@@ -179,7 +202,7 @@ rules:
       evidence_fields: [page.canonicals, transport.redirect_chain]
     producers:
       page.canonicals: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
-      transport.redirect_chain: {producer: 'NONE pending #56', representation: absent, scoping: absent, replayed: false}
+      transport.redirect_chain: {producer: 'audit_core.collection transport adapter (#56)', representation: payload dict origin/final_url/redirect_chain, scoping: subject/run, replayed: true}
     declared_surface_gap: >
       Proposed evidence transport.redirect_chain is NOT part of the declared
       families {page, links}; the earlier draft read it from a links envelope
@@ -188,13 +211,13 @@ rules:
       fact_requirements to {page, transport} via #52. Producing the value
       alone is insufficient.
     non_declared_evidence: {transport.redirect_chain: "#52/#56"}
-    readiness_blocking_families: {links: '#52 amend-away (unused by condition)', transport: '#56 produce'}
+    readiness_blocking_families: {links: '#52 amend-away (unused by condition)'}
     missing_behavior: unknown_on_missing_facts -> UNKNOWN
     match_status: MISSING_PRODUCED_FIELD
     disposition: C
-    paths: [B, C]
+    paths: [C]
     disposition_detail: redirect history is transport-family evidence; the earlier draft read it from a links envelope that no producer emits
-    required_change: '#52 requirement amendment + #56 transport production; move evidence read off the nonexistent links envelope'
+    required_change: '#52 requirement amendment ({page,transport}); evidence read moves off the nonexistent links envelope onto the produced transport adapter'
     owning_ref: "#24 correction + #52 + #56"
   - rule_id: CORE-CANON-005
     version: 1.0.0
@@ -210,7 +233,8 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       verdicts:
         UNKNOWN: canonical count != 1
         NOT_APPLICABLE: no pagination signal observed
@@ -221,14 +245,14 @@ rules:
     producers:
       page.canonicals: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
       'page.links[].rel': {producer: collection.ParsedFacts LinkOccurrence.rel, representation: per-link string, scoping: document/subject, replayed: true}
-      transport.final_url: {producer: 'NONE pending #56', representation: absent, scoping: absent, replayed: false}
+      transport.final_url: {producer: 'audit_core.collection transport adapter (#56)', representation: payload dict origin/final_url/redirect_chain, scoping: subject/run, replayed: true}
     missing_behavior: block_on_missing_facts -> UNAVAILABLE while families unproducible
     match_status: MISSING_PRODUCED_FIELD
     disposition: B
-    paths: [B, C]
-    readiness_blocking_families: {links: '#52 amend-away (unused by condition)', transport: '#56 produce'}
+    paths: [C]
+    readiness_blocking_families: {links: '#52 amend-away (unused by condition)'}
     disposition_detail: pagination signal is derivable from produced page@1 rel; synthetic links.rel_values envelopes are unnecessary; unused links@1 requirement must be amended (#52) or the rule stays UNAVAILABLE after #56 alone
-    required_change: '#56 transport production + #52 links amendment; re-point evaluator at page.links[].rel'
+    required_change: '#52 links amendment; re-point evaluator at page.links[].rel'
     owning_ref: "#24 correction + #52 + #56"
   - rule_id: CORE-CANON-006
     version: 1.0.0
@@ -244,7 +268,8 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       verdicts:
         UNKNOWN: canonical count != 1 or variant inventory unavailable
         FAIL: any observed variant shares canonical scheme+host+path AND has non-empty query
@@ -252,7 +277,7 @@ rules:
       evidence_fields: [page.canonicals, run.parameter_variants]
     producers:
       page.canonicals: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
-      run.parameter_variants: {producer: 'NONE pending #57', representation: absent, scoping: run, replayed: false}
+      run.parameter_variants: {producer: 'audit_core.collection canonical projection (#57)', representation: payload dict parameter_variants/cross_domain_targets, scoping: run, replayed: true}
     declared_surface_gap: >
       Proposed evidence run.parameter_variants is a run-scoped projection that
       belongs to NO declared family of this rule ({page}). Admissible only
@@ -263,7 +288,7 @@ rules:
     missing_behavior: unknown_on_missing_facts -> UNKNOWN
     match_status: MISSING_PRODUCED_FIELD
     disposition: C
-    paths: [B, C]
+    paths: [C]
     disposition_detail: duplicate variants are a run-scoped inventory view absent from every produced envelope today
     required_change: '#52 requirement amendment + #57 projection surface'
     owning_ref: "#24 correction + #52 + #57"
@@ -281,7 +306,8 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       verdicts:
         UNKNOWN: canonical count != 1 or projection unavailable
         PASS: canonical on audited origin (trivial consistency)
@@ -289,7 +315,7 @@ rules:
       evidence_fields: [page.canonicals, run.cross_domain_targets]
     producers:
       page.canonicals: {producer: collection.ParsedFacts, representation: 'tuple[str]', scoping: document/subject, replayed: true}
-      run.cross_domain_targets: {producer: 'NONE pending #57', representation: absent, scoping: run, replayed: false}
+      run.cross_domain_targets: {producer: 'audit_core.collection canonical projection (#57)', representation: payload dict parameter_variants/cross_domain_targets, scoping: run, replayed: true}
     declared_surface_gap: >
       Proposed evidence run.cross_domain_targets is a run-scoped projection in
       NO declared family ({page, links}); admissible only after governed
@@ -300,7 +326,7 @@ rules:
     missing_behavior: block_on_missing_facts -> UNAVAILABLE
     match_status: MISSING_PRODUCED_FIELD
     disposition: C
-    paths: [B, C]
+    paths: [C]
     disposition_detail: cross-crawl consistency needs a governed run-scoped target inventory; the draft's links.origin/cross_domain_targets reads were synthetic
     required_change: '#52 requirement amendment + #57 projection surface'
     owning_ref: "#24 correction + #52 + #57"
@@ -329,11 +355,11 @@ rules:
     missing_behavior: block_on_missing_facts applies to missing facts, not to zero declarations
     match_status: MATCH
     disposition: D
-    paths: [A-semantics, D-binding, B-or-C-readiness]
+    paths: [A-semantics, D-binding, C-readiness]
     binding_readiness: blocked — declared links@1/transport@1 requirements are unproducible although the condition never reads them; Path A cannot be claimed while readiness fails
-    readiness_blocking_families: {links: '#52 amend-away (declared but unused)', transport: '#56 produce'}
-    disposition_detail: semantic MATCH against the catalog-derived condition stands, but the rule cannot reach READY on the normal pipeline, so it stays unbonded; after #56 alone the links@1 requirement would still block — amendment through #52 is required either way
-    required_change: resolve readiness via #56 production of transport AND #52 amendment dropping the unused links requirement (or produce links too); then Path A applies end-to-end
+    readiness_blocking_families: {links: '#52 amend-away (declared but unused)'}
+    disposition_detail: semantic MATCH against the catalog-derived condition stands, but the rule cannot reach READY on the normal pipeline, so it stays unbonded; with links still unamended the rule would remain blocked even though transport is now produced — amendment through #52 is required either way
+    required_change: resolve readiness by amending the unused links requirement away via #52 (transport is already produced); then Path A applies end-to-end
     owning_ref: "#24 correction + #52 + #56"
   - rule_id: CORE-LINK-001
     version: 1.0.0
@@ -349,7 +375,8 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       intent: page exposes resolvable internal hyperlinks
       positive: at least one observed link resolves under subject_origin AND the collected record is an HTML success response
       negative: zero internal-resolvable links while the record is an HTML success response
@@ -370,7 +397,7 @@ rules:
     missing_behavior: block_on_missing_facts -> UNAVAILABLE while links@1 stays unproducible
     match_status: BLOCKED
     disposition: C
-    paths: [B, C]
+    paths: [C]
     disposition_detail: position-derived semantics make the evaluator normative today; contracts require governance acceptance
     required_change: '#53 accepted contract (+ representation requirement decision); correct implementation verbatim'
     owning_ref: "#27 correction + #53"
@@ -388,19 +415,20 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       intent: declared resource URLs referenced by links resolve consistently
       positive: every link whose raw_href matches a declared resource URL resolves to that resource resolved_url
       negative: at least one such link resolves elsewhere; or no link references any declared resource URL
       indeterminate: resources inventory unavailable
       evidence_fields: [resources.inventory, 'page.links[]']
     producers:
-      resources.inventory: {producer: 'NONE pending #57', representation: absent, scoping: run/subject, replayed: false}
+      resources.inventory: {producer: 'NONE — production decision recorded in #53/#57 follow-up', representation: absent, scoping: run/subject, replayed: false}
       'page.links[]': {producer: collection.ParsedFacts links tuple, representation: sequence of LinkOccurrence, scoping: document/subject, replayed: true}
     missing_behavior: block_on_missing_facts -> UNAVAILABLE
     match_status: BLOCKED
     disposition: C
-    paths: [B, C]
+    paths: [C]
     readiness_blocking_families: {links: '#53 decide produce-vs-rescope', resources: '#57 decide produce-vs-rescope'}
     disposition_detail: depends on unproducible resources@1 and ungoverned join semantics
     required_change: '#53 accepted contract + #57 resources production decision'
@@ -419,7 +447,8 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       intent: page declares at least one hyperlink
       positive: len(page.links) >= 1
       negative: len(page.links) == 0 on a parsed HTML document
@@ -433,7 +462,7 @@ rules:
     missing_behavior: block_on_missing_facts -> UNAVAILABLE while links@1 stays unproducible
     match_status: BLOCKED
     disposition: C
-    paths: [B, C]
+    paths: [C]
     disposition_detail: doubly unbondable — position-derived semantics plus unproducible declared family
     required_change: '#53 accepted contract; decide whether consuming page@1 links makes the separate links@1 requirement redundant (amendment)'
     owning_ref: "#27 correction + #53"
@@ -451,7 +480,8 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       intent: internal link availability diagnostic
       positive: internal-resolvable links exist AND the collected record is an HTML success response
       warn: otherwise (diagnostic role — never FAIL)
@@ -468,7 +498,7 @@ rules:
     missing_behavior: unknown_on_missing_facts -> UNKNOWN
     match_status: BLOCKED
     disposition: C
-    paths: [B, C]
+    paths: [C]
     disposition_detail: WARN-vs-FAIL split is evaluator-authored; diagnostic role constrains but does not define the condition
     required_change: '#53 accepted contract (+ representation requirement decision)'
     owning_ref: "#27 correction + #53"
@@ -486,19 +516,20 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       intent: internal resource orphan detection
       positive: every declared resource URL is referenced by at least one internal link
       negative: at least one declared resource is never referenced; or references exist while resources inventory empty
       indeterminate: neither side observable
       evidence_fields: [resources.inventory, 'page.links[]']
     producers:
-      resources.inventory: {producer: 'NONE pending #57', representation: absent, scoping: run/subject, replayed: false}
+      resources.inventory: {producer: 'NONE — production decision recorded in #53/#57 follow-up', representation: absent, scoping: run/subject, replayed: false}
       'page.links[]': {producer: collection.ParsedFacts links tuple, representation: sequence of LinkOccurrence, scoping: document/subject, replayed: true}
     missing_behavior: block_on_missing_facts -> UNAVAILABLE
     match_status: BLOCKED
     disposition: C
-    paths: [B, C]
+    paths: [C]
     readiness_blocking_families: {links: '#53 decide produce-vs-rescope', resources: '#57 decide produce-vs-rescope'}
     disposition_detail: orphan detection joins two inventories whose production and join semantics are both ungoverned today
     required_change: '#53 accepted contract + #57 resources production decision'
@@ -517,7 +548,8 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       intent: external link census
       positive_or_census: always PASS with external-link count derived from governed page links resolution
       negative: "not applicable - observation rule records the census and never fails"
@@ -533,7 +565,7 @@ rules:
     missing_behavior: unknown_on_missing_facts -> UNKNOWN
     match_status: BLOCKED
     disposition: C
-    paths: [B, C]
+    paths: [C]
     disposition_detail: always-pass census is evaluator-authored framing; even observation rules need an explicitly governed decision space
     required_change: '#53 accepted contract'
     owning_ref: "#27 correction + #53"
@@ -551,12 +583,13 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       structural_part:
         FAIL: no description / whitespace-only / more than one distinct non-empty description
         PASS: exactly one non-empty description
       length_band_part:
-        threshold_source: external Google guidance prose — explicitly NOT runtime evidence until governed (#54)
+        threshold_source: "governed via #54 - normative numbers live in agentready.rule-semantics.v2"
         band: 120 <= collapsed-length <= 160 inclusive
         FAIL_below: "too short (below band)"
         FAIL_above: "too long (above band)"
@@ -569,7 +602,7 @@ rules:
     missing_behavior: block_on_missing_facts -> UNAVAILABLE while structured-data@1 unproducible
     match_status: UNGOVERNED_THRESHOLD
     disposition: C
-    paths: [B, C]
+    paths: [C]
     disposition_detail: '#31 forbids importing fixed-length thresholds without separate catalog change; readiness fails independently'
     required_change: '#54 numeric-boundary governance + structured-data requirement decision'
     owning_ref: "#31 correction + #54"
@@ -588,12 +621,13 @@ rules:
     automation_mode: automated
     authoritative_executable_condition: null
     proposed_executable_condition:
-      governance_status: proposed
+      governance_status: accepted
+      accepted_via: agentready.rule-semantics.v2 (governance #52-#55)
       structural_part:
         FAIL: no title / whitespace-only after strip / more than one non-empty title
         PASS_structural: exactly one non-empty title
       length_band_part:
-        threshold_source: legacy SEO engine heuristic prose — explicitly NOT runtime evidence until governed (#55)
+        threshold_source: "governed via #55 - normative numbers live in agentready.rule-semantics.v2"
         band: 30 <= stripped-length <= 65 inclusive
       measurement: str.strip() character length of page.titles[0]
       evidence_fields: [page.titles]

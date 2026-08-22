@@ -22,6 +22,15 @@ from .loader import (
     load_frozen_rule_catalog,
     validate_catalog_document,
 )
+from .rule_semantics import (
+    SEMANTICS_SCHEMA_ID,
+    AcceptedCondition,
+    RequirementAmendment,
+    RuleSemanticsDocument,
+    RuleSemanticsError,
+    compute_semantics_digest,
+    load_rule_semantics,
+)
 
 __all__ = [
     "CATALOG_SCHEMA_ID",
@@ -35,4 +44,11 @@ __all__ = [
     "compute_catalog_digest",
     "load_frozen_rule_catalog",
     "validate_catalog_document",
+    "SEMANTICS_SCHEMA_ID",
+    "AcceptedCondition",
+    "RequirementAmendment",
+    "RuleSemanticsDocument",
+    "RuleSemanticsError",
+    "compute_semantics_digest",
+    "load_rule_semantics",
 ]
