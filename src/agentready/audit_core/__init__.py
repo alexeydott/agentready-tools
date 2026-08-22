@@ -103,6 +103,15 @@ from .evaluator_registry import (
     evaluate_core_coverage,
     evaluate_frozen_rule,
 )
+from .google_title_evaluators import (
+    GOOGLE_TITLE_EVALUATOR_REGISTRY,
+    GOOGLE_TITLE_MAX_LENGTH,
+    GOOGLE_TITLE_MIN_LENGTH,
+    GOOGLE_TITLE_RULE_ID,
+    GOOGLE_TITLE_RULE_VERSION,
+    bind_google_title_rule,
+    evaluate_google_title,
+)
 
 __all__ = [
     "Applicability",
@@ -121,6 +130,13 @@ __all__ = [
     "build_canary_report",
     "evaluate_core_coverage",
     "evaluate_frozen_rule",
+    "GOOGLE_TITLE_EVALUATOR_REGISTRY",
+    "GOOGLE_TITLE_MAX_LENGTH",
+    "GOOGLE_TITLE_MIN_LENGTH",
+    "GOOGLE_TITLE_RULE_ID",
+    "GOOGLE_TITLE_RULE_VERSION",
+    "bind_google_title_rule",
+    "evaluate_google_title",
     "AuditRunContext",
     "AuthorityLevel",
     "CollectedPage",
