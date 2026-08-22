@@ -42,6 +42,7 @@ __all__ = [
     "EvaluatorResult",
     "EvaluatorBinding",
     "EvaluatorRegistry",
+    "ExpectedContract",
     "FrozenRuleBindingError",
     "UnregisteredRuleError",
     "UnresolvedCatalogTargetError",
@@ -95,13 +96,43 @@ class EvaluatorBinding:
     evaluator: Evaluator
 
 
+@dataclass(frozen=True, slots=True)
+class ExpectedContract:
+    """Table-driven catalog contract expectation for one frozen rule target.
+
+    Each registry validates its own expected contracts against the packaged
+    catalog before a binding is returned; the canary keeps its exact E0
+    contract, and other families declare their own rows.
+    """
+
+    rule_id: str
+    version: str
+    scope: str
+    condition: str
+    facts: tuple[tuple[str, str], ...]
+    score_role: str
+    failure_policy: str
+    mechanism: str
+    rule_kind: str
+    automation_mode: str
+
+
 class EvaluatorRegistry:
     """Explicit evaluator allowlist; catalog rows are never auto-registered."""
 
     def __init__(
         self,
         bindings: Iterable[tuple[str, str, Evaluator]] = (),
+        *,
+        allowlist: frozenset[tuple[str, str]] | None = None,
+        expected_contracts: Mapping[tuple[str, str], ExpectedContract] | None = None,
     ) -> None:
+        self._allowlist = allowlist if allowlist is not None else frozenset(
+            {(CORE_COVERAGE_RULE_ID, CORE_COVERAGE_RULE_VERSION)}
+        )
+        self._expected_contracts: dict[tuple[str, str], ExpectedContract] = dict(
+            expected_contracts or {}
+        )
         self._bindings: dict[tuple[str, str], Evaluator] = {}
         for rule_id, version, evaluator in bindings:
             self.register(rule_id, version, evaluator)
@@ -112,7 +143,7 @@ class EvaluatorRegistry:
 
     def register(self, rule_id: str, version: str, evaluator: Evaluator) -> None:
         target = (rule_id, version)
-        if target != (CORE_COVERAGE_RULE_ID, CORE_COVERAGE_RULE_VERSION):
+        if target not in self._allowlist:
             raise UnregisteredRuleError(
                 f"frozen evaluator target is not allowlisted: {rule_id}@{version}"
             )
@@ -125,6 +156,9 @@ class EvaluatorRegistry:
             return self._bindings[(rule_id, version)]
         except KeyError as exc:
             raise UnregisteredRuleError(f"no evaluator binding for {rule_id}@{version}") from exc
+
+    def expected_contract(self, rule_id: str, version: str) -> ExpectedContract | None:
+        return self._expected_contracts.get((rule_id, version))
 
 
 def _core_coverage_evaluator(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
@@ -192,6 +226,27 @@ def _validate_canary_contract(entry: "RuleCatalogEntry") -> None:
         )
 
 
+def _validate_expected_contract(entry: "RuleCatalogEntry", contract: ExpectedContract) -> None:
+    """Validate one catalog entry against its registry-declared expectation."""
+    facts = tuple((item.family, item.min_schema_version) for item in entry.fact_requirements)
+    if (
+        entry.rule_id != contract.rule_id
+        or entry.version != contract.version
+        or entry.scope != contract.scope
+        or entry.condition != contract.condition
+        or facts != contract.facts
+        or entry.score_role != contract.score_role
+        or entry.failure_policy != contract.failure_policy
+        or entry.mechanism != contract.mechanism
+        or entry.rule_kind != contract.rule_kind
+        or entry.automation_mode != contract.automation_mode
+    ):
+        raise FrozenRuleBindingError(
+            f"catalog contract does not match the accepted frozen contract: "
+            f"{entry.rule_id}@{entry.version}"
+        )
+
+
 def bind_frozen_rule(
     rule_id: str = CORE_COVERAGE_RULE_ID,
     version: str = CORE_COVERAGE_RULE_VERSION,
@@ -212,8 +267,21 @@ def bind_frozen_rule(
             f"catalog target version is stale: requested {rule_id}@{version}, found {entry.version}"
         )
     evaluator = registry.resolve(rule_id, version)
-    _validate_canary_contract(entry)
+    contract = registry.expected_contract(rule_id, version)
+    if contract is None:
+        _validate_canary_contract(entry)
+    else:
+        _validate_expected_contract(entry, contract)
     return EvaluatorBinding(rule_id, version, entry.title, project_entry(entry), evaluator)
+
+
+def _failure_policy_for(catalog_policy: str) -> FailurePolicy:
+    """Map a catalog failure policy onto the canonical FailurePolicy enum."""
+    if catalog_policy == "block_on_missing_facts":
+        return FailurePolicy.BLOCK_ON_MISSING_FACTS
+    if catalog_policy == "unknown_on_missing_facts":
+        return FailurePolicy.PARTIAL_DECISION_ALLOWED
+    return FailurePolicy.STRICT
 
 
 def _finding(
@@ -223,7 +291,7 @@ def _finding(
     result: EvaluatorResult | None,
 ) -> FindingContract:
     key = FindingKey(binding.rule_id, binding.version, UrlIdentity.parse(target))
-    failure_policy = FailurePolicy.BLOCK_ON_MISSING_FACTS
+    failure_policy = _failure_policy_for(binding.projection.failure_policy)
     if readiness.applicability is Applicability.NOT_APPLICABLE:
         status = Status.SKIP
         outcome = EvaluationOutcome.NOT_APPLICABLE
@@ -298,6 +366,8 @@ def evaluate_frozen_rule(
     target: str,
     facts: Iterable[object],
     *,
+    rule_id: str = CORE_COVERAGE_RULE_ID,
+    version: str = CORE_COVERAGE_RULE_VERSION,
     subject_kind: str = _EXPECTED_SCOPE,
     snapshot: "RuleCatalogSnapshot | None" = None,
     registry: EvaluatorRegistry = CANARY_EVALUATOR_REGISTRY,
@@ -317,7 +387,7 @@ def evaluate_frozen_rule(
     )
 
     snapshot = snapshot or load_rule_catalog_snapshot()
-    binding = bind_frozen_rule(snapshot=snapshot, registry=registry)
+    binding = bind_frozen_rule(rule_id, version, snapshot=snapshot, registry=registry)
     fact_bundle = _build_fact_bundle(target, facts)
     schema_registry = _build_fact_schema_registry(fact_bundle, fact_registry)
     readiness = resolve_evaluation_readiness(
