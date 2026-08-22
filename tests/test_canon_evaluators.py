@@ -5,6 +5,8 @@ import socket
 from dataclasses import replace
 from pathlib import Path
 
+import dataclasses
+
 import pytest
 
 from agentready.audit_core import (
@@ -30,82 +32,105 @@ from agentready.audit_core.rule_catalog import load_rule_catalog_snapshot
 from agentready.audit_core.urls import UrlIdentity
 from agentready.report_v2 import FindingStatus, semantic_diff
 
+from agentready.audit_core.collection import (
+    page_fact_envelope,
+    parsed_facts_from_dict,
+    run_projection_fact_envelope,
+    transport_fact_envelope,
+)
+
+
+from agentready.audit_core.collection import (
+    page_fact_envelope,
+    parsed_facts_from_dict,
+    run_projection_fact_envelope,
+    transport_fact_envelope,
+)
+
+
 TARGET = "https://example.test/page"
 OTHER_TARGET = "https://example.test/other"
 ORIGIN = "https://example.test"
 CANONICAL = "https://example.test/page"
 
 
+T0 = "2026-08-22T00:00:00Z"
+
+
+T0 = "2026-08-22T00:00:00Z"
+
+
 def _facts(
     *,
     target: str = TARGET,
     page_version: str = "1",
-    links_version: str = "1",
     transport_version: str = "1",
+    projection_version: str = "1",
     canonicals: list[str] | None = None,
     meta_robots: list[str] | None = None,
+    links: list[dict] | None = None,
+    origin: str = ORIGIN,
+    final_url: str | None = None,
+    redirect_chain: list[str] | None = None,
     parameter_variants: list[str] | None = None,
-    links_payload: dict | None = None,
-    transport_payload: dict | None = None,
+    cross_domain_targets: list[str] | None = None,
 ):
-    target_identity = UrlIdentity.parse(target)
-    page = FactEnvelope(
-        "page-fact",
-        "page",
-        target_identity,
-        {
-            "status_code": 200,
-            "content_type": "text/html",
-            "canonicals": [CANONICAL] if canonicals is None else canonicals,
-            "meta_robots": [] if meta_robots is None else meta_robots,
-            "parameter_variants": [] if parameter_variants is None else parameter_variants,
-        },
-        "2026-08-22T00:00:00Z",
-        schema_family="page",
-        schema_version=page_version,
+    identity = UrlIdentity.parse(target)
+    page_rows = {
+        "canonicals": [CANONICAL] if canonicals is None else canonicals,
+        "meta_robots": [] if meta_robots is None else meta_robots,
+        "links": [] if links is None else links,
+    }
+    envelope = page_fact_envelope(
+        subject_url=target,
+        facts=parsed_facts_from_dict(page_rows),
+        observed_at=T0,
     )
-    links = FactEnvelope(
-        "links-fact",
-        "links",
-        target_identity,
-        {"links": []} if links_payload is None else links_payload,
-        "2026-08-22T00:00:00Z",
-        schema_family="links",
-        schema_version=links_version,
+    if page_version != "1":
+        envelope = dataclasses.replace(envelope, schema_version=page_version)
+
+    chain = [target] if redirect_chain is None else list(redirect_chain)
+    transport = transport_fact_envelope(
+        subject_url=target,
+        final_url=final_url or target,
+        redirect_chain=tuple(chain),
+        observed_at=T0,
     )
-    transport = FactEnvelope(
-        "transport-fact",
-        "transport",
-        target_identity,
-        {
-            "final_url": target,
-            "redirect_chain": [target],
-            "origin": ORIGIN,
-        }
-        if transport_payload is None
-        else transport_payload,
-        "2026-08-22T00:00:00Z",
-        schema_family="transport",
-        schema_version=transport_version,
+    if origin != ORIGIN:
+        payload = dict(transport.value)
+        payload["origin"] = origin
+        transport = dataclasses.replace(transport, value=payload)
+    if transport_version != "1":
+        transport = dataclasses.replace(transport, schema_version=transport_version)
+
+    projection = run_projection_fact_envelope(
+        anchor_url=f"{ORIGIN}/",
+        parameter_variants=tuple([] if parameter_variants is None else parameter_variants),
+        cross_domain_targets=tuple([] if cross_domain_targets is None else cross_domain_targets),
+        observed_at=T0,
     )
-    return (page, links, transport)
+    projection = dataclasses.replace(projection, target=identity)
+    if projection_version != "1":
+        projection = dataclasses.replace(projection, schema_version=projection_version)
+
+    return (envelope, transport, projection)
+
+
+REQUIRED_FAMILIES = {
+    "CORE-CANON-002": ("page", "transport"),
+    "CORE-CANON-003": ("page",),
+    "CORE-CANON-004": ("page", "transport"),
+    "CORE-CANON-005": ("page", "transport"),
+    "CORE-CANON-006": ("page", "run-projection"),
+    "CORE-CANON-007": ("page", "run-projection"),
+    "CORE-CANON-008": ("page",),
+}
 
 
 def _facts_for(rule_id: str, **kwargs):
-    """Return only the fact families required by the given rule."""
-    required = {
-        "CORE-CANON-002": {"page", "links", "transport"},
-        "CORE-CANON-003": {"page"},
-        "CORE-CANON-004": {"page", "links"},
-        "CORE-CANON-005": {"page", "links", "transport"},
-        "CORE-CANON-006": {"page"},
-        "CORE-CANON-007": {"page", "links"},
-        "CORE-CANON-008": {"page", "links", "transport"},
-    }[rule_id]
+    """Return only the fact families required by the amended catalog row."""
     by_family = {envelope.schema_family: envelope for envelope in _facts(**kwargs)}
-    return tuple(by_family[family] for family in required)
-
-
+    return tuple(by_family[family] for family in REQUIRED_FAMILIES[rule_id])
 # ---------------------------------------------------------------------------
 # registry allowlist
 # ---------------------------------------------------------------------------
@@ -245,16 +270,12 @@ def test_positive_path_produces_pass_finding_with_report_identity(rule_id):
     [
         ("CORE-CANON-002", {"canonicals": ["https://other.test/page"]}),
         ("CORE-CANON-003", {"meta_robots": ["noindex"]}),
-        ("CORE-CANON-004", {"links_payload": {"redirect_chain": [CANONICAL, TARGET]}}),
+        ("CORE-CANON-004", {"redirect_chain": [CANONICAL, TARGET]}),
         (
             "CORE-CANON-005",
             {
-                "links_payload": {"rel_values": ["next"]},
-                "transport_payload": {
-                    "final_url": "https://example.test/page?page=2",
-                    "redirect_chain": [TARGET],
-                    "origin": ORIGIN,
-                },
+                "links": [{"source_representation_id": "static-html", "ordinal": 0, "raw_href": "/next", "rel": "next"}],
+                "final_url": "https://example.test/page?page=2",
             },
         ),
         ("CORE-CANON-006", {"parameter_variants": ["https://example.test/page?utm=x"]}),
@@ -262,10 +283,7 @@ def test_positive_path_produces_pass_finding_with_report_identity(rule_id):
             "CORE-CANON-007",
             {
                 "canonicals": ["https://cdn.test/canonical"],
-                "links_payload": {
-                    "origin": ORIGIN,
                     "cross_domain_targets": ["https://mirror.test/canonical"],
-                },
             },
         ),
         ("CORE-CANON-008", {"canonicals": [CANONICAL, "https://example.test/alt"]}),

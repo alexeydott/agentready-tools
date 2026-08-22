@@ -129,7 +129,7 @@ _CONTRACT_ROWS: tuple[tuple[str, tuple[tuple[str, str], ...], str, str, str, str
     ),
     (
         "CORE-CANON-008",
-        (("page", "1")),
+        (("page", "1"),),
         "scored",
         "block_on_missing_facts",
         "composite_check",
@@ -176,7 +176,6 @@ def _scheme_host(url: str) -> tuple[str, str]:
 
 def _canonical_evaluator(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
     page = facts["page"]
-    links = facts["links"]
     transport = facts["transport"]
     canonicals = _canonicals(page)
     if len(canonicals) != 1:
@@ -228,7 +227,7 @@ def _robots_directives_evaluator(target: str, facts: Mapping[str, Any]) -> Evalu
 
 def _redirect_chain_evaluator(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
     page = facts["page"]
-    links = facts["links"]
+    transport = facts["transport"]
     canonicals = _canonicals(page)
     if len(canonicals) != 1:
         return EvaluatorResult(
@@ -237,10 +236,11 @@ def _redirect_chain_evaluator(target: str, facts: Mapping[str, Any]) -> Evaluato
         )
     canonical = canonicals[0]
     chain: list[str] = []
-    redirect_chain = _single(links, "redirect_chain")
+    redirect_chain = _single(transport, "redirect_chain")
     if isinstance(redirect_chain, (list, tuple)):
         chain = [str(item) for item in redirect_chain]
-    if canonical in chain:
+    non_initial = chain[1:]
+    if canonical in non_initial:
         position = chain.index(canonical) + 1
         return EvaluatorResult(
             EvaluationOutcome.FAIL,
@@ -255,7 +255,6 @@ def _redirect_chain_evaluator(target: str, facts: Mapping[str, Any]) -> Evaluato
 
 def _self_paginated_evaluator(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
     page = facts["page"]
-    links = facts["links"]
     transport = facts["transport"]
     canonicals = _canonicals(page)
     if len(canonicals) != 1:
@@ -265,10 +264,12 @@ def _self_paginated_evaluator(target: str, facts: Mapping[str, Any]) -> Evaluato
         )
     canonical = canonicals[0]
     final_url = str(_single(transport, "final_url") or "")
-    paginated = False
-    rel_values = _single(links, "rel_values")
-    if isinstance(rel_values, (list, tuple)):
-        paginated = any(str(item).strip().lower() in {"next", "prev"} for item in rel_values)
+    link_rows = page.get("links", []) if isinstance(page.get("links"), (list, tuple)) else []
+    paginated = any(
+        str(row.get("rel", "")).strip().lower() in {"next", "prev"}
+        for row in link_rows
+        if isinstance(row, dict)
+    )
     if paginated and canonical != final_url:
         return EvaluatorResult(
             EvaluationOutcome.FAIL,
@@ -293,7 +294,7 @@ def _parameter_duplicates_evaluator(target: str, facts: Mapping[str, Any]) -> Ev
             f"expected exactly one declared canonical, found {len(canonicals)}",
         )
     canonical_parts = urlsplit(canonicals[0])
-    variants = _single(page, "parameter_variants")
+    variants = _single(facts["run-projection"], "parameter_variants")
     variant_urls: list[str] = []
     if isinstance(variants, (list, tuple)):
         variant_urls = [str(item) for item in variants]
@@ -322,7 +323,7 @@ def _parameter_duplicates_evaluator(target: str, facts: Mapping[str, Any]) -> Ev
 
 def _cross_domain_consistency_evaluator(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
     page = facts["page"]
-    links = facts["links"]
+    projection = facts["run-projection"]
     canonicals = _canonicals(page)
     if len(canonicals) != 1:
         return EvaluatorResult(
@@ -331,7 +332,7 @@ def _cross_domain_consistency_evaluator(target: str, facts: Mapping[str, Any]) -
         )
     canonical = canonicals[0]
     canonical_scheme, canonical_host = _scheme_host(canonical)
-    origin = str(_single(links, "origin") or "")
+    origin = target
     origin_scheme, origin_host = _scheme_host(origin)
     if (canonical_scheme, canonical_host) == (origin_scheme, origin_host):
         return EvaluatorResult(
@@ -339,7 +340,7 @@ def _cross_domain_consistency_evaluator(target: str, facts: Mapping[str, Any]) -
             "the declared canonical stays on the audited origin; cross-domain consistency holds trivially",
             (EvidenceRef("page:canonical", target, f"declared canonical: {canonical}"),),
         )
-    targets = _single(links, "cross_domain_targets")
+    targets = _single(projection, "cross_domain_targets")
     observed: list[str] = []
     if isinstance(targets, (list, tuple)):
         observed = [str(item) for item in targets]
@@ -358,8 +359,6 @@ def _cross_domain_consistency_evaluator(target: str, facts: Mapping[str, Any]) -
 
 def _declared_once_evaluator(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
     page = facts["page"]
-    links = facts["links"]
-    transport = facts["transport"]
     canonicals = _canonicals(page)
     if len(canonicals) == 1:
         return EvaluatorResult(
