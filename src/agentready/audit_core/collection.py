@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass
 
@@ -18,7 +20,9 @@ from ..page_parser import (
     StructuredDataMarker,
     parse_page,
 )
+from .contracts import FactEnvelope
 from .fact_schema import FactSchemaRegistry, FactSchemaResult, FactSchemaRequirement
+from .urls import UrlIdentity
 
 
 @dataclass(frozen=True, slots=True)
@@ -322,6 +326,108 @@ def parsed_facts_from_dict(payload: Mapping[str, object]) -> ParsedFacts:
         visible_text=str(payload.get("visible_text", "")),
         raw_text_signature_inputs=tuple(str(item) for item in payload.get("raw_text_signature_inputs", ())),
     )
+
+
+def page_fact_envelope(
+    *,
+    subject_url: str,
+    facts: ParsedFacts,
+    observed_at: str,
+    representation_id: str | None = None,
+    envelope_id: str | None = None,
+) -> FactEnvelope:
+    """Build the sanctioned ``page@1`` evaluation envelope from parsed facts.
+
+    This is the single production adaptation point between collected page
+    payloads (``ParsedFacts``) and the frozen-rule evaluation surface
+    (:class:`FactEnvelope`). Envelope identity is deterministic over the
+    subject URL, observation timestamp, representation id, and canonical
+    payload, so replayed evaluations are reproducible offline.
+    """
+    from .fact_schema import DEFAULT_FACT_SCHEMA_VERSIONS
+
+    if not subject_url or not subject_url.strip():
+        raise ValueError("page fact envelope requires a non-empty subject URL")
+    if not observed_at or not observed_at.strip():
+        raise ValueError("page fact envelope requires a non-empty observed_at")
+    identity = UrlIdentity.parse(subject_url)
+    payload = parsed_facts_to_dict(facts)
+    version = DEFAULT_FACT_SCHEMA_VERSIONS["page"]
+    resolved_id = envelope_id or _page_envelope_id(
+        identity.normalized(), observed_at, representation_id, payload
+    )
+    return FactEnvelope(
+        id=resolved_id,
+        kind="page",
+        target=identity,
+        value=payload,
+        observed_at=observed_at,
+        representation_id=representation_id,
+        schema_family="page",
+        schema_version=version,
+    )
+
+
+def _page_envelope_id(
+    normalized_url: str,
+    observed_at: str,
+    representation_id: str | None,
+    payload: Mapping[str, object],
+) -> str:
+    digest_input = json.dumps(
+        [normalized_url, observed_at, representation_id or "", _canonical_payload(payload)],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return "page-fact:" + hashlib.sha256(digest_input.encode("utf-8")).hexdigest()
+
+
+def _canonical_payload(payload: Mapping[str, object]) -> object:
+    return json.loads(json.dumps(asdict(_payload_as_parsed_facts(payload)), sort_keys=True, default=str))
+
+
+def _payload_as_parsed_facts(payload: Mapping[str, object]) -> ParsedFacts:
+    return parsed_facts_from_dict(payload)
+
+
+def load_page_fact_envelopes(
+    store: object,
+    run_id: str,
+    *,
+    observed_at: str | None = None,
+) -> tuple[FactEnvelope, ...]:
+    """Adapt replayed collected pages into sanctioned ``page@1`` envelopes.
+
+    Reads only durable store records via :func:`replay_collected_pages` — no
+    network or browser access. Provenance is taken from the actual persisted
+    representation: ``representation_id`` and the default ``observed_at``
+    come from the ``Representation`` record itself. ``observed_at`` falls
+    back to the run's recorded ``started_at`` only when a representation
+    carries no observation timestamp (legacy records), keeping repeated
+    replays of one run deterministic.
+    """
+    run = store.get_run(run_id)  # type: ignore[attr-defined]
+    envelopes: list[FactEnvelope] = []
+    for page in replay_collected_pages(store, run_id):
+        if page.facts is None or not page.available:
+            continue
+        representation_id = getattr(page.representation, "representation_id", None)
+        rep_observed_at = getattr(page.representation, "observed_at", "") or ""
+        timestamp = (
+            observed_at
+            if observed_at is not None
+            else (rep_observed_at or (getattr(run, "started_at", "") or ""))
+        )
+        envelopes.append(
+            page_fact_envelope(
+                subject_url=page.url,
+                facts=page.facts,
+                observed_at=timestamp,
+                representation_id=str(representation_id) if representation_id else None,
+            )
+        )
+    return tuple(envelopes)
 
 
 def _page_from_persisted_facts(facts: ParsedFacts, representation: Representation, parser_backend: str | None) -> ParsedPage:
