@@ -129,6 +129,15 @@ from .google_desc_evaluators import (
     MIN_DESCRIPTION_LENGTH,
     evaluate_google_desc,
 )
+from .link_evaluators import (
+    CORE_LINK_RULE_VERSION,
+    LINK_RULE_IDS,
+    LINK_EVALUATOR_REGISTRY,
+    LINK_EXPECTED_CONTRACTS,
+    bind_link_rule,
+    evaluate_link_rule,
+)
+
 
 __all__ = [
     "Applicability",
@@ -251,4 +260,10 @@ __all__ = [
     "CANON_RULE_VERSION",
     "CanonEvaluation",
     "evaluate_canon_rule",
-]
+
+    CORE_LINK_RULE_VERSION,
+    LINK_RULE_IDS,
+    LINK_EVALUATOR_REGISTRY,
+    LINK_EXPECTED_CONTRACTS,
+    bind_link_rule,
+    evaluate_link_rule,]
