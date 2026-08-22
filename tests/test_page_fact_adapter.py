@@ -121,7 +121,7 @@ class _RepresentationRecord:
     content_type: str | None = "text/html"
     body_hash: str | None = None
     byte_size: int | None = None
-    observed_at: str | None = "2026-08-22T00:00:00Z"
+    observed_at: str | None = "2026-08-21T23:59:59Z"
     parser_backend: str | None = None
     facts: object | None = None
     body: bytes | None = b"<html><title>Example Domain</title></html>"
@@ -155,18 +155,40 @@ class _FakeStore:
 
 def test_load_page_fact_envelopes_replays_store_records_offline() -> None:
     store = _FakeStore()
+    run_started_at = store.get_run("run-1").started_at
     envelopes = load_page_fact_envelopes(store, "run-1")
     assert len(envelopes) == 1
+    envelope = envelopes[0]
+    # Provenance comes from the persisted Representation, not from the source
+    # label and not from the run's start time.
+    assert envelope.representation_id == "rep-1"
+    assert envelope.observed_at == store._representations[(SUBJECT,)][0].observed_at
+    assert envelope.observed_at != run_started_at
     expected = page_fact_envelope(
         subject_url=SUBJECT,
-        facts=envelopes[0].value and parsed_facts_from_dict(dict(envelopes[0].value)),
-        observed_at=store.get_run("run-1").started_at,
-        representation_id="static-html",
+        facts=parsed_facts_from_dict(dict(envelope.value)),
+        observed_at=envelope.observed_at,
+        representation_id="rep-1",
     )
-    assert envelopes[0] == expected
+    assert envelope == expected
     explicit = load_page_fact_envelopes(store, "run-1", observed_at="2026-01-01T00:00:00Z")
     assert explicit[0].observed_at == "2026-01-01T00:00:00Z"
-    assert explicit[0].id != envelopes[0].id
+    assert explicit[0].id != envelope.id
+
+
+def test_envelope_identity_uses_representation_provenance_not_run_start() -> None:
+    """Regression (review round 3): provenance fields must drive the id."""
+    store = _FakeStore()
+    by_representation = load_page_fact_envelopes(store, "run-1")[0]
+    forced_run_time = load_page_fact_envelopes(store, "run-1", observed_at=store.get_run("run-1").started_at)[0]
+    assert by_representation.observed_at != forced_run_time.observed_at
+    assert by_representation.representation_id == "rep-1" != "static-html"
+    assert by_representation.id != forced_run_time.id
+
+    legacy_store = _FakeStore()
+    legacy_store._representations[(SUBJECT,)][0].observed_at = ""
+    legacy = load_page_fact_envelopes(legacy_store, "run-1")[0]
+    assert legacy.observed_at == legacy_store.get_run("run-1").started_at  # documented fallback
 
 
 def test_production_fact_envelope_construction_stays_in_the_sanctioned_adapter() -> None:

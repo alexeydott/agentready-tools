@@ -400,22 +400,31 @@ def load_page_fact_envelopes(
     """Adapt replayed collected pages into sanctioned ``page@1`` envelopes.
 
     Reads only durable store records via :func:`replay_collected_pages` — no
-    network or browser access. ``observed_at`` defaults to the run's recorded
-    ``started_at`` so repeated replays of one run yield identical envelopes.
+    network or browser access. Provenance is taken from the actual persisted
+    representation: ``representation_id`` and the default ``observed_at``
+    come from the ``Representation`` record itself. ``observed_at`` falls
+    back to the run's recorded ``started_at`` only when a representation
+    carries no observation timestamp (legacy records), keeping repeated
+    replays of one run deterministic.
     """
     run = store.get_run(run_id)  # type: ignore[attr-defined]
-    timestamp = observed_at if observed_at is not None else getattr(run, "started_at", "") or ""
     envelopes: list[FactEnvelope] = []
     for page in replay_collected_pages(store, run_id):
         if page.facts is None or not page.available:
             continue
-        representation = getattr(page.representation, "source", None)
+        representation_id = getattr(page.representation, "representation_id", None)
+        rep_observed_at = getattr(page.representation, "observed_at", "") or ""
+        timestamp = (
+            observed_at
+            if observed_at is not None
+            else (rep_observed_at or (getattr(run, "started_at", "") or ""))
+        )
         envelopes.append(
             page_fact_envelope(
                 subject_url=page.url,
                 facts=page.facts,
                 observed_at=timestamp,
-                representation_id=str(representation) if representation else None,
+                representation_id=str(representation_id) if representation_id else None,
             )
         )
     return tuple(envelopes)

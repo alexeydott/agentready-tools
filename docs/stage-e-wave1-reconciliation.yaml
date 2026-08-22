@@ -52,8 +52,12 @@ adapter_boundary:
       adapter: >
         audit_core.collection page_fact_envelope / load_page_fact_envelopes —
         the sanctioned production constructors adapting replayed collected
-        pages (ParsedFacts payloads) into FactEnvelope objects with
-        deterministic ids; verified offline by tests/test_page_fact_adapter.py
+        pages (ParsedFacts payloads) into FactEnvelope objects; envelope
+        provenance is taken from the persisted Representation record itself
+        (representation_id and observed_at; run started_at only as documented
+        legacy fallback when a representation carries no observation time),
+        with deterministic ids over subject+provenance+payload; verified
+        offline by tests/test_page_fact_adapter.py
     - family: robots.fetch|robots.parsed|robots.policy|sitemap.*
       adapter: audit_core.run_facts persist_* helpers writing SiteStore run facts
     - family: representation
