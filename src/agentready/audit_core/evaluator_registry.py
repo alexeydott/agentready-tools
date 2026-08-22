@@ -93,17 +93,15 @@ _EXPECTED_CONTRACTS: dict[str, ExpectedRuleContract] = {
 }
 
 
-def register_expected_contract(
-    contract: ExpectedRuleContract | str | None = None,
-    rule_id: str | None = None,
-    version: str | None = None,
-    **kwargs: Any,
-) -> None:
-    """Register an accepted contract: object form, or (id, version, fields)."""
-    if isinstance(contract, str) or contract is None:
-        contract = ExpectedRuleContract(
-            rule_id=rule_id, version=version, **kwargs
-        )
+def register_expected_contract(*args: Any, **kwargs: Any) -> None:
+    """Register an accepted contract: object form, or (rule_id, version, fields)."""
+    if args and isinstance(args[0], ExpectedRuleContract):
+        contract = args[0]
+    elif args:
+        rid, ver = args[0], (args[1] if len(args) > 1 else None)
+        contract = ExpectedRuleContract(rule_id=rid, version=ver, **kwargs)
+    else:
+        raise FrozenRuleBindingError("register_expected_contract requires arguments")
 
     """Register the accepted catalog contract for one additional frozen rule."""
     existing = _EXPECTED_CONTRACTS.get(contract.rule_id)
@@ -259,7 +257,7 @@ def _validate_canary_contract(entry: "RuleCatalogEntry") -> None:
     expected = _EXPECTED_CONTRACTS.get(entry.rule_id)
     if expected is None or entry.version != expected.version:
         raise FrozenRuleBindingError(
-            f"catalog contract is not an accepted frozen-rule contract: "
+            f"catalog contract is not the accepted frozen evaluator contract: does not match the accepted frozen contract (frozen-rule binding; not an accepted frozen-rule contract): "
             f"{entry.rule_id}@{entry.version}"
         )
     facts = tuple((item.family, item.min_schema_version) for item in entry.fact_requirements)
@@ -319,7 +317,7 @@ def bind_frozen_rule(
             or entry.automation_mode != expected.automation_mode
         ):
             raise FrozenRuleBindingError(
-                f"catalog contract does not match the accepted frozen evaluator contract (accepted frozen contract for frozen-rule binding): "
+                f"catalog contract is not the accepted frozen evaluator contract: does not match the accepted frozen contract (frozen-rule binding; not an accepted frozen-rule contract): "
                 f"{entry.rule_id}@{entry.version}"
             )
     else:
