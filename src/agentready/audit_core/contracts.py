@@ -145,12 +145,14 @@ class FindingContract:
         if (
             self.status in {Status.PASS, Status.FAIL}
             and self.completeness is not EvaluationCompleteness.COMPLETE
-            and self.failure_policy is FailurePolicy.STRICT
+            and self.failure_policy
+            in {FailurePolicy.STRICT, FailurePolicy.BLOCK_ON_MISSING_FACTS}
         ):
             raise ValueError("pass/fail findings require complete evaluation")
         if (
             self.completeness is not EvaluationCompleteness.COMPLETE
-            and self.failure_policy is FailurePolicy.STRICT
+            and self.failure_policy
+            in {FailurePolicy.STRICT, FailurePolicy.BLOCK_ON_MISSING_FACTS}
             and self.outcome in {EvaluationOutcome.PASS, EvaluationOutcome.FAIL}
         ):
             raise ValueError("strict failure policy rejects incomplete pass/fail outcomes")

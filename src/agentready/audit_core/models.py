@@ -48,6 +48,7 @@ class ScoreRole(StrEnum):
 class FailurePolicy(StrEnum):
     STRICT = "strict"
     PARTIAL_DECISION_ALLOWED = "partial_decision_allowed"
+    BLOCK_ON_MISSING_FACTS = "block_on_missing_facts"
 
 
 class Status(StrEnum):
