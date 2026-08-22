@@ -5,6 +5,8 @@ import socket
 from dataclasses import replace
 from pathlib import Path
 
+import pathlib
+
 import pytest
 
 from agentready.audit_core import (
@@ -436,3 +438,28 @@ def test_canary_path_remains_unchanged_alongside_desc_binding():
     assert result.report.findings[0].id == CORE_COVERAGE_RULE_ID
     assert result.report.findings[0].status is FindingStatus.PASS
     assert result.report.findings[0].rule_version == CORE_COVERAGE_RULE_VERSION
+
+
+def _desc_module_source() -> str:
+    return (
+        pathlib.Path(__file__).parents[1]
+        / "src"
+        / "agentready"
+        / "audit_core"
+        / "google_desc_evaluators.py"
+    ).read_text(encoding="utf-8")
+
+
+def test_desc_contract_is_single_family_page():
+    """#54 amendment: page@1 only — no hidden structured-data readiness deps."""
+    src = _desc_module_source()
+    assert '("structured-data", "1")' not in src
+    assert 'schema_family="structured-data"' not in src
+    assert "structured-data-fact" not in src
+    assert "structured_version" not in src
+
+    page_only = tuple(e for e in _facts() if e.schema_family == "page")
+    result = evaluate_google_desc(
+        TARGET, page_only, fact_registry=FactSchemaRegistry({"page": "1"})
+    )
+    assert result.readiness.can_evaluate is True
