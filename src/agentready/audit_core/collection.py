@@ -510,7 +510,7 @@ def load_transport_fact_envelopes(
         )
         envelopes.append(
             transport_fact_envelope(
-                subject_url=page.url,
+                subject_url=page.requested_url or page.url,
                 final_url=page.url,
                 redirect_chain=_redirect_chain_from_records(page.redirect_records),
                 observed_at=timestamp,

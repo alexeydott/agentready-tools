@@ -95,12 +95,16 @@ import re  # noqa: E402  (kept next to usage-free import ordering constraints)
 
 
 def test_numeric_bands_are_governed_by_the_artifact(semantics) -> None:
+    from agentready.seo.rules.catalog.rule_semantics import LengthBand
+
     desc = semantics.condition("GOOGLE-DESC-001")
     title = semantics.condition("GOOGLE-TITLE-001")
-    desc_text = repr(desc.verdicts)
-    title_text = repr(title.verdicts)
-    assert "120" in desc_text and "160" in desc_text
-    assert "30" in title_text and "65" in title_text
+    assert desc.length_band == LengthBand(min=120, max=160, inclusive=True)
+    assert title.length_band == LengthBand(min=30, max=65, inclusive=True)
+    assert desc.measurement and "whitespace-collapsed" in desc.measurement
+    assert title.measurement and "str.strip()" in title.measurement
+    assert desc.provenance_note and "governed HERE" in desc.provenance_note
+    assert title.provenance_note and "governed HERE" in title.provenance_note
     assert desc.source_issue == "#54" and title.source_issue == "#55"
 
 

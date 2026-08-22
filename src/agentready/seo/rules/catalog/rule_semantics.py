@@ -23,6 +23,15 @@ SEMANTICS_RESOURCE_NAME = "agentready.rule-semantics.v2.yaml"
 
 
 @dataclass(frozen=True, slots=True)
+class LengthBand:
+    """Governed numeric band (e.g. description 120..160, title 30..65)."""
+
+    min: int
+    max: int
+    inclusive: bool = True
+
+
+@dataclass(frozen=True, slots=True)
 class AcceptedCondition:
     rule_id: str
     version: str
@@ -30,6 +39,9 @@ class AcceptedCondition:
     verdicts: dict[str, str]
     evidence_fields: tuple[str, ...]
     intent: str | None = None
+    measurement: str | None = None
+    length_band: LengthBand | None = None
+    provenance_note: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +109,9 @@ def load_rule_semantics(
             verdicts={str(k): str(v) for k, v in (item.get("verdicts") or {}).items()},
             evidence_fields=tuple(str(f) for f in item.get("evidence_fields", ())),
             intent=item.get("intent"),
+            measurement=item.get("measurement"),
+            length_band=_parse_length_band(item.get("length_band")),
+            provenance_note=item.get("provenance_note"),
         )
         for item in raw["accepted_conditions"]
     )
@@ -120,6 +135,16 @@ def load_rule_semantics(
     if snapshot is not None:
         _validate_against_snapshot(document, snapshot)
     return document
+
+
+def _parse_length_band(raw: Any) -> LengthBand | None:
+    if raw is None:
+        return None
+    return LengthBand(
+        min=int(raw["min"]),
+        max=int(raw["max"]),
+        inclusive=bool(raw.get("inclusive", True)),
+    )
 
 
 def _validate_against_snapshot(

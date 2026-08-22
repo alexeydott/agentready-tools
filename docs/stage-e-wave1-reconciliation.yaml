@@ -7,11 +7,9 @@
 #     mechanism, rule_kind, automation_mode) plus repository fact contracts
 #     that are actually produced by the shared collection/store/replay path
 #     at the accepted base.
-#   * Every `executable_condition` block carries `governance_status`.
-#     `proposed` conditions are NOT authoritative and this PR is NOT their
-#     acceptance mechanism: acceptance happens only through the follow-up
-#     governance issues listed below (#52..#55) and fact-contract changes
-#     (#56, #57).
+#   * POST-GOVERNANCE STATE (#52-#55 accepted): every wave condition is
+#     authoritative through the packaged `agentready.rule-semantics.v2`
+#     artifact; numeric thresholds are normative there, not in evaluators.
 #   * Evidence admissibility rule: a produced value may serve as evaluator
 #     input only if it belongs to a fact family DECLARED by that rule's
 #     fact_requirements; otherwise a catalog-governance change of the
@@ -25,10 +23,12 @@ accepted_base: 54135bedeedf5b94f731f416c208cd3937214cff
 authority:
   catalog_authored_is_authoritative: true
   catalog_authored_fields: [title, applicability, fact_requirements, score_role, failure_policy, mechanism, rule_kind, automation_mode]
-  proposed_conditions_are_not_authoritative: true
+  executable_conditions_are_authoritative_via_semantics_artifact: true
+  semantics_artifact_is_normative_for_thresholds: true
   binding_requires_accepted_governance_path: true
   declared_family_evidence_rule: true
-  this_pr_is_not_an_acceptance_mechanism: true
+  acceptance_mechanism: '#52-#55 via agentready.rule-semantics.v2'
+  historical_note_pr51_was_not_the_acceptance_mechanism: true
 followup_issues:
   gov_canonical: "#52"
   gov_links: "#53"
@@ -95,8 +95,9 @@ produced_fact_contract_at_base:
   links@1:
     producer: NONE — registered in DEFAULT_FACT_SCHEMA_VERSIONS, no envelope emitter exists; resolution is requirement amendment (#52), not production
   transport@1:
-    producer: audit_core.collection transport adapter — PRODUCED per #56 (origin, final_url, redirect_chain); persisted/replayed via store records + replay
+    producer: audit_core.collection transport adapter — PRODUCED per #56 (origin of the original request, post-redirect final_url, persisted redirect chain)
     evaluation_envelope_adapter: present — transport_fact_envelope / load_transport_fact_envelopes
+    persistence_contract_change_accepted: reconstructed from durable Page/Redirect records at replay instead of separate run-fact rows (#56 deviation recorded 2026-08-22; single source of truth)
   run-projection@1:
     producer: audit_core.collection canonical projection — PRODUCED per #57 (parameter_variants, cross_domain_targets)
     evaluation_envelope_adapter: present — run_projection_fact_envelope / canonical_projection_fact_envelopes

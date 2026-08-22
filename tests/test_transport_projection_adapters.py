@@ -143,6 +143,24 @@ def _store_for(urls_and_bodies, redirects=(), final_urls=None):
     return _FakeStore(pages, reps, redirects)
 
 
+def test_transport_envelope_keeps_request_origin_across_cross_origin_redirect() -> None:
+    """P0 regression: origin must be the ORIGINAL request, not the final URL."""
+    start = "http://old.example.org/landing"
+    final = "https://example.com/final"
+    store = _store_for(
+        [(start, b"<html><title>t</title></html>")],
+        redirects=[
+            _RedirectRecord(from_url=start, to_url=final, request_url=start, location_raw=final)
+        ],
+        final_urls={start: final},
+    )
+    envelope = load_transport_fact_envelopes(store, "run-p")[0]
+    assert envelope.target.normalized() == start
+    assert envelope.value["origin"] == "http://old.example.org"
+    assert envelope.value["final_url"] == final
+    assert list(envelope.value["redirect_chain"]) == [final]
+
+
 def test_load_transport_envelopes_from_replayed_redirects() -> None:
     store = _store_for(
         [(SUBJECT, b"<html><title>t</title></html>")],

@@ -176,8 +176,11 @@ def test_followup_issues_are_wired(matrix) -> None:
     ):
         assert re.fullmatch(r"#\d+", followups[key]), key
     authority = matrix["authority"]
-    assert authority["this_pr_is_not_an_acceptance_mechanism"] is True
+    authority = matrix["authority"]
+    assert authority["executable_conditions_are_authoritative_via_semantics_artifact"] is True
+    assert authority["semantics_artifact_is_normative_for_thresholds"] is True
     assert authority["declared_family_evidence_rule"] is True
+    assert authority["historical_note_pr51_was_not_the_acceptance_mechanism"] is True
 
 
 def test_rows_are_structurally_complete_and_synced(rules, snapshot) -> None:
@@ -324,8 +327,10 @@ def test_gate7_unaccepted_semantics_cannot_bind_authoritatively(rules, matrix) -
         assert proposed["governance_status"] == "accepted", rule_id
     authority = matrix["authority"]
     assert authority["catalog_authored_is_authoritative"] is True
-    assert authority["proposed_conditions_are_not_authoritative"] is True
+    assert authority["executable_conditions_are_authoritative_via_semantics_artifact"] is True
+    assert authority["semantics_artifact_is_normative_for_thresholds"] is True
     assert authority["binding_requires_accepted_governance_path"] is True
+    assert authority["historical_note_pr51_was_not_the_acceptance_mechanism"] is True
 
 
 def test_gate8_pipeline_modules_never_construct_non_emitted_family_envelopes(matrix) -> None:
