@@ -57,7 +57,7 @@ GOOGLE_TITLE_RULE_ID = "GOOGLE-TITLE-001"
 GOOGLE_TITLE_RULE_VERSION = "1.0.0"
 
 # Deterministic recommended title-length band in characters (inclusive).
-from agentready.seo.rules.catalog import load_rule_semantics
+from .rule_catalog import load_rule_semantics
 
 _TITLE_CONDITION = load_rule_semantics().condition("GOOGLE-TITLE-001")
 assert _TITLE_CONDITION is not None and _TITLE_CONDITION.length_band is not None
