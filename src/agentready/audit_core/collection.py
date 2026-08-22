@@ -430,6 +430,194 @@ def load_page_fact_envelopes(
     return tuple(envelopes)
 
 
+def _fact_envelope_id(prefix: str, parts: list[object]) -> str:
+    digest_input = json.dumps(parts, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return prefix + hashlib.sha256(digest_input.encode("utf-8")).hexdigest()
+
+
+def _redirect_chain_from_records(records: tuple[object, ...]) -> tuple[str, ...]:
+    hops = sorted(records, key=lambda r: getattr(r, "hop_index", 0))
+    chain: list[str] = []
+    for hop in hops:
+        target = getattr(hop, "to_url", None) or getattr(hop, "location_raw", "")
+        if target and (not chain or chain[-1] != target):
+            chain.append(str(target))
+    return tuple(chain)
+
+
+def transport_fact_envelope(
+    *,
+    subject_url: str,
+    final_url: str | None,
+    redirect_chain: tuple[str, ...] = (),
+    observed_at: str,
+    representation_id: str | None = None,
+    envelope_id: str | None = None,
+) -> FactEnvelope:
+    """Build the sanctioned ``transport@1`` evaluation envelope.
+
+    Payload records the request origin, the post-redirect final URL, and the
+    persisted redirect chain. Envelope identity is deterministic over the
+    subject URL, observation timestamp, representation id, and payload.
+    """
+    identity = UrlIdentity.parse(subject_url)
+    if not observed_at or not observed_at.strip():
+        raise ValueError("transport fact envelope requires a non-empty observed_at")
+    payload: dict[str, object] = {
+        "origin": identity.origin.to_string(),
+        "final_url": final_url or identity.normalized(),
+        "redirect_chain": [str(hop) for hop in redirect_chain],
+    }
+    resolved_id = envelope_id or _fact_envelope_id(
+        "transport-fact:",
+        [identity.normalized(), observed_at, representation_id or "", payload],
+    )
+    from .fact_schema import DEFAULT_FACT_SCHEMA_VERSIONS
+
+    return FactEnvelope(
+        id=resolved_id,
+        kind="transport",
+        target=identity,
+        value=payload,
+        observed_at=observed_at,
+        representation_id=representation_id,
+        schema_family="transport",
+        schema_version=DEFAULT_FACT_SCHEMA_VERSIONS["transport"],
+    )
+
+
+def load_transport_fact_envelopes(
+    store: object,
+    run_id: str,
+    *,
+    observed_at: str | None = None,
+) -> tuple[FactEnvelope, ...]:
+    """Adapt replayed collected pages into ``transport@1`` envelopes.
+
+    Same provenance rules as :func:`load_page_fact_envelopes`.
+    """
+    run = store.get_run(run_id)  # type: ignore[attr-defined]
+    envelopes: list[FactEnvelope] = []
+    for page in replay_collected_pages(store, run_id):
+        if not page.available:
+            continue
+        representation_id = getattr(page.representation, "representation_id", None)
+        rep_observed_at = getattr(page.representation, "observed_at", "") or ""
+        timestamp = (
+            observed_at
+            if observed_at is not None
+            else (rep_observed_at or (getattr(run, "started_at", "") or ""))
+        )
+        envelopes.append(
+            transport_fact_envelope(
+                subject_url=page.requested_url or page.url,
+                final_url=page.url,
+                redirect_chain=_redirect_chain_from_records(page.redirect_records),
+                observed_at=timestamp,
+                representation_id=str(representation_id) if representation_id else None,
+            )
+        )
+    return tuple(envelopes)
+
+
+def run_projection_fact_envelope(
+    *,
+    anchor_url: str,
+    parameter_variants: tuple[str, ...],
+    cross_domain_targets: tuple[str, ...],
+    observed_at: str,
+    representation_id: str | None = None,
+    envelope_id: str | None = None,
+) -> FactEnvelope:
+    """Build the sanctioned run-scoped ``run-projection@1`` envelope.
+
+    Carries the canonical-duplicate variant inventory and the off-origin
+    canonical target set computed by the shared projection layer over one
+    run's collected inventory. Pure function of its inputs.
+    """
+    anchor_identity = UrlIdentity.parse(anchor_url)
+    if not observed_at or not observed_at.strip():
+        raise ValueError("run projection envelope requires a non-empty observed_at")
+    payload: dict[str, object] = {
+        "parameter_variants": sorted(set(parameter_variants)),
+        "cross_domain_targets": sorted(set(cross_domain_targets)),
+    }
+    resolved_id = envelope_id or _fact_envelope_id(
+        "run-projection:",
+        [anchor_identity.normalized(), observed_at, representation_id or "", payload],
+    )
+    from .fact_schema import DEFAULT_FACT_SCHEMA_VERSIONS
+
+    return FactEnvelope(
+        id=resolved_id,
+        kind="run-projection",
+        target=anchor_identity,
+        value=payload,
+        observed_at=observed_at,
+        representation_id=representation_id,
+        schema_family="run-projection",
+        schema_version=DEFAULT_FACT_SCHEMA_VERSIONS["run-projection"],
+    )
+
+
+def canonical_projection_fact_envelopes(
+    store: object,
+    run_id: str,
+    *,
+    observed_at: str | None = None,
+) -> tuple[FactEnvelope, ...]:
+    """Project canonical duplicate variants and cross-domain targets for a run.
+
+    Pure projection over replayed collected pages: a URL is a
+    ``parameter_variants`` entry when it shares scheme/host/path with some
+    declared canonical and carries a non-empty query; a canonical is a
+    ``cross_domain_targets`` entry when its host differs from the declaring
+    subject's host.
+    """
+    pages = [
+        page
+        for page in replay_collected_pages(store, run_id)
+        if page.facts is not None and page.available and page.facts.canonicals
+    ]
+    if not pages:
+        return ()
+    variants: set[str] = set()
+    cross_domain: set[str] = set()
+    for page in pages:
+        page_identity = UrlIdentity.parse(page.url)
+        canonical = UrlIdentity.parse(page.facts.canonicals[0])
+        if canonical.host != page_identity.host:
+            cross_domain.add(canonical.normalized())
+        for candidate in pages:
+            candidate_identity = UrlIdentity.parse(candidate.url)
+            if (
+                candidate_identity.origin == canonical.origin
+                and candidate_identity.path == canonical.path
+                and candidate_identity.query
+                and candidate_identity.normalized() != canonical.normalized()
+            ):
+                variants.add(candidate_identity.normalized())
+    anchor = pages[0]
+    representation_id = getattr(anchor.representation, "representation_id", None)
+    rep_observed_at = getattr(anchor.representation, "observed_at", "") or ""
+    run = store.get_run(run_id)  # type: ignore[attr-defined]
+    timestamp = (
+        observed_at
+        if observed_at is not None
+        else (rep_observed_at or (getattr(run, "started_at", "") or ""))
+    )
+    anchor_url = f"{UrlIdentity.parse(anchor.url).origin.to_string()}/"
+    return (
+        run_projection_fact_envelope(
+            anchor_url=anchor_url,
+            parameter_variants=tuple(variants),
+            cross_domain_targets=tuple(cross_domain),
+            observed_at=timestamp,
+            representation_id=str(representation_id) if representation_id else None,
+        ),
+    )
+
+
 def _page_from_persisted_facts(facts: ParsedFacts, representation: Representation, parser_backend: str | None) -> ParsedPage:
     titles = tuple(dict.fromkeys(facts.titles))
     return ParsedPage(

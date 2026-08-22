@@ -1,0 +1,173 @@
+# Accepted executable rule semantics for the Stage E first wave.
+#
+# Governance vehicle for issues #52 (canonical), #53 (links), #54 (GOOGLE-DESC),
+# #55 (GOOGLE-TITLE). This artifact is the normative source for evaluator
+# decisions once accepted here; numeric thresholds (120..160 / 30..65) are
+# governed by THIS document, not by evaluator code or tests.
+#
+# The pinned catalog digest below must equal the live frozen catalog snapshot;
+# requirement_amendments record the agreed fact_requirements changes whose
+# application to the immutable catalog follows this acceptance.
+schema: agentready.rule-semantics.v2
+semantics_version: 1.0.0
+accepted_at: '2026-08-22'
+governance:
+  canonical: '#52'
+  links: '#53'
+  google_desc: '#54'
+  google_title: '#55'
+catalog_pin:
+  name: agentready.rule-catalog.v2
+  version: 2.1.0-draft.1
+  digest: a1507f064f95248d6ee21a1a2123f3b09f4f138012f10d3dd310654a72b62f17
+requirement_amendments:
+  - {rule_id: CORE-CANON-002, families: [page, transport]}
+  - {rule_id: CORE-CANON-003, families: [page]}
+  - {rule_id: CORE-CANON-004, families: [page, transport]}
+  - {rule_id: CORE-CANON-005, families: [page, transport]}
+  - {rule_id: CORE-CANON-006, families: [page, run-projection]}
+  - {rule_id: CORE-CANON-007, families: [page, run-projection]}
+  - {rule_id: CORE-CANON-008, families: [page]}
+  - {rule_id: CORE-LINK-001, families: [page]}
+  - {rule_id: CORE-LINK-002, families: [page, resources]}
+  - {rule_id: CORE-LINK-003, families: [page]}
+  - {rule_id: CORE-LINK-004, families: [page]}
+  - {rule_id: CORE-LINK-005, families: [page, resources]}
+  - {rule_id: CORE-LINK-006, families: [page]}
+  - {rule_id: GOOGLE-DESC-001, families: [page]}
+  - {rule_id: GOOGLE-TITLE-001, families: [page]}
+accepted_conditions:
+  - rule_id: CORE-CANON-002
+    version: 1.0.0
+    source_issue: '#52'
+    verdicts:
+      UNKNOWN: canonical declaration count != 1
+      PASS: urlsplit(page.canonicals[0]) scheme/host equals transport.origin scheme/host, host case-insensitive
+      FAIL: otherwise
+    evidence_fields: [page.canonicals, transport.origin]
+  - rule_id: CORE-CANON-003
+    version: 1.0.0
+    source_issue: '#52'
+    verdicts:
+      FAIL: effective meta robots directive set contains noindex or none; nofollow does not block (it governs link crawling, not indexation)
+      PASS: otherwise
+      UNKNOWN: meta robots directives unparsable
+    evidence_fields: [page.meta_robots]
+  - rule_id: CORE-CANON-004
+    version: 1.0.0
+    source_issue: '#52'
+    verdicts:
+      UNKNOWN: canonical count != 1 or transport.redirect_chain unavailable
+      FAIL: canonical URL equals a non-initial hop of transport.redirect_chain
+      PASS: otherwise
+    evidence_fields: [page.canonicals, transport.redirect_chain]
+  - rule_id: CORE-CANON-005
+    version: 1.0.0
+    source_issue: '#52'
+    verdicts:
+      UNKNOWN: canonical count != 1 or transport.final_url unavailable
+      NOT_APPLICABLE: no pagination signal observed (lowercased rel tokens of page.links have empty intersection with {next, prev})
+      PASS: paginated AND page.canonicals[0] == transport.final_url
+      FAIL: paginated AND page.canonicals[0] != transport.final_url
+    evidence_fields: [page.canonicals, 'page.links[].rel', transport.final_url]
+  - rule_id: CORE-CANON-006
+    version: 1.0.0
+    source_issue: '#52'
+    verdicts:
+      UNKNOWN: canonical count != 1 or run-projection inventory unavailable
+      FAIL: some parameter variant shares canonical scheme/host/path and carries a non-empty query
+      PASS: otherwise
+    evidence_fields: [page.canonicals, run-projection.parameter_variants]
+  - rule_id: CORE-CANON-007
+    version: 1.0.0
+    source_issue: '#52'
+    verdicts:
+      UNKNOWN: canonical count != 1 or run-projection inventory unavailable
+      PASS: canonical host equals audited subject host
+      FAIL: distinct off-origin canonical target cardinality > 1 across the run
+    evidence_fields: [page.canonicals, run-projection.cross_domain_targets]
+  - rule_id: CORE-CANON-008
+    version: 1.0.0
+    source_issue: '#52'
+    verdicts:
+      PASS: len(page.canonicals) == 1
+      FAIL: len(page.canonicals) != 1 (zero declarations violate exactly-once)
+    evidence_fields: [page.canonicals]
+  - rule_id: CORE-LINK-001
+    version: 1.0.0
+    source_issue: '#53'
+    intent: page exposes resolvable internal hyperlinks
+    verdicts:
+      UNKNOWN: internal link resolution impossible for the subject
+      PASS: at least one observed link resolves under subject_origin while representation is an HTML success response
+      FAIL: zero internal-resolvable links while representation is an HTML success response
+    evidence_fields: ['page.links[]', representation.status_code, representation.content_type, subject_origin]
+  - rule_id: CORE-LINK-002
+    version: 1.0.0
+    source_issue: '#53'
+    intent: declared resource URLs referenced by links resolve consistently
+    verdicts:
+      UNKNOWN: resources inventory unavailable
+      PASS: every link whose raw_href matches a declared resource URL resolves to that resource resolved_url
+      FAIL: some such link resolves elsewhere, or no link references any declared resource URL
+    evidence_fields: [resources.inventory, 'page.links[]']
+  - rule_id: CORE-LINK-003
+    version: 1.0.0
+    source_issue: '#53'
+    intent: page declares at least one hyperlink
+    verdicts:
+      PASS: len(page.links) >= 1
+      FAIL: len(page.links) == 0 on a parsed HTML document
+      UNKNOWN: never (an empty list is decisive)
+    evidence_fields: ['page.links[]']
+  - rule_id: CORE-LINK-004
+    version: 1.0.0
+    source_issue: '#53'
+    intent: internal link availability diagnostic
+    verdicts:
+      UNKNOWN: internal link computation impossible
+      PASS: internal-resolvable links exist AND representation is an HTML success response
+      WARN: otherwise (diagnostic role — never FAIL)
+    evidence_fields: ['page.links[]', representation.status_code, representation.content_type, subject_origin]
+  - rule_id: CORE-LINK-005
+    version: 1.0.0
+    source_issue: '#53'
+    intent: internal resource orphan detection
+    verdicts:
+      UNKNOWN: neither side observable
+      PASS: every declared resource URL is referenced by at least one internal link
+      FAIL: some declared resource is never referenced, or references exist while the resources inventory is empty
+    evidence_fields: [resources.inventory, 'page.links[]']
+  - rule_id: CORE-LINK-006
+    version: 1.0.0
+    source_issue: '#53'
+    intent: external link census (observation)
+    verdicts:
+      UNKNOWN: link resolution unavailable
+      PASS: always, recording the external-link count derived from governed page links resolution (never fails)
+      FAIL: never applicable
+    evidence_fields: ['page.links[]', subject_origin]
+  - rule_id: GOOGLE-DESC-001
+    version: 1.0.0
+    source_issue: '#54'
+    verdicts:
+      UNKNOWN: page fact unavailable
+      FAIL_structural: no description / whitespace-only description / more than one distinct non-empty description
+      FAIL_length: collapsed length < 120 (too short) or > 160 (too long)
+      PASS: exactly one non-empty description with 120 <= collapsed-length <= 160 inclusive
+    measurement: whitespace-collapsed character length of page.descriptions[0]
+    length_band: {min: 120, max: 160, inclusive: true}
+    provenance_note: band numbers governed HERE (#54); external guidance prose is background, never runtime evidence
+    evidence_fields: [page.descriptions]
+  - rule_id: GOOGLE-TITLE-001
+    version: 1.0.0
+    source_issue: '#55'
+    verdicts:
+      UNKNOWN: page fact unavailable
+      FAIL_structural: no title / whitespace-only after strip / more than one non-empty title
+      FAIL_length: stripped length < 30 (too short) or > 65 (too long)
+      PASS: exactly one non-empty title with 30 <= stripped-length <= 65 inclusive
+    measurement: str.strip() character length of page.titles[0]
+    length_band: {min: 30, max: 65, inclusive: true}
+    provenance_note: band numbers governed HERE (#55); legacy SEO heuristic prose is background, never runtime evidence
+    evidence_fields: [page.titles]

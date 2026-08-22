@@ -102,6 +102,7 @@ DEFAULT_FACT_SCHEMA_VERSIONS: dict[str, str] = {
     "links": "1",
     "resources": "1",
     "structured-data": "1",
+    "run-projection": "1",
     "robots.fetch": "1",
     "robots.parsed": "1",
     "robots.policy": "1",
