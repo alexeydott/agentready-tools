@@ -64,6 +64,7 @@ __all__ = [
 
 CANON_RULE_VERSION = "1.0.0"
 CANON_RULE_IDS = (
+    "CORE-CANON-001",
     "CORE-CANON-002",
     "CORE-CANON-003",
     "CORE-CANON-004",
@@ -79,6 +80,14 @@ _EXPECTED_AUTOMATION = "automated"
 
 # (rule_id, facts, score_role, failure_policy, mechanism, rule_kind)
 _CONTRACT_ROWS: tuple[tuple[str, tuple[tuple[str, str], ...], str, str, str, str], ...] = (
+    (
+        "CORE-CANON-001",
+        (("page", "1"), ("links", "1")),
+        "scored",
+        "block_on_missing_facts",
+        "composite_check",
+        "scored_rule",
+    ),
     (
         "CORE-CANON-002",
         (("page", "1"), ("transport", "1")),
@@ -377,7 +386,32 @@ def _declared_once_evaluator(target: str, facts: Mapping[str, Any]) -> Evaluator
     )
 
 
+def _canonical_presence_evaluator(
+    target: str, facts: Mapping[str, Any]
+) -> EvaluatorResult:
+    page = facts["page"]
+    canonicals = _canonicals(page)
+    if len(canonicals) >= 1:
+        return EvaluatorResult(
+            EvaluationOutcome.PASS,
+            f"a canonical URL is declared for this page: {canonicals[0]}"
+            + (f" (+{len(canonicals) - 1} more)" if len(canonicals) > 1 else ""),
+            (
+                EvidenceRef(
+                    "page:canonical",
+                    target,
+                    f"declared canonical(s): {', '.join(canonicals)}",
+                ),
+            ),
+        )
+    return EvaluatorResult(
+        EvaluationOutcome.FAIL,
+        "no canonical URL is declared for this page",
+    )
+
+
 _EVALUATORS = {
+    "CORE-CANON-001": _canonical_presence_evaluator,
     "CORE-CANON-002": _canonical_evaluator,
     "CORE-CANON-003": _robots_directives_evaluator,
     "CORE-CANON-004": _redirect_chain_evaluator,
