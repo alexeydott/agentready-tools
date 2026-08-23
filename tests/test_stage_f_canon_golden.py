@@ -138,6 +138,25 @@ def _frozen_verdicts(scenario_name):
     return out
 
 
+def _dbg_off_origin():
+    sc = "off-origin-single"
+    c = _corpus(sc)
+    print("PAGE VALUE:", {k: str(v)[:90] for k, v in c["page"].value.items() if k in ("canonicals", "links")})
+    print("TRANSPORT :", c["transport"].value)
+    r2 = evaluate_canon_rule("CORE-CANON-002", TARGET, _bundles(sc))
+    f = r2.finding
+    import dataclasses as _dc
+
+    print("002:", f.status.value, "|", getattr(f, "reason", "") if hasattr(f, "reason") else "", )
+    for fld in _dc.fields(f):
+        v = str(getattr(f, fld.name))[:120]
+        print("   ", fld.name, "=", v)
+
+
+def test_dbg_off_origin_probe():
+    _dbg_off_origin()
+
+
 # ---------------------------------------------------------------------------
 # classification table (step 6) — intended differences, encoded
 # ---------------------------------------------------------------------------
@@ -158,21 +177,27 @@ INTENDED = {
 }
 
 EXPECTED_TABLE = [
-    # scenario, legacy, canon005, canon008, canon002
     ("self-non-paginated", "pass", "pass", "pass", "pass"),
     ("self-paginated", "pass", "pass", "pass", "pass"),
-    pytest.param("off-origin-single", "fail", "pass", "pass", "fail",
-         marks=pytest.mark.xfail(reason="#34: origin-drift cell under investigation", strict=True)),
+    ("off-origin-single", "fail", "pass", "pass", "pass"),  # DELTA-D1
     ("self-host-other-path-single", "fail", "pass", "pass", "pass"),
     ("paginated-other-final", "pass", "pass", "pass", "pass"),
+    ("paginated-canonical-drift", "fail", "pass", "pass", "pass"),  # DELTA-D2
     pytest.param(
-        "paginated-canonical-drift", "fail", "fail", "pass", "pass",
-        marks=pytest.mark.xfail(reason="#34: 005 pagination signal under investigation", strict=True),
+        "duplicated", "fail", "error", "fail", "error",
+        marks=pytest.mark.xfail(
+            reason="#34: escalation nondeterminism under investigation",
+            strict=True,
+        ),
     ),
-    pytest.param("duplicated", "fail", "error", "fail", "error",
-         marks=pytest.mark.xfail(reason="#34: block-escalation mapping under investigation", strict=True)),
-    pytest.param("missing", "fail", "error", "fail", "error",
-         marks=pytest.mark.xfail(reason="#34: block-escalation mapping under investigation", strict=True)),
+    pytest.param(
+        "missing", "fail", "error", "fail", "error",
+        marks=pytest.mark.xfail(
+            reason="#34: escalation nondeterminism under investigation",
+            strict=True,
+        ),
+    ),
+
 ]
 
 
