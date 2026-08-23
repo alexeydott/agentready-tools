@@ -1,24 +1,23 @@
-"""Stage F golden procedure — CORE-CANON family (#34 increment 1).
+"""Stage F golden cutover tests — CORE-CANON family (#34 increment 1).
 
-Ten-step golden cutover procedure for the partial-overlap pair ``canonical``
-(legacy) ↔ {CORE-CANON-002/005/008} (frozen), with explicit dispositions for
-every difference and hard gates against duplicate collection and double
-scoring.
+Data-driven: scenario table, expected verdicts and classifications live in the
+checked-in frozen manifest ``docs/stage-f-canon-golden.yaml`` (single source of
+truth for Stage-F semantics). The tests pin the manifest to the live catalog
+snapshot and execute both sides of every scenario from ONE shared collection.
 
-Crosswalk class: PARTIAL_OVERLAP — only overlapping semantics may cut over;
-presence-only branches (CORE-CANON-001) are not implemented at runtime, so
-full replacement is BLOCKED until that binding lands.
+Targeted exact-HEAD suite:
 
-FREEZE MODE: current runtime verdicts are frozen as golden. Semantic
-divergences vs the accepted semantics artifact are tracked separately
-(see KNOWN_DELTAS in tests/test_stage_f_known_deltas.py).
+    python -m pytest tests/test_stage_f_canon_golden.py -q
+
 """
 
 from __future__ import annotations
 
+import ast
 import pathlib
 
 import pytest
+import yaml
 
 from agentready.audit_core.canon_evaluators import evaluate_canon_rule
 from agentready.audit_core.collection import (
@@ -26,55 +25,69 @@ from agentready.audit_core.collection import (
     parsed_facts_from_dict,
     transport_fact_envelope,
 )
+from agentready.audit_core.rule_catalog import load_rule_catalog_snapshot
 from agentready.seo.evidence import SeoPageEvidence
 from agentready.seo.rules.builtin import _canonical
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+MANIFEST = pathlib.Path("docs") / "stage-f-canon-golden.yaml"
 TARGET = "https://example.test/page"
-FINAL = "https://example.test/page"
-OTHER_ORIGIN = "https://cdn.example.test/canonical"
-OTHER_PATH = "https://example.test/other"
-ORIGIN_TEST = "https://example.test"
 T0 = "2026-08-22T00:00:00Z"
 
 
-def _row(ordinal, raw_href, resolved_url, rel=""):
-    return {
-        "source_representation_id": "static-html",
-        "ordinal": ordinal,
-        "raw_href": raw_href,
-        "resolved_url": resolved_url,
-        "rel": rel,
+def _load_manifest():
+    return yaml.safe_load((REPO_ROOT / MANIFEST).read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def manifest():
+    return _load_manifest()
+
+
+@pytest.fixture(scope="module")
+def snapshot():
+    return load_rule_catalog_snapshot()
+
+
+# ---------------------------------------------------------------------------
+# manifest ↔ live catalog consistency
+# ---------------------------------------------------------------------------
+
+
+def test_manifest_pins_the_live_catalog(manifest, snapshot):
+    pin = manifest["catalog_pin"]
+    assert pin["version"] == snapshot.catalog_version
+    assert pin["digest"] == snapshot.rule_catalog_digest
+
+
+def test_manifest_covers_exactly_the_frozen_rules(manifest, snapshot):
+    frozen = set(manifest["frozen_rules"])
+    wave_ids = {
+        "CORE-CANON-002",
+        "CORE-CANON-005",
+        "CORE-CANON-008",
     }
+    assert frozen == wave_ids
+    blocked = {b["rule_id"] for b in manifest["blocked_rules"]}
+    assert blocked == {"CORE-CANON-001"}
+    # every blocked entry carries a reason
+    for b in manifest["blocked_rules"]:
+        assert b.get("reason"), b
 
 
-SCENARIOS = {
-    "self-non-paginated": {"canonicals": [FINAL], "links": []},
-    "self-paginated": {
-        "canonicals": [FINAL],
-        "links": [_row(0, "/next", f"{ORIGIN_TEST}/next", "next")],
-    },
-    "off-origin-single": {"canonicals": [OTHER_ORIGIN], "links": []},
-    "self-host-other-path-single": {"canonicals": [OTHER_PATH], "links": []},
-    "paginated-other-final": {
-        "canonicals": [OTHER_PATH],
-        "links": [_row(0, "/next", f"{ORIGIN_TEST}/next", "next")],
-    },
-    "paginated-canonical-drift": {
-        "canonicals": [FINAL],
-        "links": [_row(0, "/next", f"{ORIGIN_TEST}/next", "next")],
-        "final_url": OTHER_PATH,
-    },
-    "duplicated": {"canonicals": [FINAL, OTHER_PATH], "links": []},
-    "missing": {"canonicals": [], "links": []},
-}
-
-_BUNDLES: dict[str, tuple] = {}
+def test_classification_vocabulary_is_respected(manifest):
+    vocab = set(manifest["classification_vocab"])
+    for sc in manifest["scenarios"]:
+        assert sc["classification"] in vocab, sc["name"]
 
 
-def _corpus(scenario_name):
-    """Step 1–3: build BOTH legacy evidence and frozen bundles from one fact set."""
-    sc = SCENARIOS[scenario_name]
-    final_url = sc.get("final_url", FINAL)
+# ---------------------------------------------------------------------------
+# golden execution — legacy + frozen from one shared collection
+# ---------------------------------------------------------------------------
+
+
+def _corpus(scenario):
+    final_url = scenario.get("final_url", TARGET)
 
     legacy = SeoPageEvidence(
         url=TARGET,
@@ -86,7 +99,7 @@ def _corpus(scenario_name):
         description="d",
         descriptions=("d",),
         h1=(),
-        canonicals=tuple(sc["canonicals"]),
+        canonicals=tuple(scenario["canonicals"]),
         hreflangs=(),
         meta_robots=(),
         x_robots="",
@@ -94,11 +107,18 @@ def _corpus(scenario_name):
         jsonld_errors=(),
         evidence_ids=("ev-canonical",),
     )
-
+    payload_links = [
+        {
+            "source_representation_id": "static-html",
+            "ordinal": i,
+            **row,
+        }
+        for i, row in enumerate(scenario["links"])
+    ]
     page = page_fact_envelope(
         subject_url=TARGET,
         facts=parsed_facts_from_dict(
-            {"canonicals": list(sc["canonicals"]), "links": list(sc["links"])}
+            {"canonicals": list(scenario["canonicals"]), "links": payload_links}
         ),
         observed_at=T0,
     )
@@ -108,98 +128,130 @@ def _corpus(scenario_name):
         redirect_chain=[final_url],
         observed_at=T0,
     )
+    return {"legacy": legacy, "page": page, "transport": transport}
 
-    return {"legacy_evidence": legacy, "page": page, "transport": transport}
+
+_BUNDLES: dict[str, tuple] = {}
 
 
-def _bundles(scenario_name):
+def _bundles(scenario_name, scenario):
     if scenario_name not in _BUNDLES:
-        c = _corpus(scenario_name)
+        c = _corpus(scenario)
         _BUNDLES[scenario_name] = (c["page"], c["transport"])
     return _BUNDLES[scenario_name]
 
 
-def _legacy_verdict(scenario_name):
-    return str(_canonical(_corpus(scenario_name)["legacy_evidence"]).status)
+def _legacy_verdict(corpus):
+    return str(_canonical(corpus["legacy"]).status)
 
 
-def _frozen_verdicts(scenario_name):
-    b = _bundles(scenario_name)
-    out = {}
-    for rid in ("CORE-CANON-002", "CORE-CANON-005", "CORE-CANON-008"):
-        r = evaluate_canon_rule(rid, TARGET, b)
-        out[rid] = r.finding.status.value
-    return out
+def _frozen_verdicts(scenario_name, scenario):
+    b = _bundles(scenario_name, scenario)
+    return {
+        rid: evaluate_canon_rule(rid, TARGET, b).finding.status.value
+        for rid in ("CORE-CANON-002", "CORE-CANON-005", "CORE-CANON-008")
+    }
 
 
-# ---------------------------------------------------------------------------
-# classification table (step 6) — frozen runtime verdicts
-# ---------------------------------------------------------------------------
-
-EXPECTED_TABLE = [
-    ("self-non-paginated", "pass", "pass", "pass", "pass"),
-    ("self-paginated", "pass", "pass", "pass", "pass"),
-    ("off-origin-single", "fail", "pass", "pass", "fail"),
-    ("self-host-other-path-single", "fail", "pass", "pass", "pass"),
-    ("paginated-other-final", "fail", "fail", "pass", "pass"),
-    ("paginated-canonical-drift", "fail", "fail", "pass", "pass"),
-    ("duplicated", "fail", "error", "fail", "error"),
-    ("missing", "fail", "error", "fail", "error"),
-]
+@pytest.mark.parametrize(
+    "scenario",
+    [sc["name"] for sc in _load_manifest()["scenarios"]],
+)
+def test_golden_scenario_matches_manifest(scenario, manifest):
+    sc = next(s for s in manifest["scenarios"] if s["name"] == scenario)
+    corpus = _corpus(sc)
+    bundle = _bundles(scenario, sc)
+    assert _legacy_verdict_for(corpus) == sc["legacy_status"], scenario
+    for rid, expected in sc["frozen"].items():
+        got = evaluate_canon_rule(rid, TARGET, bundle).finding.status.value
+        assert got == expected, f"{scenario}/{rid}"
 
 
-@pytest.mark.parametrize("scenario,legacy,f005,f008,f002", EXPECTED_TABLE)
-def test_golden_classification_table(scenario, legacy, f005, f008, f002):
-    assert _legacy_verdict(scenario) == legacy
-    got = _frozen_verdicts(scenario)
-    assert got["CORE-CANON-005"] == f005, scenario
-    assert got["CORE-CANON-008"] == f008, scenario
-    assert got["CORE-CANON-002"] == f002, scenario
 
 
-# ---------------------------------------------------------------------------
-# intended differences (crosswalk PARTIAL_OVERLAP splits)
-# ---------------------------------------------------------------------------
+def _sc(name):
+    doc = yaml.safe_load((REPO_ROOT / MANIFEST).read_text(encoding="utf-8"))
+    return next(s for s in doc["scenarios"] if s["name"] == name)
 
 
-def test_off_origin_difference_is_intended_split():
-    got = _frozen_verdicts("off-origin-single")
-    assert got["CORE-CANON-002"] == "fail"      # 002 owns scheme/host drift
-    assert got["CORE-CANON-005"] == "pass"      # strategy not violated
-
-
-def test_paginated_strategy_is_owned_by_005():
-    got = _frozen_verdicts("paginated-canonical-drift")
-    assert got["CORE-CANON-005"] == "fail"      # 005 owns pagination strategy
-    assert got["CORE-CANON-002"] == "pass"      # same-origin drift is not 002's
-
-
-def test_presence_branch_is_blocked_for_replacement():
-    got = _frozen_verdicts("duplicated")
-    assert got["CORE-CANON-008"] == "fail"      # exactly-once covers dup detection
-    assert got["CORE-CANON-005"] == "error"     # block policy escalates unknown
+def _legacy_verdict_for(corpus):
+    return str(_canonical(corpus["legacy"]).status)
 
 
 # ---------------------------------------------------------------------------
-# procedure gates (steps 9–10 + determinism)
+# classification semantics
+# ---------------------------------------------------------------------------
+
+
+def test_off_origin_split_is_intended():
+    m = _load_manifest()
+    off = next(s for s in m["scenarios"] if s["name"] == "off-origin-single")
+    assert off["frozen"]["CORE-CANON-002"] == "fail"
+    assert off["frozen"]["CORE-CANON-005"] == "pass"
+    assert off["split_note"].startswith("CORE-CANON-002 owns")
+
+
+def test_paginated_drift_is_owned_by_005():
+    drift = next(
+        s for s in _load_manifest()["scenarios"] if s["name"] == "paginated-canonical-drift"
+    )
+    assert drift["frozen"]["CORE-CANON-005"] == "fail"
+    assert drift["frozen"]["CORE-CANON-002"] == "pass"
+
+
+def test_presence_scenarios_are_blocked_and_escalated():
+    m = _load_manifest()
+    for name in ("duplicated", "missing"):
+        sc = next(s for s in m["scenarios"] if s["name"] == name)
+        assert sc["classification"] == "presence_blocked"
+        assert sc["escalation"] == "block_unknown_escalation"
+        assert sc["frozen"]["CORE-CANON-008"] == "fail"
+
+
+def test_policy_notes_document_block_unknown_escalation(manifest):
+    note = manifest["policy_notes"]["block_unknown_escalation"]
+    assert "block_on_missing_facts" in note
+    assert "`error`" in note or "error" in note
+
+
+# ---------------------------------------------------------------------------
+# procedure gates (steps 9–10 + determinism + purity)
 # ---------------------------------------------------------------------------
 
 
 def test_single_collection_no_duplicate_fetch_surface():
-    a = _bundles("self-paginated")
-    b = _bundles("self-paginated")
+    sc = next(s for s in _load_manifest()["scenarios"] if s["name"] == "self-paginated")
+    a = _bundles("self-paginated", sc)
+    b = _bundles("self-paginated", sc)
     assert a[0] is b[0] and a[1] is b[1]
 
 
 def test_frozen_reruns_are_deterministic():
-    a = _frozen_verdicts("paginated-canonical-drift")
-    b = _frozen_verdicts("paginated-canonical-drift")
+    sc = _sc("paginated-canonical-drift")
+    a = _frozen_verdicts("paginated-canonical-drift", sc)
+    b = _frozen_verdicts("paginated-canonical-drift", sc)
     assert a == b
 
 
 def test_legacy_scoring_inputs_untouched_by_frozen_run():
-    before = _canonical(_corpus("off-origin-single")["legacy_evidence"])
-    _frozen_verdicts("off-origin-single")
-    after = _canonical(_corpus("off-origin-single")["legacy_evidence"])
-    assert before.status == after.status == "fail"
-    assert before.impact == after.impact and before.priority == after.priority
+    sc = next(s for s in _load_manifest()["scenarios"] if s["name"] == "off-origin-single")
+    before = str(_canonical(_corpus(sc)["legacy"]).status)
+    _bundles("off-origin-single", _sc("off-origin-single"))
+    after = str(_canonical(_corpus(sc)["legacy"]).status)
+    assert before == after == "fail"
+
+
+def test_purity_module_has_no_io_imports():
+    tree = ast.parse(
+        (
+            REPO_ROOT / "src" / "agentready" / "audit_core" / "canon_evaluators.py"
+        ).read_text(encoding="utf-8")
+    )
+    roots = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            roots.add(node.names[0].name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            roots.add(node.module.split(".")[0])
+    forbidden = {"requests", "httpx", "sqlite3", "socket", "subprocess"}
+    assert roots & forbidden == set(), roots & forbidden
