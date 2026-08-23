@@ -77,10 +77,17 @@ def test_registered_evaluator_targets_are_frozen():
 
 
 def test_score_model_id_is_frozen():
-    assert (
-        BASELINE["score_projection"]["score_model_id"]
-        == "readiness-transparent-v2"
+    """P1 (review): live runtime default must equal the frozen baseline value."""
+    import dataclasses
+
+    from agentready.audit_core.run_context import AuditRunContext
+
+    field = next(
+        f for f in dataclasses.fields(AuditRunContext) if f.name == "score_model_id"
     )
+    live_score_model_id = field.default
+    assert live_score_model_id == BASELINE["score_projection"]["score_model_id"]
+    assert live_score_model_id == "readiness-transparent-v2"
 
 
 def test_deferred_declared_not_produced_set_is_frozen():
