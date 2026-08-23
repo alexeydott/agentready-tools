@@ -507,7 +507,14 @@ _EVALUATORS = {
 
 from .evaluator_registry import ExpectedContract
 
-_BOUND_RULES = ("CORE-LINK-001", "CORE-LINK-003", "CORE-LINK-004", "CORE-LINK-006")
+_BOUND_RULES = (
+    "CORE-LINK-001",
+    "CORE-LINK-002",
+    "CORE-LINK-003",
+    "CORE-LINK-004",
+    "CORE-LINK-005",
+    "CORE-LINK-006",
+)
 
 _CONTRACT_OBJECTS = {
     (rid, CORE_LINK_RULE_VERSION): ExpectedContract(
