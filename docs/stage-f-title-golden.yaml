@@ -1,0 +1,69 @@
+schema: agentready.stage-f-title-golden.v1
+version: '1.0.0'
+family: google-metadata
+legacy_rule: title-length
+crosswalk_class: PARTIAL_OVERLAP
+crosswalk_note: >
+  Legacy is a HEURISTIC rule that warns outside the band and skips without a
+  title; the frozen rule is SCORED with structural fails and a governed band.
+accepted_semantics:
+  artifact: agentready.rule-semantics.v2
+  version: '1.0.1'
+catalog_pin:
+  name: agentready.rule-catalog.v2
+  version: 2.1.0-draft.2
+  digest: d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f
+frozen_rules: [GOOGLE-TITLE-001]
+measurement: str.strip() character length of page.titles[0]
+length_band: {min: 30, max: 65, inclusive: true}
+classification_vocab:
+  - equivalent_band
+  - intended_heuristic_vs_scored
+  - intended_normalization
+  - intended_multiplicity
+scenarios:
+  - name: in-band
+    titles: ['AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+    legacy_status: pass
+    frozen_status: pass
+    classification: equivalent_band
+  - name: lower-boundary-30
+    titles: ['BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB']
+    legacy_status: pass
+    frozen_status: pass
+    classification: equivalent_band
+  - name: upper-boundary-65
+    titles: ['CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC']
+    legacy_status: pass
+    frozen_status: pass
+    classification: equivalent_band
+  - name: too-short
+    titles: ['DDDDDDDDDD']
+    legacy_status: warn
+    frozen_status: fail
+    classification: intended_heuristic_vs_scored
+    note: legacy warns (heuristic); frozen scores a failure under the governed band
+  - name: too-long
+    titles: ['EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE']
+    legacy_status: warn
+    frozen_status: fail
+    classification: intended_heuristic_vs_scored
+    note: same as too-short
+  - name: missing-title
+    titles: []
+    legacy_status: skip
+    frozen_status: fail
+    classification: intended_heuristic_vs_scored
+    note: legacy skips entirely; frozen treats absence as a scored structural failure
+  - name: whitespace-only
+    titles: ['   ']
+    legacy_status: warn
+    frozen_status: fail
+    classification: intended_normalization
+    note: legacy measures the RAW whitespace-only title (warn at 3 chars); frozen collapses whitespace and reports a structural empty-title failure
+  - name: multiple-titles-first-in-band
+    titles: ['FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF', 'GGGGGGGGGG']
+    legacy_status: pass
+    frozen_status: fail
+    classification: intended_multiplicity
+    note: legacy inspects only the primary title; frozen requires exactly one non-empty title
