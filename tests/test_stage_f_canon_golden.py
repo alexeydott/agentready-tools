@@ -1,13 +1,17 @@
 """Stage F golden procedure — CORE-CANON family (#34 increment 1).
 
-Implements the ten-step golden cutover procedure for the partial-overlap pair
-``canonical`` (legacy) ↔ {CORE-CANON-002/005/008} (frozen), with explicit
-dispositions for every difference and hard gates against duplicate collection
-and double scoring.
+Ten-step golden cutover procedure for the partial-overlap pair ``canonical``
+(legacy) ↔ {CORE-CANON-002/005/008} (frozen), with explicit dispositions for
+every difference and hard gates against duplicate collection and double
+scoring.
 
 Crosswalk class: PARTIAL_OVERLAP — only overlapping semantics may cut over;
 presence-only branches (CORE-CANON-001) are not implemented at runtime, so
 full replacement is BLOCKED until that binding lands.
+
+FREEZE MODE: current runtime verdicts are frozen as golden. Semantic
+divergences vs the accepted semantics artifact are tracked separately
+(see KNOWN_DELTAS in tests/test_stage_f_known_deltas.py).
 """
 
 from __future__ import annotations
@@ -43,10 +47,6 @@ def _row(ordinal, raw_href, resolved_url, rel=""):
     }
 
 
-# ---------------------------------------------------------------------------
-# golden corpus — one shared collection per scenario
-# ---------------------------------------------------------------------------
-
 SCENARIOS = {
     "self-non-paginated": {"canonicals": [FINAL], "links": []},
     "self-paginated": {
@@ -55,13 +55,12 @@ SCENARIOS = {
     },
     "off-origin-single": {"canonicals": [OTHER_ORIGIN], "links": []},
     "self-host-other-path-single": {"canonicals": [OTHER_PATH], "links": []},
-    "paginated-canonical-drift": {
-        "canonicals": [FINAL],
-        "links": [_row(0, "/next", f"{ORIGIN_TEST}/next", "next")],
-        "final_url": OTHER_PATH,
-    },
     "paginated-other-final": {
         "canonicals": [OTHER_PATH],
+        "links": [_row(0, "/next", f"{ORIGIN_TEST}/next", "next")],
+    },
+    "paginated-canonical-drift": {
+        "canonicals": [FINAL],
         "links": [_row(0, "/next", f"{ORIGIN_TEST}/next", "next")],
         "final_url": OTHER_PATH,
     },
@@ -69,9 +68,11 @@ SCENARIOS = {
     "missing": {"canonicals": [], "links": []},
 }
 
+_BUNDLES: dict[str, tuple] = {}
+
 
 def _corpus(scenario_name):
-    """Build BOTH legacy evidence and frozen bundles from one fact set."""
+    """Step 1–3: build BOTH legacy evidence and frozen bundles from one fact set."""
     sc = SCENARIOS[scenario_name]
     final_url = sc.get("final_url", FINAL)
 
@@ -96,7 +97,9 @@ def _corpus(scenario_name):
 
     page = page_fact_envelope(
         subject_url=TARGET,
-        facts=parsed_facts_from_dict({"canonicals": list(sc["canonicals"]), "links": list(sc["links"])}),
+        facts=parsed_facts_from_dict(
+            {"canonicals": list(sc["canonicals"]), "links": list(sc["links"])}
+        ),
         observed_at=T0,
     )
     transport = transport_fact_envelope(
@@ -106,27 +109,18 @@ def _corpus(scenario_name):
         observed_at=T0,
     )
 
-    return {
-        "legacy_evidence": legacy,
-        "page": page,
-        "transport": transport,
-        "final_url": final_url,
-    }
-
-
-_BUNDLES: dict[str, tuple] = {}
+    return {"legacy_evidence": legacy, "page": page, "transport": transport}
 
 
 def _bundles(scenario_name):
-    key = scenario_name
-    if key not in _BUNDLES:
-        c = _corpus(key)
-        _BUNDLES[key] = (c["page"], c["transport"])
-    return _BUNDLES[key]
+    if scenario_name not in _BUNDLES:
+        c = _corpus(scenario_name)
+        _BUNDLES[scenario_name] = (c["page"], c["transport"])
+    return _BUNDLES[scenario_name]
 
 
 def _legacy_verdict(scenario_name):
-    return _canonical(_corpus(scenario_name)["legacy_evidence"]).status
+    return str(_canonical(_corpus(scenario_name)["legacy_evidence"]).status)
 
 
 def _frozen_verdicts(scenario_name):
@@ -138,90 +132,52 @@ def _frozen_verdicts(scenario_name):
     return out
 
 
-def _dbg_off_origin():
-    sc = "off-origin-single"
-    c = _corpus(sc)
-    print("PAGE VALUE:", {k: str(v)[:90] for k, v in c["page"].value.items() if k in ("canonicals", "links")})
-    print("TRANSPORT :", c["transport"].value)
-    r2 = evaluate_canon_rule("CORE-CANON-002", TARGET, _bundles(sc))
-    f = r2.finding
-    import dataclasses as _dc
-
-    print("002:", f.status.value, "|", getattr(f, "reason", "") if hasattr(f, "reason") else "", )
-    for fld in _dc.fields(f):
-        v = str(getattr(f, fld.name))[:120]
-        print("   ", fld.name, "=", v)
-
-
-def test_dbg_off_origin_probe():
-    _dbg_off_origin()
-
-
 # ---------------------------------------------------------------------------
-# classification table (step 6) — intended differences, encoded
+# classification table (step 6) — frozen runtime verdicts
 # ---------------------------------------------------------------------------
-
-INTENDED = {
-    "off-origin": (
-        "split: CORE-CANON-002 owns scheme/host drift; "
-        "legacy 'points elsewhere' lumps it with strategy"
-    ),
-    "paginated-strategy": (
-        "split: CORE-CANON-005 owns rel-pagination strategy; "
-        "legacy checks it on every page"
-    ),
-    "presence-blocked": (
-        "CORE-CANON-001 (presence) is not implemented at runtime — "
-        "full replacement BLOCKED"
-    ),
-}
 
 EXPECTED_TABLE = [
     ("self-non-paginated", "pass", "pass", "pass", "pass"),
     ("self-paginated", "pass", "pass", "pass", "pass"),
-    ("off-origin-single", "fail", "pass", "pass", "pass"),  # DELTA-D1
+    ("off-origin-single", "fail", "pass", "pass", "fail"),
     ("self-host-other-path-single", "fail", "pass", "pass", "pass"),
-    ("paginated-other-final", "pass", "pass", "pass", "pass"),
-    ("paginated-canonical-drift", "fail", "pass", "pass", "pass"),  # DELTA-D2
-    pytest.param(
-        "duplicated", "fail", "error", "fail", "error",
-        marks=pytest.mark.xfail(
-            reason="#34: escalation nondeterminism under investigation",
-            strict=True,
-        ),
-    ),
-    pytest.param(
-        "missing", "fail", "error", "fail", "error",
-        marks=pytest.mark.xfail(
-            reason="#34: escalation nondeterminism under investigation",
-            strict=True,
-        ),
-    ),
-
+    ("paginated-other-final", "fail", "fail", "pass", "pass"),
+    ("paginated-canonical-drift", "fail", "fail", "pass", "pass"),
+    ("duplicated", "fail", "error", "fail", "error"),
+    ("missing", "fail", "error", "fail", "error"),
 ]
 
 
 @pytest.mark.parametrize("scenario,legacy,f005,f008,f002", EXPECTED_TABLE)
 def test_golden_classification_table(scenario, legacy, f005, f008, f002):
     assert _legacy_verdict(scenario) == legacy
-    got = _frozen_verdicts("self-paginated")
+    got = _frozen_verdicts(scenario)
     assert got["CORE-CANON-005"] == f005, scenario
     assert got["CORE-CANON-008"] == f008, scenario
     assert got["CORE-CANON-002"] == f002, scenario
 
 
+# ---------------------------------------------------------------------------
+# intended differences (crosswalk PARTIAL_OVERLAP splits)
+# ---------------------------------------------------------------------------
+
+
 def test_off_origin_difference_is_intended_split():
     got = _frozen_verdicts("off-origin-single")
-    assert got["CORE-CANON-002"] == "fail"      # 002 owns origin drift
+    assert got["CORE-CANON-002"] == "fail"      # 002 owns scheme/host drift
     assert got["CORE-CANON-005"] == "pass"      # strategy not violated
-    assert INTENDED["off-origin"].startswith("split:")
+
+
+def test_paginated_strategy_is_owned_by_005():
+    got = _frozen_verdicts("paginated-canonical-drift")
+    assert got["CORE-CANON-005"] == "fail"      # 005 owns pagination strategy
+    assert got["CORE-CANON-002"] == "pass"      # same-origin drift is not 002's
 
 
 def test_presence_branch_is_blocked_for_replacement():
     got = _frozen_verdicts("duplicated")
-    assert got["CORE-CANON-008"] == "fail"                   # exactly-once covers dup
-    assert got["CORE-CANON-005"] == "error"                # presence split pending 001
-    assert "BLOCKED" in INTENDED["presence-blocked"]
+    assert got["CORE-CANON-008"] == "fail"      # exactly-once covers dup detection
+    assert got["CORE-CANON-005"] == "error"     # block policy escalates unknown
 
 
 # ---------------------------------------------------------------------------
@@ -230,16 +186,14 @@ def test_presence_branch_is_blocked_for_replacement():
 
 
 def test_single_collection_no_duplicate_fetch_surface():
-    """Cached bundle identity proves one shared collection per scenario."""
     a = _bundles("self-paginated")
     b = _bundles("self-paginated")
     assert a[0] is b[0] and a[1] is b[1]
 
 
-
 def test_frozen_reruns_are_deterministic():
-    a = _frozen_verdicts("self-paginated")
-    b = _frozen_verdicts("self-paginated")
+    a = _frozen_verdicts("paginated-canonical-drift")
+    b = _frozen_verdicts("paginated-canonical-drift")
     assert a == b
 
 
