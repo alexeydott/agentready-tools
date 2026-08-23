@@ -2,10 +2,9 @@
 
 Fixture model: page@1 envelopes are built through the sanctioned
 ``page_fact_envelope`` adapter; representation facts use the documented
-store-record shape (PageRecord status/content_type columns). CORE-LINK-002/005
-are declared_not_produced: evaluator functions stay covered via direct
-invocation, but no registry binding exists until resources@1 production lands
-(Option A upgrade path).
+store-record shape (PageRecord status/content_type columns). CORE-LINK-002/005 are bound via the produced
+resources@1 envelope (Option A executed): evaluator functions are covered by
+direct contract-preparation tests AND registry bindings.
 
 Targeted exact-HEAD suite:
 
@@ -24,6 +23,7 @@ import pytest
 from agentready.audit_core.collection import (
     page_fact_envelope,
     parsed_facts_from_dict,
+    resource_fact_envelope,
 )
 from agentready.audit_core.contracts import FactEnvelope
 from agentready.audit_core.evaluator_registry import (
@@ -47,8 +47,16 @@ TARGET = "https://example.test/page"
 ORIGIN = "https://example.test"
 T0 = "2026-08-22T00:00:00Z"
 
-BOUND_RULES = ("CORE-LINK-001", "CORE-LINK-003", "CORE-LINK-004", "CORE-LINK-006")
-DEFERRED_RULES = ("CORE-LINK-002", "CORE-LINK-005")
+BOUND_RULES = (
+    "CORE-LINK-001",
+    "CORE-LINK-002",
+    "CORE-LINK-003",
+    "CORE-LINK-004",
+    "CORE-LINK-005",
+    "CORE-LINK-006",
+)
+FORMERLY_DEFERRED = ("CORE-LINK-002", "CORE-LINK-005")
+DEFERRED_RULES = FORMERLY_DEFERRED  # historical alias in older assertions
 
 
 def _row(ordinal, raw_href, resolved_url=None, rel=""):
@@ -122,22 +130,23 @@ def test_catalog_requirements_match_evaluator_contracts():
         assert catalog == expected, rid
 
 
-def test_registry_scoped_to_bound_rules_only():
+def test_registry_covers_all_six_link_rules():
     assert {rid for rid, _v in LINK_EVALUATOR_REGISTRY.registered_targets} == set(
         BOUND_RULES
     )
 
 
-def test_contract_prep_rules_are_not_registered_frozen_bindings():
-    """Direct-invocation coverage (contract preparation) must never leak into bindings."""
+def test_contract_prep_rules_are_now_registered_frozen_bindings():
+    """Option A executed: prep coverage graduated into registered bindings."""
     bound = {rid for rid, _v in LINK_EVALUATOR_REGISTRY.registered_targets}
-    assert set(DEFERRED_RULES).isdisjoint(bound)
+    assert set(DEFERRED_RULES) <= bound
 
 
 @pytest.mark.parametrize("rule_id", DEFERRED_RULES)
-def test_declared_not_produced_rules_are_not_bindable(rule_id):
-    with pytest.raises(UnregisteredRuleError):
-        LINK_EVALUATOR_REGISTRY.resolve(rule_id, CORE_LINK_RULE_VERSION)
+def test_formerly_deferred_rules_are_now_bindable(rule_id):
+    """Option A executed: resources@1 produced, 002/005 bound like siblings."""
+    binding = LINK_EVALUATOR_REGISTRY.resolve(rule_id, CORE_LINK_RULE_VERSION)
+    assert binding is not None
 
 
 @pytest.mark.parametrize("rule_id", DEFERRED_RULES)

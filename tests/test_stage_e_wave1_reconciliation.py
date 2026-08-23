@@ -340,7 +340,7 @@ def test_gate8_pipeline_modules_never_construct_non_emitted_family_envelopes(mat
     run-projection gained sanctioned adapters (#56/#57).
     """
     families = set(matrix["adapter_boundary"]["non_emitted_registered_families"])
-    assert families == {"links", "resources", "structured-data"}
+    assert families == {"links", "structured-data"}
     kind_names = {"schema_family", "kind"}
     offenders: list[str] = []
     src_root = REPO_ROOT / "src" / "agentready"
@@ -408,7 +408,7 @@ def test_adapter_boundary_documented_and_real(matrix) -> None:
     robots_or_sitemap = [n for n in persist_functions if "robots" in n or "sitemap" in n]
     assert robots_or_sitemap, "run_facts emitters disappeared"
     non_emitted = set(matrix["adapter_boundary"]["non_emitted_registered_families"])
-    assert non_emitted == {"links", "resources", "structured-data"}
+    assert non_emitted == {"links", "structured-data"}
     from agentready.audit_core.collection import (  # noqa: F401
         canonical_projection_fact_envelopes as _cp,
         load_transport_fact_envelopes as _lt,

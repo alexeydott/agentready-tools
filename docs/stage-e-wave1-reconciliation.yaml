@@ -83,7 +83,6 @@ adapter_boundary:
       '
   non_emitted_registered_families:
   - links
-  - resources
   - structured-data
 produced_fact_contract_at_base:
   page@1:

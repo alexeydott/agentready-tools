@@ -91,7 +91,5 @@ def test_score_model_id_is_frozen():
 
 
 def test_deferred_declared_not_produced_set_is_frozen():
-    deferred = {
-        item["rule_id"] for item in BASELINE["deferred_declared_not_produced"]
-    }
-    assert deferred == {"CORE-LINK-002", "CORE-LINK-005"}
+    """Option A executed: nothing remains deferred after resources@1 production."""
+    assert BASELINE["deferred_declared_not_produced"] == []

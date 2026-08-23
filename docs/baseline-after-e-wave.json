@@ -1,15 +1,6 @@
 {
-  "commit": "f05279f853f2a717df28e360fc1c9ddc1685a21c",
-  "deferred_declared_not_produced": [
-    {
-      "reason": "resources@1 pending production (Option B)",
-      "rule_id": "CORE-LINK-002"
-    },
-    {
-      "reason": "resources@1 pending production (Option B)",
-      "rule_id": "CORE-LINK-005"
-    }
-  ],
+  "commit": "7fa0b9c25a030a729c83f6367ac34afe0a97e789",
+  "deferred_declared_not_produced": [],
   "frozen_bindings": {
     "CORE-CANON-002": {
       "failure_policy": "block_on_missing_facts",
@@ -108,18 +99,18 @@
       "version": "1.0.0"
     }
   },
-  "generated_at": "2026-08-23T12:01:04Z",
+  "generated_at": "2026-08-23T14:19:36Z",
   "package_version": "0.13.7",
   "registered_evaluators": {
     "CANARY": {
-      "scoped_contracts": null,
+      "scoped_contracts": {},
       "targets": [
         "CORE-COVERAGE-001@1.0.0"
       ]
     },
     "CANON": {
       "scoped_contracts": {
-        "('CORE-CANON-002', '1.0.0')": [
+        "CORE-CANON-002@1.0.0": [
           [
             "page",
             "1"
@@ -129,23 +120,13 @@
             "1"
           ]
         ],
-        "('CORE-CANON-003', '1.0.0')": [
+        "CORE-CANON-003@1.0.0": [
           [
             "page",
             "1"
           ]
         ],
-        "('CORE-CANON-004', '1.0.0')": [
-          [
-            "page",
-            "1"
-          ],
-          [
-            "transport",
-            "1"
-          ]
-        ],
-        "('CORE-CANON-005', '1.0.0')": [
+        "CORE-CANON-004@1.0.0": [
           [
             "page",
             "1"
@@ -155,7 +136,17 @@
             "1"
           ]
         ],
-        "('CORE-CANON-006', '1.0.0')": [
+        "CORE-CANON-005@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "transport",
+            "1"
+          ]
+        ],
+        "CORE-CANON-006@1.0.0": [
           [
             "page",
             "1"
@@ -165,7 +156,7 @@
             "1"
           ]
         ],
-        "('CORE-CANON-007', '1.0.0')": [
+        "CORE-CANON-007@1.0.0": [
           [
             "page",
             "1"
@@ -175,7 +166,7 @@
             "1"
           ]
         ],
-        "('CORE-CANON-008', '1.0.0')": [
+        "CORE-CANON-008@1.0.0": [
           [
             "page",
             "1"
@@ -193,14 +184,14 @@
       ]
     },
     "GOOGLE_DESC": {
-      "scoped_contracts": null,
+      "scoped_contracts": {},
       "targets": [
         "GOOGLE-DESC-001@1.0.0"
       ]
     },
     "GOOGLE_TITLE": {
       "scoped_contracts": {
-        "CORE-COVERAGE-001": [
+        "CORE-COVERAGE-001@1.0.0": [
           [
             "page",
             "1"
@@ -210,7 +201,7 @@
             "1"
           ]
         ],
-        "GOOGLE-TITLE-001": [
+        "GOOGLE-TITLE-001@1.0.0": [
           [
             "page",
             "1"
@@ -223,7 +214,7 @@
     },
     "LINK_BOUND": {
       "scoped_contracts": {
-        "('CORE-LINK-001', '1.0.0')": [
+        "CORE-LINK-001@1.0.0": [
           [
             "page",
             "1"
@@ -233,7 +224,7 @@
             "1"
           ]
         ],
-        "('CORE-LINK-002', '1.0.0')": [
+        "CORE-LINK-002@1.0.0": [
           [
             "page",
             "1"
@@ -243,13 +234,13 @@
             "1"
           ]
         ],
-        "('CORE-LINK-003', '1.0.0')": [
+        "CORE-LINK-003@1.0.0": [
           [
             "page",
             "1"
           ]
         ],
-        "('CORE-LINK-004', '1.0.0')": [
+        "CORE-LINK-004@1.0.0": [
           [
             "page",
             "1"
@@ -259,7 +250,7 @@
             "1"
           ]
         ],
-        "('CORE-LINK-005', '1.0.0')": [
+        "CORE-LINK-005@1.0.0": [
           [
             "page",
             "1"
@@ -269,7 +260,7 @@
             "1"
           ]
         ],
-        "('CORE-LINK-006', '1.0.0')": [
+        "CORE-LINK-006@1.0.0": [
           [
             "page",
             "1"
@@ -278,8 +269,10 @@
       },
       "targets": [
         "CORE-LINK-001@1.0.0",
+        "CORE-LINK-002@1.0.0",
         "CORE-LINK-003@1.0.0",
         "CORE-LINK-004@1.0.0",
+        "CORE-LINK-005@1.0.0",
         "CORE-LINK-006@1.0.0"
       ]
     }
