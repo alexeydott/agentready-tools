@@ -57,10 +57,10 @@ scenarios:
     note: legacy skips entirely; frozen treats absence as a scored structural failure
   - name: whitespace-only
     titles: ['   ']
-    legacy_status: skip
+    legacy_status: warn
     frozen_status: fail
     classification: intended_normalization
-    note: frozen strips before measuring; legacy measures raw length
+    note: legacy measures the RAW whitespace-only title (warn at 3 chars); frozen collapses whitespace and reports a structural empty-title failure
   - name: multiple-titles-first-in-band
     titles: ['FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF', 'GGGGGGGGGG']
     legacy_status: pass

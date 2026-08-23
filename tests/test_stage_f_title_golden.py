@@ -45,7 +45,7 @@ def _load_manifest():
 
 
 def _legacy_evidence(titles):
-    primary = next((t for t in titles if t.strip()), "")
+    primary = titles[0] if titles else ""
     return SeoPageEvidence(
         url=TARGET,
         final_url=TARGET,
