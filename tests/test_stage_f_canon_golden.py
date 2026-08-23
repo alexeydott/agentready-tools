@@ -21,6 +21,7 @@ import yaml
 
 from agentready.audit_core.canon_evaluators import evaluate_canon_rule
 from agentready.audit_core.collection import (
+    links_fact_envelope,
     page_fact_envelope,
     parsed_facts_from_dict,
     transport_fact_envelope,
@@ -63,13 +64,14 @@ def test_manifest_pins_the_live_catalog(manifest, snapshot):
 def test_manifest_covers_exactly_the_frozen_rules(manifest, snapshot):
     frozen = set(manifest["frozen_rules"])
     wave_ids = {
+        "CORE-CANON-001",
         "CORE-CANON-002",
         "CORE-CANON-005",
         "CORE-CANON-008",
     }
     assert frozen == wave_ids
     blocked = {b["rule_id"] for b in manifest["blocked_rules"]}
-    assert blocked == {"CORE-CANON-001"}
+    assert blocked == set()
     # every blocked entry carries a reason
     for b in manifest["blocked_rules"]:
         assert b.get("reason"), b
@@ -137,7 +139,12 @@ _BUNDLES: dict[str, tuple] = {}
 def _bundles(scenario_name, scenario):
     if scenario_name not in _BUNDLES:
         c = _corpus(scenario)
-        _BUNDLES[scenario_name] = (c["page"], c["transport"])
+        links_env = links_fact_envelope(
+            subject_url=TARGET,
+            links=tuple(scenario["links"]),
+            observed_at=T0,
+        )
+        _BUNDLES[scenario_name] = (c["page"], c["transport"], links_env)
     return _BUNDLES[scenario_name]
 
 
@@ -149,7 +156,7 @@ def _frozen_verdicts(scenario_name, scenario):
     b = _bundles(scenario_name, scenario)
     return {
         rid: evaluate_canon_rule(rid, TARGET, b).finding.status.value
-        for rid in ("CORE-CANON-002", "CORE-CANON-005", "CORE-CANON-008")
+        for rid in ("CORE-CANON-001", "CORE-CANON-002", "CORE-CANON-005", "CORE-CANON-008")
     }
 
 

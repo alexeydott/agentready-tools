@@ -35,14 +35,7 @@ from agentready.audit_core.urls import UrlIdentity
 from agentready.report_v2 import FindingStatus, semantic_diff
 
 from agentready.audit_core.collection import (
-    page_fact_envelope,
-    parsed_facts_from_dict,
-    run_projection_fact_envelope,
-    transport_fact_envelope,
-)
-
-
-from agentready.audit_core.collection import (
+    links_fact_envelope,
     page_fact_envelope,
     parsed_facts_from_dict,
     run_projection_fact_envelope,
@@ -71,6 +64,7 @@ def _facts(
     canonicals: list[str] | None = None,
     meta_robots: list[str] | None = None,
     links: list[dict] | None = None,
+    links_version: str = "1",
     origin: str = ORIGIN,
     final_url: str | None = None,
     redirect_chain: list[str] | None = None,
@@ -115,10 +109,19 @@ def _facts(
     if projection_version != "1":
         projection = dataclasses.replace(projection, schema_version=projection_version)
 
-    return (envelope, transport, projection)
+    links_env = links_fact_envelope(
+        subject_url=target,
+        links=tuple(links or []),
+        observed_at=T0,
+    )
+    if links_version != "1":
+        links_env = dataclasses.replace(links_env, schema_version=links_version)
+
+    return (envelope, transport, projection, links_env)
 
 
 REQUIRED_FAMILIES = {
+    "CORE-CANON-001": ("page", "links"),
     "CORE-CANON-002": ("page", "transport"),
     "CORE-CANON-003": ("page",),
     "CORE-CANON-004": ("page", "transport"),

@@ -97,9 +97,15 @@
       "score_role": "scored",
       "title": "Title tag is present and within recommended length",
       "version": "1.0.0"
+    },
+    "CORE-CANON-001": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Canonical URL is present and resolves to a single preferred URL",
+      "version": "1.0.0"
     }
   },
-  "generated_at": "2026-08-23T14:19:36Z",
+  "generated_at": "2026-08-23T19:59:26Z",
   "package_version": "0.13.7",
   "registered_evaluators": {
     "CANARY": {
@@ -171,9 +177,20 @@
             "page",
             "1"
           ]
+        ],
+        "CORE-CANON-001@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "links",
+            "1"
+          ]
         ]
       },
       "targets": [
+        "CORE-CANON-001@1.0.0",
         "CORE-CANON-002@1.0.0",
         "CORE-CANON-003@1.0.0",
         "CORE-CANON-004@1.0.0",
@@ -289,8 +306,8 @@
     "score_model_id": "readiness-transparent-v2"
   },
   "semantics_artifact": {
-    "digest": "4db6ba9768bb05c05e149d59b2fb0f29b1fc38004ff297c0c87a51988fbcce5c",
+    "digest": "1346763d7d1f49c3eb5e0160aa116a0e7bd35f8470b921aa04692bc8a0fb80f3",
     "name": "agentready.rule-semantics.v2",
-    "version": "1.0.1"
+    "version": "1.0.2"
   }
 }

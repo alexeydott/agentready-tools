@@ -520,6 +520,61 @@ def load_transport_fact_envelopes(
     return tuple(envelopes)
 
 
+def links_fact_envelope(
+    *,
+    subject_url: str,
+    links: tuple[Mapping[str, Any], ...] = (),
+    observed_at: str,
+    representation_id: str | None = None,
+    envelope_id: str | None = None,
+) -> FactEnvelope:
+    """Build the sanctioned ``links@1`` evaluation envelope.
+
+    ``links`` are collected link rows (raw_href / resolved_url / rel) for the
+    subject as declared on the audited page. Envelope identity is
+    deterministic over subject URL, observation timestamp, representation id
+    and the canonical link rows.
+    """
+    identity = UrlIdentity.parse(subject_url)
+    if not observed_at or not observed_at.strip():
+        raise ValueError("links fact envelope requires a non-empty observed_at")
+    normalized_rows = sorted(
+        (
+            str(row.get("raw_href", "")),
+            str(row.get("resolved_url") or ""),
+            str(row.get("rel", "")),
+        )
+        for row in links
+        if isinstance(row, Mapping)
+    )
+    payload: dict[str, object] = {"links": [
+        {"raw_href": rh, "resolved_url": ru, "rel": rel}
+        for (rh, ru, rel) in normalized_rows
+    ]}
+    digest_input = json.dumps(
+        [identity.normalized(), observed_at, representation_id or "", payload],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    from .fact_schema import DEFAULT_FACT_SCHEMA_VERSIONS
+
+    resolved_id = envelope_id or (
+        "links-fact:"
+        + hashlib.sha256(digest_input.encode("utf-8")).hexdigest()
+    )
+    return FactEnvelope(
+        id=resolved_id,
+        kind="links",
+        target=identity,
+        value=payload,
+        observed_at=observed_at,
+        representation_id=representation_id,
+        schema_family="links",
+        schema_version=DEFAULT_FACT_SCHEMA_VERSIONS["links"],
+    )
+
+
 def resource_fact_envelope(
     *,
     subject_url: str,

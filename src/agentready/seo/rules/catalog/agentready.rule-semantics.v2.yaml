@@ -1,6 +1,6 @@
 schema: agentready.rule-semantics.v2
-semantics_version: 1.0.1
-accepted_at: '2026-08-22'
+semantics_version: 1.0.2
+accepted_at: '2026-08-23'
 governance:
   canonical: '#52'
   links: '#53'
@@ -11,6 +11,10 @@ catalog_pin:
   version: 2.1.0-draft.2
   digest: d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f
 requirement_amendments:
+- rule_id: CORE-CANON-001
+  families:
+  - page
+  - links
 - rule_id: CORE-CANON-002
   families:
   - page
@@ -66,6 +70,17 @@ requirement_amendments:
   families:
   - page
 accepted_conditions:
+- rule_id: CORE-CANON-001
+  version: 1.0.0
+  source_issue: '#52'
+  verdicts:
+    UNKNOWN: page.canonicals unavailable (blocked fact collection)
+    PASS: at least one canonical URL is declared for the page (preferred URL is present);
+      declaration uniqueness is owned by CORE-CANON-008 and target validity by the
+      remaining canonical rules, so duplicates do not fail this rule (intended_split)
+    FAIL: no canonical URL is declared for the page
+  evidence_fields:
+  - page.canonicals
 - rule_id: CORE-CANON-002
   version: 1.0.0
   source_issue: '#52'
