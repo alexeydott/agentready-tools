@@ -1,5 +1,5 @@
 {
-  "commit": "bf9f79404dd89bb6a786d82623ca8c957ffc0666",
+  "commit": "f05279f853f2a717df28e360fc1c9ddc1685a21c",
   "deferred_declared_not_produced": [
     {
       "reason": "resources@1 pending production (Option B)",
@@ -108,7 +108,7 @@
       "version": "1.0.0"
     }
   },
-  "generated_at": "2026-08-22T23:27:45Z",
+  "generated_at": "2026-08-23T12:01:04Z",
   "package_version": "0.13.7",
   "registered_evaluators": {
     "CANARY": {
@@ -119,7 +119,7 @@
     },
     "CANON": {
       "scoped_contracts": {
-        "('CORE-CANON-002', '1.0.0')@1.0.0": [
+        "('CORE-CANON-002', '1.0.0')": [
           [
             "page",
             "1"
@@ -129,23 +129,13 @@
             "1"
           ]
         ],
-        "('CORE-CANON-003', '1.0.0')@1.0.0": [
+        "('CORE-CANON-003', '1.0.0')": [
           [
             "page",
             "1"
           ]
         ],
-        "('CORE-CANON-004', '1.0.0')@1.0.0": [
-          [
-            "page",
-            "1"
-          ],
-          [
-            "transport",
-            "1"
-          ]
-        ],
-        "('CORE-CANON-005', '1.0.0')@1.0.0": [
+        "('CORE-CANON-004', '1.0.0')": [
           [
             "page",
             "1"
@@ -155,7 +145,17 @@
             "1"
           ]
         ],
-        "('CORE-CANON-006', '1.0.0')@1.0.0": [
+        "('CORE-CANON-005', '1.0.0')": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "transport",
+            "1"
+          ]
+        ],
+        "('CORE-CANON-006', '1.0.0')": [
           [
             "page",
             "1"
@@ -165,7 +165,7 @@
             "1"
           ]
         ],
-        "('CORE-CANON-007', '1.0.0')@1.0.0": [
+        "('CORE-CANON-007', '1.0.0')": [
           [
             "page",
             "1"
@@ -175,7 +175,7 @@
             "1"
           ]
         ],
-        "('CORE-CANON-008', '1.0.0')@1.0.0": [
+        "('CORE-CANON-008', '1.0.0')": [
           [
             "page",
             "1"
@@ -200,7 +200,7 @@
     },
     "GOOGLE_TITLE": {
       "scoped_contracts": {
-        "CORE-COVERAGE-001@1.0.0": [
+        "CORE-COVERAGE-001": [
           [
             "page",
             "1"
@@ -210,13 +210,7 @@
             "1"
           ]
         ],
-        "GOOGLE-DESC-001@1.0.0": [
-          [
-            "page",
-            "1"
-          ]
-        ],
-        "GOOGLE-TITLE-001@1.0.0": [
+        "GOOGLE-TITLE-001": [
           [
             "page",
             "1"
@@ -229,7 +223,7 @@
     },
     "LINK_BOUND": {
       "scoped_contracts": {
-        "('CORE-LINK-001', '1.0.0')@1.0.0": [
+        "('CORE-LINK-001', '1.0.0')": [
           [
             "page",
             "1"
@@ -239,7 +233,7 @@
             "1"
           ]
         ],
-        "('CORE-LINK-002', '1.0.0')@1.0.0": [
+        "('CORE-LINK-002', '1.0.0')": [
           [
             "page",
             "1"
@@ -249,13 +243,13 @@
             "1"
           ]
         ],
-        "('CORE-LINK-003', '1.0.0')@1.0.0": [
+        "('CORE-LINK-003', '1.0.0')": [
           [
             "page",
             "1"
           ]
         ],
-        "('CORE-LINK-004', '1.0.0')@1.0.0": [
+        "('CORE-LINK-004', '1.0.0')": [
           [
             "page",
             "1"
@@ -265,7 +259,7 @@
             "1"
           ]
         ],
-        "('CORE-LINK-005', '1.0.0')@1.0.0": [
+        "('CORE-LINK-005', '1.0.0')": [
           [
             "page",
             "1"
@@ -275,7 +269,7 @@
             "1"
           ]
         ],
-        "('CORE-LINK-006', '1.0.0')@1.0.0": [
+        "('CORE-LINK-006', '1.0.0')": [
           [
             "page",
             "1"
@@ -291,7 +285,7 @@
     }
   },
   "rule_catalog": {
-    "digest": "acdb4a5814899f6d8ebf543ef8e656caedfa92b3938dffdd58a3d288cfaec909",
+    "digest": "d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f",
     "name": "agentready.rule-catalog.v2",
     "rule_count": 200,
     "version": "2.1.0-draft.2"
@@ -302,7 +296,7 @@
     "score_model_id": "readiness-transparent-v2"
   },
   "semantics_artifact": {
-    "digest": "c4caaef0861f127eec04bb65d0036b15a5cbe9d991055da03487c08df6db369d",
+    "digest": "4db6ba9768bb05c05e149d59b2fb0f29b1fc38004ff297c0c87a51988fbcce5c",
     "name": "agentready.rule-semantics.v2",
     "version": "1.0.1"
   }
