@@ -1,0 +1,74 @@
+schema: agentready.stage-f-desc-golden.v1
+version: '1.0.0'
+family: google-metadata
+legacy_rule: metadata
+crosswalk_class: COMPOSITE
+crosswalk_note: >
+  Legacy metadata is a composite (title + description + H1). Only the
+  description constituent overlaps GOOGLE-DESC-001; title/H1 constituents are
+  covered elsewhere.
+accepted_semantics:
+  artifact: agentready.rule-semantics.v2
+  version: '1.0.1'
+catalog_pin:
+  name: agentready.rule-catalog.v2
+  version: 2.1.0-draft.2
+  digest: d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f
+frozen_rules: [GOOGLE-DESC-001]
+measurement: whitespace-collapsed character length of page.descriptions[0]
+length_band: {min: 120, max: 160, inclusive: true}
+classification_vocab:
+  - equivalent_overlap
+  - intended_normalization
+  - intended_multiplicity
+  - intended_scored_band
+  - intended_scope
+base_fields: &base
+  title: 'T'
+  titles: ['T']
+  h1: ['H']
+scenarios:
+  - name: in-band-present
+    <<: *base
+    descriptions: ['AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+    legacy_status: pass
+    frozen_status: pass
+    classification: equivalent_overlap
+  - name: missing-description
+    <<: *base
+    descriptions: []
+    legacy_status: fail
+    frozen_status: fail
+    classification: equivalent_overlap
+    split_note: description constituent of the composite fails identically
+  - name: whitespace-only-description
+    <<: *base
+    descriptions: ["   "]
+    legacy_status: pass
+    frozen_status: fail
+    classification: intended_normalization
+    note: >
+      legacy treats a whitespace-only value as present (truthy);
+      frozen collapses whitespace before measuring
+  - name: multiple-descriptions
+    <<: *base
+    descriptions: ['BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', 'CCCCCCCCCCCCCCCCCCCC']
+    legacy_status: pass
+    frozen_status: fail
+    frozen: {GOOGLE-DESC-001: fail}
+    classification: intended_multiplicity
+    note: legacy inspects only the primary description; frozen requires exactly one distinct non-empty
+  - name: too-short-description
+    <<: *base
+    descriptions: ['DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD']
+    legacy_status: pass
+    frozen_status: fail
+    classification: intended_scored_band
+    note: legacy metadata never scored length; the governed band adds scored failures
+  - name: too-long-description
+    <<: *base
+    descriptions: ['EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE']
+    legacy_status: pass
+    frozen_status: fail
+    classification: intended_scored_band
+    note: same as too-short
