@@ -10,10 +10,8 @@ catalog_pin:
   name: agentready.rule-catalog.v2
   version: 2.1.0-draft.2
   digest: d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f
-frozen_rules: [CORE-CANON-002, CORE-CANON-005, CORE-CANON-008]
-blocked_rules:
-  - rule_id: CORE-CANON-001
-    reason: no runtime binding yet — full replacement of legacy `canonical` is BLOCKED
+frozen_rules: [CORE-CANON-001, CORE-CANON-002, CORE-CANON-005, CORE-CANON-008]
+blocked_rules: []
 policy_notes:
   block_unknown_escalation: |
     Under failure_policy=block_on_missing_facts an evaluator UNKNOWN verdict is
@@ -28,27 +26,27 @@ scenarios:
     canonicals: ['https://example.test/page']
     links: []
     legacy_status: pass
-    frozen: {CORE-CANON-002: pass, CORE-CANON-005: pass, CORE-CANON-008: pass}
+    frozen: {CORE-CANON-001: pass, CORE-CANON-002: pass, CORE-CANON-005: pass, CORE-CANON-008: pass}
     classification: equivalent_overlap
   - name: self-paginated
     canonicals: ['https://example.test/page']
     links:
       - {raw_href: /next, resolved_url: 'https://example.test/next', rel: next}
     legacy_status: pass
-    frozen: {CORE-CANON-002: pass, CORE-CANON-005: pass, CORE-CANON-008: pass}
+    frozen: {CORE-CANON-001: pass, CORE-CANON-002: pass, CORE-CANON-005: pass, CORE-CANON-008: pass}
     classification: equivalent_overlap
   - name: off-origin-single
     canonicals: ['https://cdn.example.test/canonical']
     links: []
     legacy_status: fail
-    frozen: {CORE-CANON-002: fail, CORE-CANON-005: pass, CORE-CANON-008: pass}
+    frozen: {CORE-CANON-001: pass, CORE-CANON-002: fail, CORE-CANON-005: pass, CORE-CANON-008: pass}
     classification: intended_split
     split_note: CORE-CANON-002 owns scheme/host drift; legacy lumps it with strategy
   - name: self-host-other-path-single
     canonicals: ['https://example.test/other']
     links: []
     legacy_status: fail
-    frozen: {CORE-CANON-002: pass, CORE-CANON-005: pass, CORE-CANON-008: pass}
+    frozen: {CORE-CANON-001: pass, CORE-CANON-002: pass, CORE-CANON-005: pass, CORE-CANON-008: pass}
     classification: intended_split
     split_note: same-host path drift stays with the paginated-strategy rule family
   - name: paginated-other-final
@@ -56,7 +54,7 @@ scenarios:
     links:
       - {raw_href: /next, resolved_url: 'https://example.test/next', rel: next}
     legacy_status: fail
-    frozen: {CORE-CANON-005: fail, CORE-CANON-008: pass, CORE-CANON-002: pass}
+    frozen: {CORE-CANON-001: pass, CORE-CANON-005: fail, CORE-CANON-008: pass, CORE-CANON-002: pass}
     classification: equivalent_overlap
   - name: paginated-canonical-drift
     canonicals: ['https://example.test/page']
@@ -65,20 +63,20 @@ scenarios:
       - {raw_href: /next, resolved_url: 'https://example.test/next', rel: next}
     final_url_override: 'https://example.test/other'
     legacy_status: fail
-    frozen: {CORE-CANON-002: pass, CORE-CANON-005: fail, CORE-CANON-008: pass}
+    frozen: {CORE-CANON-001: pass, CORE-CANON-002: pass, CORE-CANON-005: fail, CORE-CANON-008: pass}
     classification: intended_split
     split_note: CORE-CANON-005 owns rel-pagination strategy on drift
   - name: duplicated
     canonicals: ['https://example.test/page', 'https://example.test/other']
     links: []
     legacy_status: fail
-    frozen: {CORE-CANON-002: error, CORE-CANON-005: error, CORE-CANON-008: fail}
+    frozen: {CORE-CANON-001: pass, CORE-CANON-002: error, CORE-CANON-005: error, CORE-CANON-008: fail}
     classification: presence_blocked
     escalation: block_unknown_escalation
   - name: missing
     canonicals: []
     links: []
     legacy_status: fail
-    frozen: {CORE-CANON-002: error, CORE-CANON-005: error, CORE-CANON-008: fail}
+    frozen: {CORE-CANON-001: fail, CORE-CANON-002: error, CORE-CANON-005: error, CORE-CANON-008: fail}
     classification: presence_blocked
     escalation: block_unknown_escalation
