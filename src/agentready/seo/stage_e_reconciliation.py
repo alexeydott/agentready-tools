@@ -25,6 +25,7 @@ class ReconciliationClassification:
     MATCH = "MATCH"
     SEMANTIC_MISMATCH = "SEMANTIC_MISMATCH"
     MISSING_FROM_CATALOG = "MISSING_FROM_CATALOG"
+    RETIRED = "RETIRED"
     PLAN_NO_LONGER_APPLICABLE = "PLAN_NO_LONGER_APPLICABLE"
 
 
@@ -66,8 +67,8 @@ STAGE_E_PLAN_REFERENCES: tuple[StageEPlanReference, ...] = (
             "CORE-SITEMAP-005",
             "CORE-SITEMAP-008",
         ),
-        ReconciliationClassification.MISSING_FROM_CATALOG,
-        "retain as blocked plan IDs; replace with explicitly selected robots-sitemap catalog IDs in a follow-up plan",
+        ReconciliationClassification.RETIRED,
+        "retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-* rules covering same fact families but no semantic/evaluator binding; adding governed rules requires new catalog revision beyond final cutover",
         "atomic robots/sitemap state and URL validity rules",
     ),
     *_refs(
@@ -80,8 +81,8 @@ STAGE_E_PLAN_REFERENCES: tuple[StageEPlanReference, ...] = (
     *_refs(
         25,
         ("CORE-DUP-001", "CORE-DUP-002"),
-        ReconciliationClassification.MISSING_FROM_CATALOG,
-        "retain duplicate work as blocked until catalog IDs are intentionally added by a reviewed catalog change",
+        ReconciliationClassification.RETIRED,
+        "retired from v0.14.0 scope — duplicate detection remains legacy/current functionality; no frozen evaluator identity created",
         "exact and near duplicate cluster semantics",
     ),
     *_refs(
@@ -115,8 +116,8 @@ STAGE_E_PLAN_REFERENCES: tuple[StageEPlanReference, ...] = (
             "CORE-SITEMAP-008",
             "CORE-ROBOTS-003",
         ),
-        ReconciliationClassification.MISSING_FROM_CATALOG,
-        "keep dependent robots/sitemap work blocked until each ID has an explicit catalog disposition",
+        ReconciliationClassification.RETIRED,
+        "retired from v0.14.0 scope — follows #23 governance disposition; no catalog binding",
         "cross-family robots/sitemap consistency rules",
     ),
     StageEPlanReference(
@@ -248,13 +249,37 @@ def build_stage_e_reconciliation_matrix(
         "issues": list(range(22, 35)),
         "issue_dispositions": [
             {
+                "issue": 23,
+                "classification": ReconciliationClassification.RETIRED,
+                "disposition": (
+                    "governance-only: all planned IDs retired from v0.14.0 scope "
+                    "(see docs/governance-disposition-23-25-29.md)"
+                ),
+            },
+            {
+                "issue": 25,
+                "classification": ReconciliationClassification.RETIRED,
+                "disposition": (
+                    "governance-only: all planned IDs retired from v0.14.0 scope "
+                    "(see docs/governance-disposition-23-25-29.md)"
+                ),
+            },
+            {
+                "issue": 29,
+                "classification": ReconciliationClassification.RETIRED,
+                "disposition": (
+                    "governance-only: all planned IDs retired from v0.14.0 scope "
+                    "(see docs/governance-disposition-23-25-29.md)"
+                ),
+            },
+            {
                 "issue": 34,
                 "classification": ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE,
                 "disposition": (
-                    "downstream golden-cutover work is not implementable until each "
-                    "dependent issue has an exact catalog-authoritative contract"
+                    "final cutover/re-freeze for v0.14.0 is now unblocked — all "
+                    "dependent issues have reviewed dispositions (resolved or retired)"
                 ),
-            }
+            },
         ],
         "rows": rows,
     }

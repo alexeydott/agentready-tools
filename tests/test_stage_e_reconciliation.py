@@ -33,6 +33,7 @@ def test_every_planned_reference_has_an_explicit_disposition():
             ReconciliationClassification.MATCH,
             ReconciliationClassification.SEMANTIC_MISMATCH,
             ReconciliationClassification.MISSING_FROM_CATALOG,
+            ReconciliationClassification.RETIRED,
             ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE,
         }
         assert reference.disposition
@@ -123,17 +124,17 @@ def test_binding_gate_rejects_semantic_and_version_mismatches():
 def test_issue_34_has_an_explicit_issue_level_disposition():
     matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
     assert matrix["issues"] == list(range(22, 35))
-    assert matrix["issue_dispositions"] == [{
-        "issue": 34,
-        "classification": ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE,
-        "disposition": (
-            "downstream golden-cutover work is not implementable until each "
-            "dependent issue has an exact catalog-authoritative contract"
-        ),
-    }]
+    dispositions = matrix["issue_dispositions"]
+    assert len(dispositions) == 4
+    by_issue = {d["issue"]: d for d in dispositions}
+    assert by_issue[23]["classification"] == ReconciliationClassification.RETIRED
+    assert by_issue[25]["classification"] == ReconciliationClassification.RETIRED
+    assert by_issue[29]["classification"] == ReconciliationClassification.RETIRED
+    assert by_issue[34]["classification"] == ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE
+    assert "unblocked" in by_issue[34]["disposition"]
 
 
 def test_checked_in_matrix_matches_the_loaded_catalog_snapshot():
     expected = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
-    checked_in = yaml.safe_load((ROOT / "docs" / "stage-e-f-reconciliation.yaml").read_text())
+    checked_in = yaml.safe_load((ROOT / "docs" / "stage-e-f-reconciliation.yaml").read_text(encoding="utf-8"))
     assert checked_in == expected
