@@ -23,8 +23,8 @@ Fact-availability semantics (block_on_missing_facts):
 
 - ``page.hreflang`` key absent or not a list → **UNKNOWN** (escalated to
   ``error`` by the block policy).
-- ``page.hreflang`` present but empty → **PASS** (vacuously valid —
-  single-language page carries no hreflang annotations to violate).
+- ``page.hreflang`` present but empty → **NOT_APPLICABLE** (single-language
+  page excluded from scoring via ``Status.SKIP``).
 - ``page.hreflang`` present with entries → evaluated per rule condition.
 
 Payload shape (``page@1``)::
