@@ -58,6 +58,8 @@ __all__ = [
 CORE_COVERAGE_RULE_ID = "CORE-COVERAGE-001"
 CORE_COVERAGE_RULE_VERSION = "1.0.0"
 
+_VACUOUSLY_VALID = "vacuously valid"
+
 
 @dataclass(frozen=True, slots=True)
 class ExpectedRuleContract:
@@ -356,22 +358,35 @@ def _finding(
             if not item.usable
         )
     else:
-        assert result is not None
+        assert result is not EvaluatorResult
         outcome = result.outcome
+        reason = result.reason
+        evidence = result.evidence
         if outcome is EvaluationOutcome.UNKNOWN:
             status = Status.ERROR
             completeness = EvaluationCompleteness.PARTIAL
             operational_state = OperationalState.UNAVAILABLE
+        elif (
+            outcome is EvaluationOutcome.PASS
+            and _VACUOUSLY_VALID in (reason or "")
+        ):
+            status = Status.SKIP
+            outcome = EvaluationOutcome.NOT_APPLICABLE
+            completeness = EvaluationCompleteness.NOT_EVALUATED
+            operational_state = OperationalState.NONE
         else:
             status = Status(outcome.value)
             completeness = EvaluationCompleteness.COMPLETE
             operational_state = OperationalState.NONE
-        reason = result.reason
-        evidence = result.evidence
+    effective_applicability = (
+        Applicability.NOT_APPLICABLE
+        if status is Status.SKIP and readiness.applicability is Applicability.APPLICABLE
+        else readiness.applicability
+    )
     state_hash = FindingStateHash.from_state(
         key,
         status=status,
-        applicability=readiness.applicability,
+        applicability=effective_applicability,
         completeness=completeness,
         outcome=outcome,
         operational_state=operational_state,
@@ -382,7 +397,7 @@ def _finding(
         key=key,
         state_hash=state_hash,
         status=status,
-        applicability=readiness.applicability,
+        applicability=effective_applicability,
         completeness=completeness,
         severity=Severity.HIGH if status is Status.FAIL else Severity.INFO,
         impact="crawlability",
@@ -456,7 +471,7 @@ def evaluate_frozen_rule(
         url=target,
         public_id=binding.rule_id,
     )
-    applicable = int(readiness.applicability is Applicability.APPLICABLE)
+    applicable = int(finding.applicability is Applicability.APPLICABLE)
     report = AuditReport(
         target,
         (report_finding,),

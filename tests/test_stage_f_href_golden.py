@@ -124,13 +124,14 @@ def test_golden_scenario_matches_manifest(scenario, manifest):
         assert got == expected, f"{scenario}/{rid}: got {got}, expected {expected}"
 
 
-def test_vacuous_pass_when_no_annotations(manifest):
-    """Bound rules return pass when hreflang is an empty list (vacuously valid)."""
+def test_vacuous_skip_when_no_annotations(manifest):
+    """Bound rules return skip (not_applicable) when hreflang is an empty list."""
     sc = next(s for s in manifest["scenarios"] if s["name"] == "single-language-no-annotations")
     bundle = _bundles(sc["name"], sc)
     for rid in manifest["bound_rules"]:
         result = evaluate_google_href(TARGET, bundle, rule_id=rid)
-        assert result.finding.status.value == "pass", f"{rid}: expected pass for vacuously valid"
+        assert result.finding.status.value == "skip", f"{rid}: expected skip for vacuously valid"
+        assert result.finding.outcome.value == "not_applicable", f"{rid}: expected not_applicable"
 
 
 def test_unknown_when_hreflang_unavailable(manifest):

@@ -164,8 +164,9 @@ accepted_conditions:
   source_issue: '#28'
   verdicts:
     FAIL: one or more hreflang annotations use an invalid language code
-    PASS: all declared hreflang annotations use a valid BCP47 language code, or no
-      annotations present (vacuously valid)
+    NOT_APPLICABLE: no hreflang annotations present (single-language page excluded
+      from scoring)
+    PASS: all declared hreflang annotations use a valid BCP47 language code
     UNKNOWN: hreflang field unavailable or not a list in page fact
   version: 1.0.0
 - defer_reason: Reciprocity requires hreflang observations from other cluster pages;
@@ -185,8 +186,9 @@ accepted_conditions:
   source_issue: '#28'
   verdicts:
     FAIL: no self-referencing hreflang annotation found
-    PASS: at least one hreflang annotation references the current page URL, or no
-      annotations present (vacuously valid)
+    NOT_APPLICABLE: no hreflang annotations present (single-language page excluded
+      from scoring)
+    PASS: at least one hreflang annotation references the current page URL
     UNKNOWN: hreflang field unavailable or not a list in page fact
   version: 1.0.0
 - evidence_fields:
@@ -195,8 +197,9 @@ accepted_conditions:
   source_issue: '#28'
   verdicts:
     FAIL: no x-default hreflang entry found
-    PASS: an x-default hreflang entry is present for language-neutral fallback, or
-      no annotations present (vacuously valid)
+    NOT_APPLICABLE: no hreflang annotations present (single-language page excluded
+      from scoring)
+    PASS: an x-default hreflang entry is present for language-neutral fallback
     UNKNOWN: hreflang field unavailable or not a list in page fact
   version: 1.0.0
 - defer_reason: Canonical/indexability of hreflang target URLs requires facts about
@@ -337,4 +340,4 @@ requirement_amendments:
   - page
   rule_id: GOOGLE-TITLE-001
 schema: agentready.rule-semantics.v2
-semantics_version: 1.0.3
+semantics_version: 1.0.4

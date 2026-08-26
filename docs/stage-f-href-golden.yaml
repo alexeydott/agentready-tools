@@ -34,11 +34,11 @@ scenarios:
     meta_robots: []
     legacy_status: skip
     frozen:
-      GOOGLE-HREF-001: pass
-      GOOGLE-HREF-003: pass
-      GOOGLE-HREF-004: pass
+      GOOGLE-HREF-001: skip
+      GOOGLE-HREF-003: skip
+      GOOGLE-HREF-004: skip
     classification: intended_split
-    split_note: single-language page scored as vacuously valid in frozen rules
+    split_note: single-language page excluded from scoring via not_applicable/skip
   - name: valid-set-with-self-ref
     canonicals: ['https://example.test/page']
     hreflang:

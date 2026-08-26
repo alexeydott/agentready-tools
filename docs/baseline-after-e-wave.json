@@ -132,7 +132,7 @@
       "version": "1.0.0"
     }
   },
-  "generated_at": "2026-08-26T20:51:37Z",
+  "generated_at": "2026-08-26T21:51:47Z",
   "package_version": "0.13.7",
   "registered_evaluators": {
     "CANARY": {
@@ -368,8 +368,8 @@
     "score_model_id": "readiness-transparent-v2"
   },
   "semantics_artifact": {
-    "digest": "5ca6ceb51ad45a901e128e3a630d86917e9cc486f1264122be89da865a35e8dc",
+    "digest": "4c678b79dbdefe02f89423d6bc7e670f7d84bb3be736a808cf34572fd880f214",
     "name": "agentready.rule-semantics.v2",
-    "version": "1.0.3"
+    "version": "1.0.4"
   }
 }

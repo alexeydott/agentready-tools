@@ -94,10 +94,11 @@ def test_href001_fail_invalid_code():
     assert "invalid" in r.report.findings[0].reason.lower()
 
 
-def test_href001_pass_empty_hreflang():
+def test_href001_skip_empty_hreflang():
     bundle = _make_bundle(hreflang=[])
     r = evaluate_google_href(TARGET, bundle, rule_id="GOOGLE-HREF-001")
-    assert r.finding.status.value == "pass"
+    assert r.finding.status.value == "skip"
+    assert r.finding.outcome.value == "not_applicable"
 
 
 def test_href001_unknown_hreflang_key_missing():
@@ -127,10 +128,11 @@ def test_href003_fail_no_self_ref():
     assert "references the current url" in r.report.findings[0].reason.lower()
 
 
-def test_href003_pass_empty_hreflang():
+def test_href003_skip_empty_hreflang():
     bundle = _make_bundle(hreflang=[])
     r = evaluate_google_href(TARGET, bundle, rule_id="GOOGLE-HREF-003")
-    assert r.finding.status.value == "pass"
+    assert r.finding.status.value == "skip"
+    assert r.finding.outcome.value == "not_applicable"
 
 
 def test_href003_unknown_hreflang_key_missing():
@@ -162,10 +164,11 @@ def test_href004_fail_x_default_missing():
     assert "x-default" in r.report.findings[0].reason.lower()
 
 
-def test_href004_pass_empty_hreflang():
+def test_href004_skip_empty_hreflang():
     bundle = _make_bundle(hreflang=[])
     r = evaluate_google_href(TARGET, bundle, rule_id="GOOGLE-HREF-004")
-    assert r.finding.status.value == "pass"
+    assert r.finding.status.value == "skip"
+    assert r.finding.outcome.value == "not_applicable"
 
 
 def test_href004_unknown_hreflang_key_missing():

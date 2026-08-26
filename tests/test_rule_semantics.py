@@ -65,7 +65,7 @@ def semantics(snapshot):
 
 def test_document_loads_offline_with_stable_digest(semantics) -> None:
     assert semantics.schema == SEMANTICS_SCHEMA_ID
-    assert semantics.semantics_version == "1.0.3"
+    assert semantics.semantics_version == "1.0.4"
     assert semantics.digest == compute_semantics_digest()
     assert len(semantics.digest) == 64
     amendments = {a.rule_id: a.families for a in semantics.amendments}
