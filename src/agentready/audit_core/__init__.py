@@ -121,6 +121,12 @@ from .google_title_evaluators import (
     bind_google_title_rule,
     evaluate_google_title,
     )
+from .google_href_evaluators import (
+    GOOGLE_HREF_EVALUATOR_REGISTRY,
+    GOOGLE_HREF_RULE_IDS,
+    GOOGLE_HREF_RULE_VERSION,
+    evaluate_google_href,
+    )
 from .google_desc_evaluators import (
     GOOGLE_DESC_EVALUATOR_REGISTRY,
     GOOGLE_DESC_RULE_ID,
