@@ -27,6 +27,9 @@ from agentready.audit_core.google_title_evaluators import (
     GOOGLE_TITLE_EVALUATOR_REGISTRY,
 )
 from agentready.audit_core.link_evaluators import LINK_EVALUATOR_REGISTRY
+from agentready.audit_core.google_href_evaluators import (
+    GOOGLE_HREF_EVALUATOR_REGISTRY,
+)
 from agentready.audit_core.rule_catalog import load_rule_catalog_snapshot
 from agentready.seo.rules.catalog import compute_catalog_digest, load_rule_semantics
 
@@ -40,6 +43,7 @@ REGISTRIES = {
     "CANON": CANON_EVALUATOR_REGISTRY,
     "LINK_BOUND": LINK_EVALUATOR_REGISTRY,
     "GOOGLE_DESC": GOOGLE_DESC_EVALUATOR_REGISTRY,
+    "GOOGLE_HREF": GOOGLE_HREF_EVALUATOR_REGISTRY,
     "GOOGLE_TITLE": GOOGLE_TITLE_EVALUATOR_REGISTRY,
 }
 
@@ -91,5 +95,6 @@ def test_score_model_id_is_frozen():
 
 
 def test_deferred_declared_not_produced_set_is_frozen():
-    """Option A executed: nothing remains deferred after resources@1 production."""
-    assert BASELINE["deferred_declared_not_produced"] == []
+    """Deferred set includes HREF-002/005 (cross-page facts unavailable)."""
+    deferred = {item["rule_id"] for item in BASELINE["deferred_declared_not_produced"]}
+    assert deferred == {"GOOGLE-HREF-002", "GOOGLE-HREF-005"}

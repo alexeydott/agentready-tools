@@ -1,0 +1,116 @@
+schema: agentready.stage-f-href-golden.v1
+version: '1.0.0'
+family: google-hreflang
+crosswalk_class: INTENDED_SPLIT
+accepted_semantics:
+  artifact: agentready.rule-semantics.v2
+  version: '1.0.4'
+catalog_pin:
+  name: agentready.rule-catalog.v2
+  version: 2.1.0-draft.2
+  digest: d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f
+bound_rules: [GOOGLE-HREF-001, GOOGLE-HREF-003, GOOGLE-HREF-004]
+declared_not_producible:
+  - rule_id: GOOGLE-HREF-002
+    reason: Reciprocity requires hreflang observations from other cluster pages; {page} does not provide the required cross-page facts.
+  - rule_id: GOOGLE-HREF-005
+    reason: Canonical/indexability of hreflang target URLs requires facts about the target pages; {page, links} for the current subject cannot establish those properties.
+policy_notes:
+  cross_page_reciprocity: |
+    Cross-page hreflang reciprocity verification is a run-level site fact
+    verified by the provider/sitemap reconciliation surface and remains out
+    of scope for the page-level frozen contract.
+  fact_availability: |
+    When page.hreflang is absent or not a list, evaluators return UNKNOWN
+    (escalated to error by block_on_missing_facts).  When hreflang is an
+    empty list, evaluators return NOT_APPLICABLE (excluded from scoring
+    via Status.SKIP).
+classification_vocab:
+  - equivalent_overlap
+  - intended_split
+scenarios:
+  - name: single-language-no-annotations
+    canonicals: ['https://example.test/page']
+    hreflang: []
+    meta_robots: []
+    legacy_status: skip
+    frozen:
+      GOOGLE-HREF-001: skip
+      GOOGLE-HREF-003: skip
+      GOOGLE-HREF-004: skip
+    classification: intended_split
+    split_note: single-language page excluded from scoring via not_applicable/skip
+  - name: valid-set-with-self-ref
+    canonicals: ['https://example.test/page']
+    hreflang:
+      - {lang: en, href: 'https://example.test/page'}
+      - {lang: fr, href: 'https://example.test/page'}
+    meta_robots: []
+    legacy_status: pass
+    frozen:
+      GOOGLE-HREF-001: pass
+      GOOGLE-HREF-003: pass
+      GOOGLE-HREF-004: fail
+    classification: intended_split
+    split_note: legacy lumps all checks into one rule; frozen splits validity (001), self-ref (003), x-default (004)
+  - name: invalid-code
+    canonicals: ['https://example.test/page']
+    hreflang:
+      - {lang: INVALID, href: 'https://example.test/page'}
+      - {lang: en, href: 'https://example.test/page'}
+    meta_robots: []
+    legacy_status: warn
+    frozen:
+      GOOGLE-HREF-001: fail
+      GOOGLE-HREF-003: pass
+      GOOGLE-HREF-004: fail
+    classification: intended_split
+    split_note: legacy groups invalid code with other issues; frozen isolates to HREF-001; HREF-003 passes because self-reference exists
+  - name: no-self-ref
+    canonicals: ['https://example.test/page']
+    hreflang:
+      - {lang: en, href: 'https://example.test/other'}
+    meta_robots: []
+    legacy_status: warn
+    frozen:
+      GOOGLE-HREF-001: pass
+      GOOGLE-HREF-003: fail
+      GOOGLE-HREF-004: fail
+    classification: intended_split
+    split_note: no self-reference owned by HREF-003
+  - name: x-default-present
+    canonicals: ['https://example.test/page']
+    hreflang:
+      - {lang: en, href: 'https://example.test/page'}
+      - {lang: x-default, href: 'https://example.test/page'}
+    meta_robots: []
+    legacy_status: pass
+    frozen:
+      GOOGLE-HREF-001: pass
+      GOOGLE-HREF-003: pass
+      GOOGLE-HREF-004: pass
+    classification: intended_split
+    split_note: x-default diagnostic owned by HREF-004
+  - name: x-default-missing
+    canonicals: ['https://example.test/page']
+    hreflang:
+      - {lang: en, href: 'https://example.test/page'}
+    meta_robots: []
+    legacy_status: warn
+    frozen:
+      GOOGLE-HREF-001: pass
+      GOOGLE-HREF-003: pass
+      GOOGLE-HREF-004: fail
+    classification: intended_split
+    split_note: x-default diagnostic owned by HREF-004
+  - name: hreflang-unavailable
+    canonicals: ['https://example.test/page']
+    hreflang: null
+    meta_robots: []
+    legacy_status: error
+    frozen:
+      GOOGLE-HREF-001: error
+      GOOGLE-HREF-003: error
+      GOOGLE-HREF-004: error
+    classification: intended_split
+    split_note: fact unavailable → UNKNOWN → error under block_on_missing_facts
