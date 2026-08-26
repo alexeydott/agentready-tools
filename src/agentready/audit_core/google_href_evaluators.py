@@ -136,8 +136,8 @@ def _href_001_valid_codes(target: str, facts: Mapping[str, Any]) -> EvaluatorRes
     rows = _hreflang_rows(page)
     if not rows:
         return EvaluatorResult(
-            EvaluationOutcome.PASS,
-            "no hreflang annotations; single-language page — vacuously valid",
+            EvaluationOutcome.NOT_APPLICABLE,
+            "no hreflang annotations present; single-language page excluded from scoring",
             (EvidenceRef("page:hreflang", target, "no annotations to validate"),),
         )
     invalid = [r["lang"] for r in rows if not _HREFLANG_CODE_RE.match(r["lang"])]
@@ -166,8 +166,8 @@ def _href_003_self_reference(target: str, facts: Mapping[str, Any]) -> Evaluator
     rows = _hreflang_rows(page)
     if not rows:
         return EvaluatorResult(
-            EvaluationOutcome.PASS,
-            "no hreflang annotations; single-language page — vacuously valid",
+            EvaluationOutcome.NOT_APPLICABLE,
+            "no hreflang annotations present; single-language page excluded from scoring",
             (EvidenceRef("page:hreflang", target, "no annotations to check"),),
         )
     self_refs = [r for r in rows if _normalize_href_matches_target(r["href"], target)]
@@ -195,8 +195,8 @@ def _href_004_x_default(target: str, facts: Mapping[str, Any]) -> EvaluatorResul
     rows = _hreflang_rows(page)
     if not rows:
         return EvaluatorResult(
-            EvaluationOutcome.PASS,
-            "no hreflang annotations; single-language page — vacuously valid",
+            EvaluationOutcome.NOT_APPLICABLE,
+            "no hreflang annotations present; single-language page excluded from scoring",
             (EvidenceRef("page:hreflang", target, "no annotations to check"),),
         )
     xd = [r for r in rows if r["lang"].lower() == "x-default"]

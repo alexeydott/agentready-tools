@@ -58,8 +58,6 @@ __all__ = [
 CORE_COVERAGE_RULE_ID = "CORE-COVERAGE-001"
 CORE_COVERAGE_RULE_VERSION = "1.0.0"
 
-_VACUOUSLY_VALID = "vacuously valid"
-
 
 @dataclass(frozen=True, slots=True)
 class ExpectedRuleContract:
@@ -358,7 +356,7 @@ def _finding(
             if not item.usable
         )
     else:
-        assert result is not EvaluatorResult
+        assert result is not None
         outcome = result.outcome
         reason = result.reason
         evidence = result.evidence
@@ -366,12 +364,8 @@ def _finding(
             status = Status.ERROR
             completeness = EvaluationCompleteness.PARTIAL
             operational_state = OperationalState.UNAVAILABLE
-        elif (
-            outcome is EvaluationOutcome.PASS
-            and _VACUOUSLY_VALID in (reason or "")
-        ):
+        elif outcome is EvaluationOutcome.NOT_APPLICABLE:
             status = Status.SKIP
-            outcome = EvaluationOutcome.NOT_APPLICABLE
             completeness = EvaluationCompleteness.NOT_EVALUATED
             operational_state = OperationalState.NONE
         else:

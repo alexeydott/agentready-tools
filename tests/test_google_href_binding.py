@@ -95,7 +95,11 @@ def test_href001_fail_invalid_code():
 
 
 def test_href001_skip_empty_hreflang():
+    """Raw evaluator returns NOT_APPLICABLE; evaluate_google_href maps to skip."""
+    from agentready.audit_core.google_href_evaluators import _href_001_valid_codes
     bundle = _make_bundle(hreflang=[])
+    raw = _href_001_valid_codes(TARGET, {"page": bundle[0].value})
+    assert raw.outcome.value == "not_applicable"
     r = evaluate_google_href(TARGET, bundle, rule_id="GOOGLE-HREF-001")
     assert r.finding.status.value == "skip"
     assert r.finding.outcome.value == "not_applicable"
@@ -129,7 +133,10 @@ def test_href003_fail_no_self_ref():
 
 
 def test_href003_skip_empty_hreflang():
+    from agentready.audit_core.google_href_evaluators import _href_003_self_reference
     bundle = _make_bundle(hreflang=[])
+    raw = _href_003_self_reference(TARGET, {"page": bundle[0].value})
+    assert raw.outcome.value == "not_applicable"
     r = evaluate_google_href(TARGET, bundle, rule_id="GOOGLE-HREF-003")
     assert r.finding.status.value == "skip"
     assert r.finding.outcome.value == "not_applicable"
@@ -165,7 +172,10 @@ def test_href004_fail_x_default_missing():
 
 
 def test_href004_skip_empty_hreflang():
+    from agentready.audit_core.google_href_evaluators import _href_004_x_default
     bundle = _make_bundle(hreflang=[])
+    raw = _href_004_x_default(TARGET, {"page": bundle[0].value})
+    assert raw.outcome.value == "not_applicable"
     r = evaluate_google_href(TARGET, bundle, rule_id="GOOGLE-HREF-004")
     assert r.finding.status.value == "skip"
     assert r.finding.outcome.value == "not_applicable"

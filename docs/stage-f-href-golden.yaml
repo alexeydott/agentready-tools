@@ -4,7 +4,7 @@ family: google-hreflang
 crosswalk_class: INTENDED_SPLIT
 accepted_semantics:
   artifact: agentready.rule-semantics.v2
-  version: '1.0.3'
+  version: '1.0.4'
 catalog_pin:
   name: agentready.rule-catalog.v2
   version: 2.1.0-draft.2
@@ -23,7 +23,8 @@ policy_notes:
   fact_availability: |
     When page.hreflang is absent or not a list, evaluators return UNKNOWN
     (escalated to error by block_on_missing_facts).  When hreflang is an
-    empty list, evaluators return PASS (vacuously valid — single-language page).
+    empty list, evaluators return NOT_APPLICABLE (excluded from scoring
+    via Status.SKIP).
 classification_vocab:
   - equivalent_overlap
   - intended_split
