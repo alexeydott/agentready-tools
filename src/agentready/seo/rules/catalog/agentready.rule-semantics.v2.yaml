@@ -1,330 +1,340 @@
-schema: agentready.rule-semantics.v2
-semantics_version: 1.0.3
 accepted_at: '2026-08-24'
-governance:
-  canonical: '#52'
-  links: '#53'
-  google_desc: '#54'
-  google_title: '#55'
-catalog_pin:
-  name: agentready.rule-catalog.v2
-  version: 2.1.0-draft.2
-  digest: d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f
-requirement_amendments:
-- rule_id: CORE-CANON-001
-  families:
-  - page
-  - links
-- rule_id: CORE-CANON-002
-  families:
-  - page
-  - transport
-- rule_id: CORE-CANON-003
-  families:
-  - page
-- rule_id: CORE-CANON-004
-  families:
-  - page
-  - transport
-- rule_id: CORE-CANON-005
-  families:
-  - page
-  - transport
-- rule_id: CORE-CANON-006
-  families:
-  - page
-  - run-projection
-- rule_id: CORE-CANON-007
-  families:
-  - page
-  - run-projection
-- rule_id: CORE-CANON-008
-  families:
-  - page
-- rule_id: CORE-LINK-001
-  families:
-  - page
-  - representation
-- rule_id: CORE-LINK-002
-  families:
-  - page
-  - resources
-- rule_id: CORE-LINK-003
-  families:
-  - page
-- rule_id: CORE-LINK-004
-  families:
-  - page
-  - representation
-- rule_id: CORE-LINK-005
-  families:
-  - page
-  - resources
-- rule_id: CORE-LINK-006
-  families:
-  - page
-- rule_id: GOOGLE-HREF-001
-  families:
-  - page
-  - links
-- rule_id: GOOGLE-HREF-002
-  families:
-  - page
-- rule_id: GOOGLE-HREF-003
-  families:
-  - page
-  - links
-- rule_id: GOOGLE-HREF-004
-  families:
-  - page
-- rule_id: GOOGLE-HREF-005
-  families:
-  - page
-  - links
-- rule_id: GOOGLE-DESC-001
-  families:
-  - page
-- rule_id: GOOGLE-TITLE-001
-  families:
-  - page
 accepted_conditions:
-- rule_id: CORE-CANON-001
-  version: 1.0.0
+- evidence_fields:
+  - page.canonicals
+  rule_id: CORE-CANON-001
   source_issue: '#52'
   verdicts:
-    UNKNOWN: page.canonicals unavailable (blocked fact collection)
+    FAIL: no canonical URL is declared for the page
     PASS: at least one canonical URL is declared for the page (preferred URL is present);
       declaration uniqueness is owned by CORE-CANON-008 and target validity by the
       remaining canonical rules, so duplicates do not fail this rule (intended_split)
-    FAIL: no canonical URL is declared for the page
-  evidence_fields:
-  - page.canonicals
-- rule_id: CORE-CANON-002
+    UNKNOWN: page.canonicals unavailable (blocked fact collection)
   version: 1.0.0
-  source_issue: '#52'
-  verdicts:
-    UNKNOWN: canonical declaration count != 1
-    PASS: urlsplit(page.canonicals[0]) scheme/host equals transport.origin scheme/host, host case-insensitive
-    FAIL: otherwise
-  evidence_fields:
+- evidence_fields:
   - page.canonicals
   - transport.origin
-- rule_id: CORE-CANON-003
-  version: 1.0.0
+  rule_id: CORE-CANON-002
   source_issue: '#52'
   verdicts:
-    FAIL: effective meta robots directive set contains noindex or none; nofollow does not block (it governs
-      link crawling, not indexation)
+    FAIL: otherwise
+    PASS: urlsplit(page.canonicals[0]) scheme/host equals transport.origin scheme/host,
+      host case-insensitive
+    UNKNOWN: canonical declaration count != 1
+  version: 1.0.0
+- evidence_fields:
+  - page.meta_robots
+  rule_id: CORE-CANON-003
+  source_issue: '#52'
+  verdicts:
+    FAIL: effective meta robots directive set contains noindex or none; nofollow does
+      not block (it governs link crawling, not indexation)
     PASS: otherwise
     UNKNOWN: meta robots directives unparsable
-  evidence_fields:
-  - page.meta_robots
-- rule_id: CORE-CANON-004
   version: 1.0.0
-  source_issue: '#52'
-  verdicts:
-    UNKNOWN: canonical count != 1 or transport.redirect_chain unavailable
-    FAIL: canonical URL equals a non-initial hop of transport.redirect_chain
-    PASS: otherwise
-  evidence_fields:
+- evidence_fields:
   - page.canonicals
   - transport.redirect_chain
-- rule_id: CORE-CANON-005
-  version: 1.0.0
+  rule_id: CORE-CANON-004
   source_issue: '#52'
   verdicts:
-    UNKNOWN: canonical count != 1 or transport.final_url unavailable
-    NOT_APPLICABLE: no pagination signal observed (lowercased rel tokens of page.links have empty intersection
-      with {next, prev})
-    PASS: paginated AND page.canonicals[0] == transport.final_url
-    FAIL: paginated AND page.canonicals[0] != transport.final_url
-  evidence_fields:
+    FAIL: canonical URL equals a non-initial hop of transport.redirect_chain
+    PASS: otherwise
+    UNKNOWN: canonical count != 1 or transport.redirect_chain unavailable
+  version: 1.0.0
+- evidence_fields:
   - page.canonicals
   - page.links[].rel
   - transport.final_url
-- rule_id: CORE-CANON-006
-  version: 1.0.0
+  rule_id: CORE-CANON-005
   source_issue: '#52'
   verdicts:
-    UNKNOWN: canonical count != 1 or run-projection inventory unavailable
-    FAIL: some parameter variant shares canonical scheme/host/path and carries a non-empty query
-    PASS: otherwise
-  evidence_fields:
+    FAIL: paginated AND page.canonicals[0] != transport.final_url
+    NOT_APPLICABLE: no pagination signal observed (lowercased rel tokens of page.links
+      have empty intersection with {next, prev})
+    PASS: paginated AND page.canonicals[0] == transport.final_url
+    UNKNOWN: canonical count != 1 or transport.final_url unavailable
+  version: 1.0.0
+- evidence_fields:
   - page.canonicals
   - run-projection.parameter_variants
-- rule_id: CORE-CANON-007
-  version: 1.0.0
+  rule_id: CORE-CANON-006
   source_issue: '#52'
   verdicts:
+    FAIL: some parameter variant shares canonical scheme/host/path and carries a non-empty
+      query
+    PASS: otherwise
     UNKNOWN: canonical count != 1 or run-projection inventory unavailable
-    PASS: canonical host equals audited subject host
-    FAIL: distinct off-origin canonical target cardinality > 1 across the run
-  evidence_fields:
+  version: 1.0.0
+- evidence_fields:
   - page.canonicals
   - run-projection.cross_domain_targets
-- rule_id: CORE-CANON-008
-  version: 1.0.0
+  rule_id: CORE-CANON-007
   source_issue: '#52'
   verdicts:
-    PASS: len(page.canonicals) == 1
-    FAIL: len(page.canonicals) != 1 (zero declarations violate exactly-once)
-  evidence_fields:
+    FAIL: distinct off-origin canonical target cardinality > 1 across the run
+    PASS: canonical host equals audited subject host
+    UNKNOWN: canonical count != 1 or run-projection inventory unavailable
+  version: 1.0.0
+- evidence_fields:
   - page.canonicals
-- rule_id: CORE-LINK-001
+  rule_id: CORE-CANON-008
+  source_issue: '#52'
+  verdicts:
+    FAIL: len(page.canonicals) != 1 (zero declarations violate exactly-once)
+    PASS: len(page.canonicals) == 1
   version: 1.0.0
-  source_issue: '#53'
+- evidence_fields:
+  - page.links[]
+  - representation.status_code
+  - representation.content_type
+  - subject_origin
   intent: page exposes resolvable internal hyperlinks
+  rule_id: CORE-LINK-001
+  source_issue: '#53'
   verdicts:
-    UNKNOWN: internal link resolution impossible for the subject
-    PASS: at least one observed link resolves under subject_origin while representation is an HTML success
-      response
     FAIL: zero internal-resolvable links while representation is an HTML success response
-  evidence_fields:
-  - page.links[]
-  - representation.status_code
-  - representation.content_type
-  - subject_origin
-- rule_id: CORE-LINK-002
+    PASS: at least one observed link resolves under subject_origin while representation
+      is an HTML success response
+    UNKNOWN: internal link resolution impossible for the subject
   version: 1.0.0
-  source_issue: '#53'
+- evidence_fields:
+  - resources.inventory
+  - page.links[]
   intent: declared resource URLs referenced by links resolve consistently
+  rule_id: CORE-LINK-002
+  source_issue: '#53'
   verdicts:
+    FAIL: some such link resolves elsewhere, or no link references any declared resource
+      URL
+    PASS: every link whose raw_href matches a declared resource URL resolves to that
+      resource resolved_url
     UNKNOWN: resources inventory unavailable
-    PASS: every link whose raw_href matches a declared resource URL resolves to that resource resolved_url
-    FAIL: some such link resolves elsewhere, or no link references any declared resource URL
-  evidence_fields:
-  - resources.inventory
-  - page.links[]
-- rule_id: CORE-LINK-003
   version: 1.0.0
-  source_issue: '#53'
+- evidence_fields:
+  - page.links[]
   intent: page declares at least one hyperlink
-  verdicts:
-    PASS: len(page.links) >= 1
-    FAIL: len(page.links) == 0 on a parsed HTML document
-    UNKNOWN: never (an empty list is decisive)
-  evidence_fields:
-  - page.links[]
-- rule_id: CORE-LINK-004
-  version: 1.0.0
+  rule_id: CORE-LINK-003
   source_issue: '#53'
-  intent: internal link availability diagnostic
   verdicts:
-    UNKNOWN: internal link computation impossible
-    PASS: internal-resolvable links exist AND representation is an HTML success response
-    WARN: otherwise (diagnostic role — never FAIL)
-  evidence_fields:
+    FAIL: len(page.links) == 0 on a parsed HTML document
+    PASS: len(page.links) >= 1
+    UNKNOWN: never (an empty list is decisive)
+  version: 1.0.0
+- evidence_fields:
   - page.links[]
   - representation.status_code
   - representation.content_type
   - subject_origin
-- rule_id: CORE-LINK-005
-  version: 1.0.0
+  intent: internal link availability diagnostic
+  rule_id: CORE-LINK-004
   source_issue: '#53'
-  intent: internal resource orphan detection
   verdicts:
-    UNKNOWN: neither side observable
-    PASS: every declared resource URL is referenced by at least one internal link
-    FAIL: some declared resource is never referenced, or references exist while the resources inventory
-      is empty
-  evidence_fields:
+    PASS: internal-resolvable links exist AND representation is an HTML success response
+    UNKNOWN: internal link computation impossible
+    WARN: otherwise (diagnostic role — never FAIL)
+  version: 1.0.0
+- evidence_fields:
   - resources.inventory
   - page.links[]
-- rule_id: CORE-LINK-006
-  version: 1.0.0
+  intent: internal resource orphan detection
+  rule_id: CORE-LINK-005
   source_issue: '#53'
-  intent: external link census (observation)
   verdicts:
-    UNKNOWN: link resolution unavailable
-    PASS: always, recording the external-link count derived from governed page links resolution (never
-      fails)
-    FAIL: never applicable
-  evidence_fields:
+    FAIL: some declared resource is never referenced, or references exist while the
+      resources inventory is empty
+    PASS: every declared resource URL is referenced by at least one internal link
+    UNKNOWN: neither side observable
+  version: 1.0.0
+- evidence_fields:
   - page.links[]
   - subject_origin
-- rule_id: GOOGLE-HREF-001
+  intent: external link census (observation)
+  rule_id: CORE-LINK-006
+  source_issue: '#53'
+  verdicts:
+    FAIL: never applicable
+    PASS: always, recording the external-link count derived from governed page links
+      resolution (never fails)
+    UNKNOWN: link resolution unavailable
   version: 1.0.0
+- evidence_fields:
+  - page.hreflang
+  rule_id: GOOGLE-HREF-001
   source_issue: '#28'
   verdicts:
-    UNKNOWN: hreflang rows unavailable in page fact payload
-    NOT_APPLICABLE: no hreflang annotations present (single-language page)
-    PASS: all declared hreflang annotations use a valid BCP47 language code
     FAIL: one or more hreflang annotations use an invalid language code
+    PASS: all declared hreflang annotations use a valid BCP47 language code, or no
+      annotations present (vacuously valid)
+    UNKNOWN: hreflang field unavailable or not a list in page fact
+  version: 1.0.0
+- defer_reason: Reciprocity requires hreflang observations from other cluster pages;
+    {page} does not provide the required cross-page facts.
+  deferred: true
   evidence_fields:
   - page.hreflang
-- rule_id: GOOGLE-HREF-002
-  version: 1.0.0
+  rule_id: GOOGLE-HREF-002
   source_issue: '#28'
   verdicts:
-    UNKNOWN: hreflang rows unavailable in page fact payload
-    NOT_APPLICABLE: no hreflang annotations present (single-language page)
-    PASS: all hreflang links are absolute and no duplicate language codes are declared
-    FAIL: duplicate language codes or relative hreflang link(s) present
-  evidence_fields:
+    UNKNOWN: 'deferred: reciprocity requires hreflang observations from other cluster
+      pages; {page} does not provide the required cross-page facts'
+  version: 1.0.0
+- evidence_fields:
   - page.hreflang
-- rule_id: GOOGLE-HREF-003
-  version: 1.0.0
+  rule_id: GOOGLE-HREF-003
   source_issue: '#28'
   verdicts:
-    UNKNOWN: hreflang rows unavailable in page fact payload
-    NOT_APPLICABLE: no hreflang annotations present (single-language page)
-    PASS: at least one hreflang annotation references the current page URL
     FAIL: no self-referencing hreflang annotation found
-  evidence_fields:
-  - page.hreflang
-- rule_id: GOOGLE-HREF-004
+    PASS: at least one hreflang annotation references the current page URL, or no
+      annotations present (vacuously valid)
+    UNKNOWN: hreflang field unavailable or not a list in page fact
   version: 1.0.0
+- evidence_fields:
+  - page.hreflang
+  rule_id: GOOGLE-HREF-004
   source_issue: '#28'
   verdicts:
-    UNKNOWN: hreflang rows unavailable in page fact payload
-    NOT_APPLICABLE: no hreflang annotations present (single-language page)
-    PASS: an x-default hreflang entry is present for language-neutral fallback
     FAIL: no x-default hreflang entry found
-  evidence_fields:
-  - page.hreflang
-- rule_id: GOOGLE-HREF-005
+    PASS: an x-default hreflang entry is present for language-neutral fallback, or
+      no annotations present (vacuously valid)
+    UNKNOWN: hreflang field unavailable or not a list in page fact
   version: 1.0.0
-  source_issue: '#28'
-  verdicts:
-    UNKNOWN: hreflang rows unavailable in page fact payload
-    NOT_APPLICABLE: no hreflang annotations present (single-language page)
-    PASS: all non-x-default hreflang targets match declared canonical(s) and page is indexable
-    FAIL: one or more hreflang targets not in canonical set or page blocked from indexing
+- defer_reason: Canonical/indexability of hreflang target URLs requires facts about
+    the target pages; {page, links} for the current subject cannot establish those
+    properties.
+  deferred: true
   evidence_fields:
   - page.hreflang
   - page.canonicals
   - page.meta_robots
-- rule_id: GOOGLE-DESC-001
+  rule_id: GOOGLE-HREF-005
+  source_issue: '#28'
+  verdicts:
+    UNKNOWN: 'deferred: canonical/indexability of hreflang target URLs requires facts
+      about the target pages; {page, links} for the current subject cannot establish
+      those properties'
   version: 1.0.0
+- evidence_fields:
+  - page.descriptions
+  length_band:
+    inclusive: true
+    max: 160
+    min: 120
+  measurement: whitespace-collapsed character length of page.descriptions[0]
+  provenance_note: band numbers governed HERE (#54); external guidance prose is background,
+    never runtime evidence
+  rule_id: GOOGLE-DESC-001
   source_issue: '#54'
   verdicts:
-    UNKNOWN: page fact unavailable
-    FAIL_structural: no description / whitespace-only description / more than one distinct non-empty description
     FAIL_length: collapsed length < 120 (too short) or > 160 (too long)
+    FAIL_structural: no description / whitespace-only description / more than one
+      distinct non-empty description
     PASS: exactly one non-empty description with 120 <= collapsed-length <= 160 inclusive
-  measurement: whitespace-collapsed character length of page.descriptions[0]
-  length_band:
-    min: 120
-    max: 160
-    inclusive: true
-  provenance_note: band numbers governed HERE (#54); external guidance prose is background, never runtime
-    evidence
-  evidence_fields:
-  - page.descriptions
-- rule_id: GOOGLE-TITLE-001
+    UNKNOWN: page fact unavailable
   version: 1.0.0
+- evidence_fields:
+  - page.titles
+  length_band:
+    inclusive: true
+    max: 65
+    min: 30
+  measurement: str.strip() character length of page.titles[0]
+  provenance_note: band numbers governed HERE (#55); legacy SEO heuristic prose is
+    background, never runtime evidence
+  rule_id: GOOGLE-TITLE-001
   source_issue: '#55'
   verdicts:
-    UNKNOWN: page fact unavailable
-    FAIL_structural: no title / whitespace-only after strip / more than one non-empty title
     FAIL_length: stripped length < 30 (too short) or > 65 (too long)
+    FAIL_structural: no title / whitespace-only after strip / more than one non-empty
+      title
     PASS: exactly one non-empty title with 30 <= stripped-length <= 65 inclusive
-  measurement: str.strip() character length of page.titles[0]
-  length_band:
-    min: 30
-    max: 65
-    inclusive: true
-  provenance_note: band numbers governed HERE (#55); legacy SEO heuristic prose is background, never runtime
-    evidence
-  evidence_fields:
-  - page.titles
+    UNKNOWN: page fact unavailable
+  version: 1.0.0
+catalog_pin:
+  digest: d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f
+  name: agentready.rule-catalog.v2
+  version: 2.1.0-draft.2
+governance:
+  canonical: '#52'
+  google_desc: '#54'
+  google_title: '#55'
+  links: '#53'
+requirement_amendments:
+- families:
+  - page
+  - links
+  rule_id: CORE-CANON-001
+- families:
+  - page
+  - transport
+  rule_id: CORE-CANON-002
+- families:
+  - page
+  rule_id: CORE-CANON-003
+- families:
+  - page
+  - transport
+  rule_id: CORE-CANON-004
+- families:
+  - page
+  - transport
+  rule_id: CORE-CANON-005
+- families:
+  - page
+  - run-projection
+  rule_id: CORE-CANON-006
+- families:
+  - page
+  - run-projection
+  rule_id: CORE-CANON-007
+- families:
+  - page
+  rule_id: CORE-CANON-008
+- families:
+  - page
+  - representation
+  rule_id: CORE-LINK-001
+- families:
+  - page
+  - resources
+  rule_id: CORE-LINK-002
+- families:
+  - page
+  rule_id: CORE-LINK-003
+- families:
+  - page
+  - representation
+  rule_id: CORE-LINK-004
+- families:
+  - page
+  - resources
+  rule_id: CORE-LINK-005
+- families:
+  - page
+  rule_id: CORE-LINK-006
+- families:
+  - page
+  - links
+  rule_id: GOOGLE-HREF-001
+- families:
+  - page
+  rule_id: GOOGLE-HREF-002
+- families:
+  - page
+  - links
+  rule_id: GOOGLE-HREF-003
+- families:
+  - page
+  rule_id: GOOGLE-HREF-004
+- families:
+  - page
+  - links
+  rule_id: GOOGLE-HREF-005
+- families:
+  - page
+  rule_id: GOOGLE-DESC-001
+- families:
+  - page
+  rule_id: GOOGLE-TITLE-001
+schema: agentready.rule-semantics.v2
+semantics_version: 1.0.3

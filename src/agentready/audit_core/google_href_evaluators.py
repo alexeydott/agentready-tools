@@ -1,19 +1,31 @@
-"""Frozen GOOGLE-HREF-001..005@1.0.0 evaluators (Stage E6).
+"""Frozen GOOGLE-HREF-001/003/004@1.0.0 evaluators (Stage E6).
 
-Binds five frozen catalog rules in the ``google-hreflang`` module following
+Binds three frozen catalog rules in the ``google-hreflang`` module following
 the E0 canary pattern of :mod:`agentready.audit_core.evaluator_registry`.
 
-Each evaluator is a pure offline function operating on pre-collected page
-fact values (no HTTP, browser, parsing, or sqlite imports).  The ``links``
-family is declared in the catalog contract where required but the hreflang
-condition derives exclusively from ``page.hreflang`` rows; links remains a
-co-required collection-context family enforced by the evaluation readiness
-layer.
+Two rules (GOOGLE-HREF-002 and GOOGLE-HREF-005) are
+``declared_not_producible`` because their catalog-title conditions require
+cross-page facts not available in the declared ``{page}`` or ``{page, links}``
+fact families:
 
-Accepted conditions follow legacy ``_check_hreflang`` (seo_checks.py) and
-``_hreflang`` (rules/builtin.py) semantics mapped per frozen rule title
-via the E6 governance boundary.  Cross-page reciprocity verification remains
-out of scope for the page-level contract.
+- **GOOGLE-HREF-002** ("cluster is reciprocal across all listed URLs"):
+  Reciprocity requires hreflang observations from other cluster pages;
+  ``{page}`` does not provide the required cross-page facts.
+- **GOOGLE-HREF-005** ("target URLs are canonical and not blocked"):
+  Canonical/indexability of hreflang target URLs requires facts about the
+  target pages; ``{page, links}`` for the current subject cannot establish
+  those properties.
+
+Each bound evaluator is a pure offline function operating on pre-collected
+page fact values (no HTTP, browser, parsing, or sqlite imports).
+
+Fact-availability semantics (block_on_missing_facts):
+
+- ``page.hreflang`` key absent or not a list → **UNKNOWN** (escalated to
+  ``error`` by the block policy).
+- ``page.hreflang`` present but empty → **PASS** (vacuously valid —
+  single-language page carries no hreflang annotations to violate).
+- ``page.hreflang`` present with entries → evaluated per rule condition.
 
 Payload shape (``page@1``)::
 
@@ -47,12 +59,11 @@ __all__ = [
     "evaluate_google_href",
 ]
 
+# Only bound rules — 002/005 are declared_not_producible.
 GOOGLE_HREF_RULE_IDS = (
     "GOOGLE-HREF-001",
-    "GOOGLE-HREF-002",
     "GOOGLE-HREF-003",
     "GOOGLE-HREF-004",
-    "GOOGLE-HREF-005",
 )
 GOOGLE_HREF_RULE_VERSION = "1.0.0"
 
@@ -64,6 +75,14 @@ def _value(fact: Any, key: str) -> Any:
     if isinstance(fact, Mapping):
         return fact.get(key)
     return getattr(fact, key, None)
+
+
+def _hreflang_key_present(fact: Any) -> bool:
+    """True when the page fact contains an hreflang key with a list value."""
+    if not isinstance(fact, Mapping):
+        return False
+    rows = fact.get("hreflang")
+    return isinstance(rows, (list, tuple))
 
 
 def _hreflang_rows(fact: Any) -> list[dict[str, str]]:
@@ -103,16 +122,22 @@ def _normalize_href_matches_target(href: str, target: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Evaluators
+# Evaluators (bound rules only)
 # ---------------------------------------------------------------------------
 
 def _href_001_valid_codes(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
     """HREF-001: every declared hreflang annotation declares a valid language-region code."""
-    rows = _hreflang_rows(facts["page"])
+    page = facts["page"]
+    if not _hreflang_key_present(page):
+        return EvaluatorResult(
+            EvaluationOutcome.UNKNOWN,
+            "hreflang field unavailable or not a list in page fact",
+        )
+    rows = _hreflang_rows(page)
     if not rows:
         return EvaluatorResult(
             EvaluationOutcome.PASS,
-            "no hreflang annotations; single-language page — vacuously valid — vacuously valid",
+            "no hreflang annotations; single-language page — vacuously valid",
             (EvidenceRef("page:hreflang", target, "no annotations to validate"),),
         )
     invalid = [r["lang"] for r in rows if not _HREFLANG_CODE_RE.match(r["lang"])]
@@ -130,48 +155,20 @@ def _href_001_valid_codes(target: str, facts: Mapping[str, Any]) -> EvaluatorRes
     )
 
 
-def _href_002_cluster_consistent(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
-    """HREF-002: cluster is structurally consistent — no duplicate lang codes and all hrefs absolute.
-
-    Cross-page return-link reciprocity is a run-level site fact verified by
-    the provider/sitemap reconciliation surface and remains out of scope for
-    the page-level frozen contract.  This evaluator enforces the structural
-    preconditions required for a valid reciprocal cluster declaration.
-    """
-    rows = _hreflang_rows(facts["page"])
-    if not rows:
-        return EvaluatorResult(
-            EvaluationOutcome.PASS,
-            "no hreflang annotations; single-language page — vacuously valid — vacuously valid",
-        )
-    codes = [r["lang"] for r in rows]
-    issues: list[str] = []
-    if len(codes) != len(set(codes)):
-        dupes = sorted(set(c for c in codes if codes.count(c) > 1))
-        issues.append(f"duplicate lang code(s): {', '.join(dupes[:5])}")
-    relative = [r for r in rows if not r["href"].startswith("http")]
-    if relative:
-        issues.append(f"{len(relative)} relative hreflang link(s)")
-    if issues:
-        return EvaluatorResult(
-            EvaluationOutcome.FAIL,
-            "; ".join(issues),
-            (EvidenceRef("page:hreflang", target, "; ".join(issues[:3])),),
-        )
-    return EvaluatorResult(
-        EvaluationOutcome.PASS,
-        f"all {len(rows)} hreflang links are absolute with no duplicate lang codes",
-        (EvidenceRef("page:hreflang", target, f"{len(rows)} annotations checked for structural consistency"),),
-    )
-
-
 def _href_003_self_reference(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
     """HREF-003: cluster includes a self-referencing entry."""
-    rows = _hreflang_rows(facts["page"])
+    page = facts["page"]
+    if not _hreflang_key_present(page):
+        return EvaluatorResult(
+            EvaluationOutcome.UNKNOWN,
+            "hreflang field unavailable or not a list in page fact",
+        )
+    rows = _hreflang_rows(page)
     if not rows:
         return EvaluatorResult(
             EvaluationOutcome.PASS,
-            "no hreflang annotations; single-language page — vacuously valid — vacuously valid",
+            "no hreflang annotations; single-language page — vacuously valid",
+            (EvidenceRef("page:hreflang", target, "no annotations to check"),),
         )
     self_refs = [r for r in rows if _normalize_href_matches_target(r["href"], target)]
     if self_refs:
@@ -189,11 +186,18 @@ def _href_003_self_reference(target: str, facts: Mapping[str, Any]) -> Evaluator
 
 def _href_004_x_default(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
     """HREF-004: x-default hreflang entry is present for language-neutral fallback (diagnostic)."""
-    rows = _hreflang_rows(facts["page"])
+    page = facts["page"]
+    if not _hreflang_key_present(page):
+        return EvaluatorResult(
+            EvaluationOutcome.UNKNOWN,
+            "hreflang field unavailable or not a list in page fact",
+        )
+    rows = _hreflang_rows(page)
     if not rows:
         return EvaluatorResult(
             EvaluationOutcome.PASS,
-            "no hreflang annotations; single-language page — vacuously valid — vacuously valid",
+            "no hreflang annotations; single-language page — vacuously valid",
+            (EvidenceRef("page:hreflang", target, "no annotations to check"),),
         )
     xd = [r for r in rows if r["lang"].lower() == "x-default"]
     if xd:
@@ -209,62 +213,41 @@ def _href_004_x_default(target: str, facts: Mapping[str, Any]) -> EvaluatorResul
     )
 
 
-def _href_005_target_canonical(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
-    """HREF-005: hreflang target URLs match declared canonical(s) and page is indexable."""
-    rows = _hreflang_rows(facts["page"])
-    if not rows:
-        return EvaluatorResult(
-            EvaluationOutcome.PASS,
-            "no hreflang annotations; single-language page — vacuously valid — vacuously valid",
-        )
-    canon_set = set(_canonicals(facts["page"]))
-    non_xd = [r for r in rows if r["lang"].lower() != "x-default"]
-    if not non_xd:
-        return EvaluatorResult(
-            EvaluationOutcome.PASS,
-            "only x-default annotation present; target check vacuously holds",
-            (EvidenceRef("page:hreflang", target, "no non-x-default annotations"),),
-        )
-    not_canonical = sorted(set(r["href"] for r in non_xd if r["href"] not in canon_set))
-    if not_canonical:
-        return EvaluatorResult(
-            EvaluationOutcome.FAIL,
-            f"{len(not_canonical)} hreflang target(s) not in declared canonical(s): {', '.join(not_canonical[:5])}",
-            (EvidenceRef("page:hreflang", target, f"{len(not_canonical)} off-canonical target(s)"),),
-        )
-    if _is_blocked(_meta_robots(facts["page"])):
-        meta = _meta_robots(facts["page"])
-        return EvaluatorResult(
-            EvaluationOutcome.FAIL,
-            f"page is blocked from indexing ({', '.join(meta)}); hreflang targets unreachable",
-            (EvidenceRef("page:meta_robots", target, f"blocked: {', '.join(meta)}"),),
-        )
+# ---------------------------------------------------------------------------
+# Deferred rules (not registered — declared_not_producible)
+# ---------------------------------------------------------------------------
+
+def _href_002_deferred(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
+    """HREF-002: DEFERRED — reciprocity requires cross-page facts unavailable in {page}."""
     return EvaluatorResult(
-        EvaluationOutcome.PASS,
-        f"all {len(non_xd)} hreflang target(s) match declared canonical(s) and page is indexable",
-        (EvidenceRef("page:hreflang", target, f"{len(non_xd)} target(s) verified"),),
+        EvaluationOutcome.UNKNOWN,
+        "deferred: reciprocity requires hreflang observations from other cluster pages",
+    )
+
+
+def _href_005_deferred(target: str, facts: Mapping[str, Any]) -> EvaluatorResult:
+    """HREF-005: DEFERRED — target canonical/indexability requires facts about target pages."""
+    return EvaluatorResult(
+        EvaluationOutcome.UNKNOWN,
+        "deferred: target canonical/indexability requires facts about the target pages",
     )
 
 
 # ---------------------------------------------------------------------------
-# Registry wiring
+# Registry wiring (bound rules only)
 # ---------------------------------------------------------------------------
 
 _HREF_EVALUATORS = {
     "GOOGLE-HREF-001": _href_001_valid_codes,
-    "GOOGLE-HREF-002": _href_002_cluster_consistent,
     "GOOGLE-HREF-003": _href_003_self_reference,
     "GOOGLE-HREF-004": _href_004_x_default,
-    "GOOGLE-HREF-005": _href_005_target_canonical,
 }
 
-# Catalog-exact contract rows: (rule_id, facts_tuple, score_role, failure_policy, mechanism, rule_kind)
+# Catalog-exact contract rows for bound rules only.
 _HREF_CONTRACTS: list[tuple[str, tuple[tuple[str, str], ...], str, str, str, str]] = [
     ("GOOGLE-HREF-001", (("page", "1"), ("links", "1")), "scored", "block_on_missing_facts", "composite_check", "scored_rule"),
-    ("GOOGLE-HREF-002", (("page", "1"),),               "scored", "block_on_missing_facts", "atomic_check",  "scored_rule"),
     ("GOOGLE-HREF-003", (("page", "1"), ("links", "1")), "scored", "block_on_missing_facts", "composite_check", "scored_rule"),
     ("GOOGLE-HREF-004", (("page", "1"),),               "diagnostic", "unknown_on_missing_facts", "atomic_check", "diagnostic_rule"),
-    ("GOOGLE-HREF-005", (("page", "1"), ("links", "1")), "scored", "block_on_missing_facts", "composite_check", "scored_rule"),
 ]
 
 for rule_id, facts, score_role, failure_policy, mechanism, rule_kind in _HREF_CONTRACTS:
