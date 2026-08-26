@@ -103,9 +103,39 @@
       "score_role": "scored",
       "title": "Canonical URL is present and resolves to a single preferred URL",
       "version": "1.0.0"
+    },
+    "GOOGLE-HREF-001": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Hreflang annotations declare a valid language-region code",
+      "version": "1.0.0"
+    },
+    "GOOGLE-HREF-002": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Hreflang cluster is reciprocal across all listed URLs",
+      "version": "1.0.0"
+    },
+    "GOOGLE-HREF-003": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Hreflang cluster includes a self-referencing entry",
+      "version": "1.0.0"
+    },
+    "GOOGLE-HREF-004": {
+      "failure_policy": "unknown_on_missing_facts",
+      "score_role": "diagnostic",
+      "title": "x-default hreflang entry is present for language-neutral fallback",
+      "version": "1.0.0"
+    },
+    "GOOGLE-HREF-005": {
+      "failure_policy": "block_on_missing_facts",
+      "score_role": "scored",
+      "title": "Hreflang target URLs are canonical and not blocked from indexing",
+      "version": "1.0.0"
     }
   },
-  "generated_at": "2026-08-23T19:59:26Z",
+  "generated_at": "2026-08-26T20:10:24Z",
   "package_version": "0.13.7",
   "registered_evaluators": {
     "CANARY": {
@@ -292,6 +322,59 @@
         "CORE-LINK-005@1.0.0",
         "CORE-LINK-006@1.0.0"
       ]
+    },
+    "GOOGLE_HREF": {
+      "scoped_contracts": {
+        "GOOGLE-HREF-001@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "links",
+            "1"
+          ]
+        ],
+        "GOOGLE-HREF-002@1.0.0": [
+          [
+            "page",
+            "1"
+          ]
+        ],
+        "GOOGLE-HREF-003@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "links",
+            "1"
+          ]
+        ],
+        "GOOGLE-HREF-004@1.0.0": [
+          [
+            "page",
+            "1"
+          ]
+        ],
+        "GOOGLE-HREF-005@1.0.0": [
+          [
+            "page",
+            "1"
+          ],
+          [
+            "links",
+            "1"
+          ]
+        ]
+      },
+      "targets": [
+        "GOOGLE-HREF-001@1.0.0",
+        "GOOGLE-HREF-002@1.0.0",
+        "GOOGLE-HREF-003@1.0.0",
+        "GOOGLE-HREF-004@1.0.0",
+        "GOOGLE-HREF-005@1.0.0"
+      ]
     }
   },
   "rule_catalog": {
@@ -306,8 +389,8 @@
     "score_model_id": "readiness-transparent-v2"
   },
   "semantics_artifact": {
-    "digest": "1346763d7d1f49c3eb5e0160aa116a0e7bd35f8470b921aa04692bc8a0fb80f3",
+    "digest": "4775c7a6f63ae1ddc94132893599465b75c4bef30d4c9634bca4f6e6252e0213",
     "name": "agentready.rule-semantics.v2",
-    "version": "1.0.2"
+    "version": "1.0.3"
   }
 }

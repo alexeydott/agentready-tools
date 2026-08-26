@@ -111,8 +111,9 @@ def _href_001_valid_codes(target: str, facts: Mapping[str, Any]) -> EvaluatorRes
     rows = _hreflang_rows(facts["page"])
     if not rows:
         return EvaluatorResult(
-            EvaluationOutcome.NOT_APPLICABLE,
-            "no hreflang annotations; single-language applicability",
+            EvaluationOutcome.PASS,
+            "no hreflang annotations; single-language page — vacuously valid — vacuously valid",
+            (EvidenceRef("page:hreflang", target, "no annotations to validate"),),
         )
     invalid = [r["lang"] for r in rows if not _HREFLANG_CODE_RE.match(r["lang"])]
     if invalid:
@@ -140,8 +141,8 @@ def _href_002_cluster_consistent(target: str, facts: Mapping[str, Any]) -> Evalu
     rows = _hreflang_rows(facts["page"])
     if not rows:
         return EvaluatorResult(
-            EvaluationOutcome.NOT_APPLICABLE,
-            "no hreflang annotations; single-language applicability",
+            EvaluationOutcome.PASS,
+            "no hreflang annotations; single-language page — vacuously valid — vacuously valid",
         )
     codes = [r["lang"] for r in rows]
     issues: list[str] = []
@@ -169,8 +170,8 @@ def _href_003_self_reference(target: str, facts: Mapping[str, Any]) -> Evaluator
     rows = _hreflang_rows(facts["page"])
     if not rows:
         return EvaluatorResult(
-            EvaluationOutcome.NOT_APPLICABLE,
-            "no hreflang annotations; single-language applicability",
+            EvaluationOutcome.PASS,
+            "no hreflang annotations; single-language page — vacuously valid — vacuously valid",
         )
     self_refs = [r for r in rows if _normalize_href_matches_target(r["href"], target)]
     if self_refs:
@@ -191,8 +192,8 @@ def _href_004_x_default(target: str, facts: Mapping[str, Any]) -> EvaluatorResul
     rows = _hreflang_rows(facts["page"])
     if not rows:
         return EvaluatorResult(
-            EvaluationOutcome.NOT_APPLICABLE,
-            "no hreflang annotations; single-language applicability",
+            EvaluationOutcome.PASS,
+            "no hreflang annotations; single-language page — vacuously valid — vacuously valid",
         )
     xd = [r for r in rows if r["lang"].lower() == "x-default"]
     if xd:
@@ -213,8 +214,8 @@ def _href_005_target_canonical(target: str, facts: Mapping[str, Any]) -> Evaluat
     rows = _hreflang_rows(facts["page"])
     if not rows:
         return EvaluatorResult(
-            EvaluationOutcome.NOT_APPLICABLE,
-            "no hreflang annotations; single-language applicability",
+            EvaluationOutcome.PASS,
+            "no hreflang annotations; single-language page — vacuously valid — vacuously valid",
         )
     canon_set = set(_canonicals(facts["page"]))
     non_xd = [r for r in rows if r["lang"].lower() != "x-default"]

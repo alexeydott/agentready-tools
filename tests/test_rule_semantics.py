@@ -43,6 +43,11 @@ EXPECTED_WAVE_IDS = frozenset(
         "CORE-LINK-005",
         "CORE-LINK-006",
         "GOOGLE-DESC-001",
+        "GOOGLE-HREF-001",
+        "GOOGLE-HREF-002",
+        "GOOGLE-HREF-003",
+        "GOOGLE-HREF-004",
+        "GOOGLE-HREF-005",
         "GOOGLE-TITLE-001",
     }
 )
@@ -60,7 +65,7 @@ def semantics(snapshot):
 
 def test_document_loads_offline_with_stable_digest(semantics) -> None:
     assert semantics.schema == SEMANTICS_SCHEMA_ID
-    assert semantics.semantics_version == "1.0.2"
+    assert semantics.semantics_version == "1.0.3"
     assert semantics.digest == compute_semantics_digest()
     assert len(semantics.digest) == 64
     amendments = {a.rule_id: a.families for a in semantics.amendments}

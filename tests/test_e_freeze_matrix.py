@@ -27,6 +27,9 @@ from agentready.audit_core.google_title_evaluators import (
     GOOGLE_TITLE_EVALUATOR_REGISTRY,
 )
 from agentready.audit_core.link_evaluators import LINK_EVALUATOR_REGISTRY
+from agentready.audit_core.google_href_evaluators import (
+    GOOGLE_HREF_EVALUATOR_REGISTRY,
+)
 from agentready.audit_core.rule_catalog import load_rule_catalog_snapshot
 from agentready.seo.rules.catalog import compute_catalog_digest, load_rule_semantics
 
@@ -40,6 +43,7 @@ REGISTRIES = {
     "CANON": CANON_EVALUATOR_REGISTRY,
     "LINK_BOUND": LINK_EVALUATOR_REGISTRY,
     "GOOGLE_DESC": GOOGLE_DESC_EVALUATOR_REGISTRY,
+    "GOOGLE_HREF": GOOGLE_HREF_EVALUATOR_REGISTRY,
     "GOOGLE_TITLE": GOOGLE_TITLE_EVALUATOR_REGISTRY,
 }
 

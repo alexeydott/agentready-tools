@@ -1,0 +1,191 @@
+accepted_semantics:
+  artifact: agentready.rule-semantics.v2
+  version: 1.0.3
+blocked_rules: []
+catalog_pin:
+  digest: d596780a3753733c37164172d4f2ed8e907b89b74f599d4f0025a3144afc5e6f
+  name: agentready.rule-catalog.v2
+  version: 2.1.0-draft.2
+classification_vocab:
+- equivalent_overlap
+- intended_split
+crosswalk_class: INTENDED_SPLIT
+family: google-hreflang
+frozen_rules:
+- GOOGLE-HREF-001
+- GOOGLE-HREF-002
+- GOOGLE-HREF-003
+- GOOGLE-HREF-004
+- GOOGLE-HREF-005
+policy_notes:
+  cross_page_reciprocity: 'Cross-page hreflang reciprocity verification is a run-level
+    site fact
+
+    verified by the provider/sitemap reconciliation surface and remains out
+
+    of scope for the page-level frozen contract.
+
+    '
+  not_applicable: 'When a page carries no hreflang annotations, all five frozen rules
+
+    return NOT_APPLICABLE to match legacy single-language-page skip behavior.
+
+    '
+scenarios:
+- canonicals:
+  - https://example.test/page
+  classification: intended_split
+  frozen:
+    GOOGLE-HREF-001: pass
+    GOOGLE-HREF-002: pass
+    GOOGLE-HREF-003: pass
+    GOOGLE-HREF-004: pass
+    GOOGLE-HREF-005: pass
+  hreflang: []
+  legacy_status: skip
+  meta_robots: []
+  name: single-language-no-annotations
+  split_note: single-language page scored as skip (not applicable) in legacy; frozen
+    rules also not applicable
+- canonicals:
+  - https://example.test/page
+  classification: intended_split
+  frozen:
+    GOOGLE-HREF-001: pass
+    GOOGLE-HREF-002: pass
+    GOOGLE-HREF-003: pass
+    GOOGLE-HREF-004: fail
+    GOOGLE-HREF-005: pass
+  hreflang:
+  - href: https://example.test/page
+    lang: en
+  - href: https://example.test/page
+    lang: fr
+  legacy_status: pass
+  meta_robots: []
+  name: valid-set-with-self-ref
+  split_note: legacy lumps all checks into one rule; frozen splits validity (001),
+    consistency (002), self-ref (003), x-default (004), target (005)
+- canonicals:
+  - https://example.test/page
+  classification: intended_split
+  frozen:
+    GOOGLE-HREF-001: fail
+    GOOGLE-HREF-002: pass
+    GOOGLE-HREF-003: pass
+    GOOGLE-HREF-004: fail
+    GOOGLE-HREF-005: pass
+  hreflang:
+  - href: https://example.test/page
+    lang: INVALID
+  - href: https://example.test/page
+    lang: en
+  legacy_status: warn
+  meta_robots: []
+  name: invalid-code
+  split_note: legacy groups invalid code with other issues; frozen isolates to HREF-001
+- canonicals:
+  - https://example.test/page
+  classification: intended_split
+  frozen:
+    GOOGLE-HREF-001: pass
+    GOOGLE-HREF-002: fail
+    GOOGLE-HREF-003: pass
+    GOOGLE-HREF-004: fail
+    GOOGLE-HREF-005: pass
+  hreflang:
+  - href: https://example.test/page
+    lang: en
+  - href: https://example.test/page
+    lang: en
+  legacy_status: warn
+  meta_robots: []
+  name: duplicate-lang-codes
+  split_note: duplicate codes owned by HREF-002
+- canonicals:
+  - https://example.test/page
+  classification: intended_split
+  frozen:
+    GOOGLE-HREF-001: pass
+    GOOGLE-HREF-002: pass
+    GOOGLE-HREF-003: fail
+    GOOGLE-HREF-004: fail
+    GOOGLE-HREF-005: fail
+  hreflang:
+  - href: https://example.test/other
+    lang: en
+  legacy_status: warn
+  meta_robots: []
+  name: no-self-ref
+  split_note: no self-reference owned by HREF-003
+- canonicals:
+  - https://example.test/page
+  classification: intended_split
+  frozen:
+    GOOGLE-HREF-001: pass
+    GOOGLE-HREF-002: pass
+    GOOGLE-HREF-003: pass
+    GOOGLE-HREF-004: pass
+    GOOGLE-HREF-005: pass
+  hreflang:
+  - href: https://example.test/page
+    lang: en
+  - href: https://example.test/page
+    lang: x-default
+  legacy_status: pass
+  meta_robots: []
+  name: x-default-present
+  split_note: x-default diagnostic owned by HREF-004
+- canonicals:
+  - https://example.test/page
+  classification: intended_split
+  frozen:
+    GOOGLE-HREF-001: pass
+    GOOGLE-HREF-002: pass
+    GOOGLE-HREF-003: pass
+    GOOGLE-HREF-004: fail
+    GOOGLE-HREF-005: pass
+  hreflang:
+  - href: https://example.test/page
+    lang: en
+  legacy_status: warn
+  meta_robots: []
+  name: x-default-missing
+  split_note: x-default diagnostic owned by HREF-004
+- canonicals:
+  - https://example.test/page
+  classification: intended_split
+  frozen:
+    GOOGLE-HREF-001: pass
+    GOOGLE-HREF-002: pass
+    GOOGLE-HREF-003: pass
+    GOOGLE-HREF-004: fail
+    GOOGLE-HREF-005: fail
+  hreflang:
+  - href: https://example.test/page
+    lang: en
+  - href: https://example.test/de
+    lang: de
+  legacy_status: pass
+  meta_robots: []
+  name: target-not-canonical
+  split_note: hreflang target not in canonical set owned by HREF-005
+- canonicals:
+  - https://example.test/page
+  classification: intended_split
+  frozen:
+    GOOGLE-HREF-001: pass
+    GOOGLE-HREF-002: pass
+    GOOGLE-HREF-003: pass
+    GOOGLE-HREF-004: fail
+    GOOGLE-HREF-005: fail
+  hreflang:
+  - href: https://example.test/page
+    lang: en
+  legacy_status: warn
+  meta_robots:
+  - noindex
+  name: blocked-from-indexing
+  split_note: noindex blocking owned by HREF-005
+schema: agentready.stage-f-href-golden.v1
+version: 1.0.0

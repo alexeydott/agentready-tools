@@ -1,6 +1,6 @@
 schema: agentready.rule-semantics.v2
-semantics_version: 1.0.2
-accepted_at: '2026-08-23'
+semantics_version: 1.0.3
+accepted_at: '2026-08-24'
 governance:
   canonical: '#52'
   links: '#53'
@@ -63,6 +63,24 @@ requirement_amendments:
 - rule_id: CORE-LINK-006
   families:
   - page
+- rule_id: GOOGLE-HREF-001
+  families:
+  - page
+  - links
+- rule_id: GOOGLE-HREF-002
+  families:
+  - page
+- rule_id: GOOGLE-HREF-003
+  families:
+  - page
+  - links
+- rule_id: GOOGLE-HREF-004
+  families:
+  - page
+- rule_id: GOOGLE-HREF-005
+  families:
+  - page
+  - links
 - rule_id: GOOGLE-DESC-001
   families:
   - page
@@ -224,6 +242,58 @@ accepted_conditions:
   evidence_fields:
   - page.links[]
   - subject_origin
+- rule_id: GOOGLE-HREF-001
+  version: 1.0.0
+  source_issue: '#28'
+  verdicts:
+    UNKNOWN: hreflang rows unavailable in page fact payload
+    NOT_APPLICABLE: no hreflang annotations present (single-language page)
+    PASS: all declared hreflang annotations use a valid BCP47 language code
+    FAIL: one or more hreflang annotations use an invalid language code
+  evidence_fields:
+  - page.hreflang
+- rule_id: GOOGLE-HREF-002
+  version: 1.0.0
+  source_issue: '#28'
+  verdicts:
+    UNKNOWN: hreflang rows unavailable in page fact payload
+    NOT_APPLICABLE: no hreflang annotations present (single-language page)
+    PASS: all hreflang links are absolute and no duplicate language codes are declared
+    FAIL: duplicate language codes or relative hreflang link(s) present
+  evidence_fields:
+  - page.hreflang
+- rule_id: GOOGLE-HREF-003
+  version: 1.0.0
+  source_issue: '#28'
+  verdicts:
+    UNKNOWN: hreflang rows unavailable in page fact payload
+    NOT_APPLICABLE: no hreflang annotations present (single-language page)
+    PASS: at least one hreflang annotation references the current page URL
+    FAIL: no self-referencing hreflang annotation found
+  evidence_fields:
+  - page.hreflang
+- rule_id: GOOGLE-HREF-004
+  version: 1.0.0
+  source_issue: '#28'
+  verdicts:
+    UNKNOWN: hreflang rows unavailable in page fact payload
+    NOT_APPLICABLE: no hreflang annotations present (single-language page)
+    PASS: an x-default hreflang entry is present for language-neutral fallback
+    FAIL: no x-default hreflang entry found
+  evidence_fields:
+  - page.hreflang
+- rule_id: GOOGLE-HREF-005
+  version: 1.0.0
+  source_issue: '#28'
+  verdicts:
+    UNKNOWN: hreflang rows unavailable in page fact payload
+    NOT_APPLICABLE: no hreflang annotations present (single-language page)
+    PASS: all non-x-default hreflang targets match declared canonical(s) and page is indexable
+    FAIL: one or more hreflang targets not in canonical set or page blocked from indexing
+  evidence_fields:
+  - page.hreflang
+  - page.canonicals
+  - page.meta_robots
 - rule_id: GOOGLE-DESC-001
   version: 1.0.0
   source_issue: '#54'
