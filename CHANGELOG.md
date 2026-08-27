@@ -26,6 +26,11 @@
 
 - Fixed AssertionError in HTML parser when crawling pages with malformed
   content (binary/corrupted HTML). Now gracefully handles parse errors.
+- Fixed report bloat when crawling large sites: deduplicated per-page checks
+  in all report formats (HTML, Markdown, Console, JSON, JSONL, CSV).
+  A 16,739-page crawl now produces 49KB HTML instead of 99MB.
+- Fixed CLI to pass `full_discovered` and `crawl` flags when using
+  `--discovery crawl --max-pages 0` for full site audits.
 
 ## 0.13.7
 

@@ -259,3 +259,9 @@ Until repository is public, manual governance rules:
 - After each merge: verify new master and tree/approved HEAD correspondence.
 - Accepted history from such exceptions is not rewritten.
 - When repository becomes public: enable real branch protection/ruleset, remove temporary manual mode.
+
+### Process exceptions (direct master commits)
+
+| Commit | Reason | Date |
+|--------|--------|------|
+| `f57ee6d` | Report deduplication fix + CLI full_discovered flag | 2026-08-27 |
