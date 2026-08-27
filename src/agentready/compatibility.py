@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-RELEASE_VERSION = "0.13.7"
-RELEASE_CHANNEL = "stable"
+RELEASE_VERSION = "0.14.0rc1"
+RELEASE_CHANNEL = "prerelease"
 V2_SCHEMAS = (
     "agentready.audit.v2",
     "agentready.seo.v2",
