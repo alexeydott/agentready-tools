@@ -244,3 +244,18 @@ to GitHub Release with verified SHA-256 hashes.
 - Require at least 1 approval
 - Block merge when review threads are unresolved
 - Deny direct push to `master`
+
+## PR-only governance protocol (pre-public)
+
+Until repository is public, manual governance rules:
+
+- `master` changes only through PR process, even if GitHub allows push.
+- Re-verify current PR HEAD before each merge; never accept approval from old SHA.
+- verify-local @ exact HEAD required (exit=0, dirty=false).
+- At least one formal APPROVED on exact HEAD required.
+- Check unresolved review threads before merge.
+- Merge with expected_head_sha to prevent silent HEAD replacement.
+- Direct commit/push to `master` = process violation, recorded separately.
+- After each merge: verify new master and tree/approved HEAD correspondence.
+- Accepted history from such exceptions is not rewritten.
+- When repository becomes public: enable real branch protection/ruleset, remove temporary manual mode.
