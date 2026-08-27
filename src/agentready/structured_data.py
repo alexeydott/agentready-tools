@@ -70,8 +70,11 @@ def parse_jsonld_blocks(blocks: Iterable[str]) -> tuple[list[dict[str, Any]], li
 
 def extract_jsonld_nodes(html_text: str) -> tuple[list[dict[str, Any]], list[str], int]:
     parser = _JsonLdHtmlParser()
-    parser.feed(html_text)
-    parser.close()
+    try:
+        parser.feed(html_text)
+        parser.close()
+    except (AssertionError, Exception):
+        pass
     nodes, errors = parse_jsonld_blocks(parser.blocks)
     return nodes, errors, len(parser.blocks)
 
