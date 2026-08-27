@@ -22,6 +22,11 @@
   readiness-transparent-v2.
 - Version bumped to 0.14.0rc1 (PEP 440) for release candidate.
 
+### Bug fixes
+
+- Fixed AssertionError in HTML parser when crawling pages with malformed
+  content (binary/corrupted HTML). Now gracefully handles parse errors.
+
 ## 0.13.7
 
 ### Full discovered crawl and report completeness
