@@ -1202,13 +1202,15 @@ def _cmd_audit(args: argparse.Namespace) -> int:
         unknown = [item for item in args.checks if item not in known]
         if unknown:
             raise ValueError(f"Unknown SEO check(s): {', '.join(unknown)}")
+        is_crawl = args.crawl or bool(args.checks) or args.discovery_kind == "crawl"
         report = audit_seo(
             urls[0],
             checks=tuple(SEO_CHECKS_BY_ID[item] for item in args.checks if item in SEO_CHECKS_BY_ID),
             crawl_checks=tuple(CRAWL_CHECKS_BY_ID[item] for item in args.checks if item in CRAWL_CHECKS_BY_ID),
             timeout=args.timeout, allow_private=False,
             recommendation_limit=args.recommendations, language=args.language,
-            crawl=args.crawl or bool(args.checks), max_pages=args.max_pages,
+            crawl=is_crawl, max_pages=args.max_pages,
+            full_discovered=args.max_pages == 0 and is_crawl,
             render=args.render, ga_property=args.ga_property, gsc_site=args.gsc_site,
         )
         output = render_seo(report, args.format, args.language)
@@ -1235,6 +1237,7 @@ def _cmd_audit(args: argparse.Namespace) -> int:
         }.items()
         if value is not None
     }
+    is_crawl = args.crawl or args.discovery_kind == "crawl"
     result = AuditService().run(
         AuditRequest(
             target=urls[0],
@@ -1251,6 +1254,8 @@ def _cmd_audit(args: argparse.Namespace) -> int:
             discovery_sitemap_xml=Path(args.discovery_sitemap_xml).read_text(encoding="utf-8") if args.discovery_sitemap_xml else None,
             discovery_sitemap_urls=tuple(args.discovery_url) if args.discovery_kind == "robots-sitemap" else (),
             discovery_limit=args.discovery_limit,
+            crawl=is_crawl,
+            full_discovered=args.max_pages == 0 and is_crawl,
             render=args.render,
             provider=args.provider,
             language=args.language,

@@ -165,12 +165,53 @@ def _localized_category(category: str, lang: str) -> tuple[str, str]:
         ),
     )
 
-def render_seo_json(report: SeoReport, lang: str | None = None) -> str:
-    return json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
+def render_seo_json(report: SeoReport, lang: str | None = None, deduplicate: bool = True) -> str:
+    """Render SEO report as JSON.
+
+    When deduplicate=True (default), per-page checks are grouped by id:
+    only the worst-status instance is kept, with affected_count added.
+    """
+    if not deduplicate:
+        return json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
+    data = report.to_dict()
+    # Deduplicate checks: keep worst status per check id for per-page checks
+    seen: dict[str, dict] = {}
+    order: list[str] = []
+    site_wide: list[dict] = []
+    for item in data.get("checks", []):
+        check_id = item.get("id", "")
+        if check_id in _PER_PAGE_CHECK_IDS:
+            if check_id in seen:
+                existing = seen[check_id]
+                # Keep worst status
+                if _STATUS_PRIORITY.get(item.get("status", ""), 4) < _STATUS_PRIORITY.get(existing.get("status", ""), 4):
+                    existing.update(item)
+                existing["affected_count"] = existing.get("affected_count", 1) + 1
+            else:
+                item["affected_count"] = 1
+                seen[check_id] = item
+                order.append(check_id)
+        else:
+            site_wide.append(item)
+    data["checks"] = site_wide + [seen[cid] for cid in order]
+    return json.dumps(data, indent=2, ensure_ascii=False)
 
 
 def render_seo_jsonl(report: SeoReport, lang: str | None = None) -> str:
     """Emit one bounded summary row per check for streaming-friendly export."""
+    seen: dict[str, SeoCheckResult] = {}
+    order: list[str] = []
+    site_wide: list[SeoCheckResult] = []
+    for item in report.checks:
+        if item.id in _PER_PAGE_CHECK_IDS:
+            if item.id in seen:
+                if _STATUS_PRIORITY.get(item.status, 4) < _STATUS_PRIORITY.get(seen[item.id].status, 4):
+                    seen[item.id] = item
+            else:
+                seen[item.id] = item
+                order.append(item.id)
+        else:
+            site_wide.append(item)
     rows = [{
         "schema": report.schema,
         "target": report.target,
@@ -181,7 +222,7 @@ def render_seo_jsonl(report: SeoReport, lang: str | None = None) -> str:
         "scored": item.scored,
         "priority": next((recommendation.priority for recommendation in report.recommendations if recommendation.check_id == item.id), None),
         "affected_urls": [evidence.url for evidence in item.evidence if evidence.url][:50],
-    } for item in report.checks]
+    } for item in (*site_wide, *(seen[cid] for cid in order))]
     return "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in rows)
 
 
@@ -191,7 +232,20 @@ def render_seo_csv(report: SeoReport, lang: str | None = None) -> str:
     writer = csv.DictWriter(output, fieldnames=fields)
     writer.writeheader()
     priorities = {item.check_id: item.priority for item in report.recommendations}
+    seen: dict[str, SeoCheckResult] = {}
+    order: list[str] = []
+    site_wide: list[SeoCheckResult] = []
     for item in report.checks:
+        if item.id in _PER_PAGE_CHECK_IDS:
+            if item.id in seen:
+                if _STATUS_PRIORITY.get(item.status, 4) < _STATUS_PRIORITY.get(seen[item.id].status, 4):
+                    seen[item.id] = item
+            else:
+                seen[item.id] = item
+                order.append(item.id)
+        else:
+            site_wide.append(item)
+    for item in (*site_wide, *(seen[cid] for cid in order)):
         writer.writerow({
             "check_id": item.id,
             "category": item.category,
@@ -213,14 +267,15 @@ def render_seo_console(report: SeoReport, lang: str | None = None) -> str:
     if report.coverage:
         lines.append(f"{labels['coverage']}: {json.dumps(report.coverage, ensure_ascii=False, sort_keys=True)}")
     lines.append(f"{labels['checks']}:")
-    for check in report.checks:
-        title, category, _ = _localized_check(check.id, check.title, check.category, active)
-        lines.append(f"[{labels.get(check.status, check.status)}] {title} ({category}) — {seo_detail(check.details, active)}")
-        for item in check.evidence:
-            if item.url:
-                lines.append(f"  {labels['evidence']} URL: {item.url}")
-            if item.metrics:
-                lines.append(f"  {labels['evidence']} metrics: {json.dumps(item.metrics, ensure_ascii=False, separators=(',', ':'))}")
+    for item, affected in _group_checks(report.checks):
+        title, category, _ = _localized_check(item.id, item.title, item.category, active)
+        count_note = f" ({affected} стр.)" if affected > 1 and active == "ru" else (f" ({affected} pages)" if affected > 1 else "")
+        lines.append(f"[{labels.get(item.status, item.status)}] {title} ({category}) — {seo_detail(item.details, active)}{count_note}")
+        for ev in item.evidence[:_MAX_EVIDENCE_ITEMS]:
+            if ev.url:
+                lines.append(f"  {labels['evidence']} URL: {ev.url}")
+            if ev.metrics:
+                lines.append(f"  {labels['evidence']} metrics: {json.dumps(ev.metrics, ensure_ascii=False, separators=(',', ':'))}")
     lines.extend(["", f"{labels['categories']}:"])
     lines.extend(
         f"  {_localized_category(item.category, active)[0]}: {item.score if item.score is not None else '-'}"
@@ -287,7 +342,7 @@ def _additional_details_html(check: object, labels: dict[str, str]) -> str:
     if not evidence:
         return ""
     items: list[str] = []
-    for item in evidence:
+    for item in evidence[:_MAX_EVIDENCE_ITEMS]:
         fields = [
             (labels["evidence"], getattr(item, "action", "")),
             ("URL", getattr(item, "url", "")),
@@ -353,16 +408,16 @@ def render_seo_markdown(report: SeoReport, lang: str | None = None) -> str:
     ]
     if not report.inventory and not report.coverage:
         lines[5:9] = []
+    for item, affected in _group_checks(report.checks):
+        title, category, _ = _localized_check(item.id, item.title, item.category, lang or report.language)
+        detail = seo_detail(item.details, lang or report.language).replace("|", "\\|")
+        count_note = f" ({affected} стр.)" if affected > 1 and (lang or report.language) == "ru" else (f" ({affected} pages)" if affected > 1 else "")
+        lines.append(f"| {labels.get(item.status, item.status)} | {category} | {title} (`{item.id}`) | {detail}{count_note} |")
+    evidence_items: list[tuple[str, object]] = []
     for check in report.checks:
-        title, category, _ = _localized_check(check.id, check.title, check.category, lang or report.language)
-        detail = seo_detail(check.details, lang or report.language).replace("|", "\\|")
-        lines.append(f"| {labels.get(check.status, check.status)} | {category} | {title} (`{check.id}`) | {detail} |")
-    evidence_items = [
-        (check.id, item)
-        for check in report.checks
-        for item in check.evidence
-        if item.url or item.metrics or item.finding
-    ]
+        for item in check.evidence[:_MAX_EVIDENCE_ITEMS]:
+            if item.url or item.metrics or item.finding:
+                evidence_items.append((check.id, item))
     if evidence_items:
         lines.extend(["", f"## {labels['evidence']}", ""])
         for check_id, item in evidence_items:
@@ -385,7 +440,12 @@ def render_seo_markdown(report: SeoReport, lang: str | None = None) -> str:
     else:
         lines.append(labels["no_items"])
     lines.extend(["", f"## {labels['remediation']}", ""])
-    actionable = [item for item in report.checks if item.remediation]
+    remediation_seen: set[str] = set()
+    actionable = []
+    for item in report.checks:
+        if item.remediation and item.id not in remediation_seen:
+            remediation_seen.add(item.id)
+            actionable.append(item)
     if not actionable:
         lines.append(labels["no_items"])
     for item in actionable:
@@ -400,18 +460,94 @@ def render_seo_markdown(report: SeoReport, lang: str | None = None) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+_PER_PAGE_CHECK_IDS = {
+    "page-available", "metadata", "page-indexability", "canonical", "robots-sitemap",
+    "favicon", "jsonld", "title-length", "description-length", "h1-length",
+    "content-length", "heading-structure", "image-alt", "internal-links",
+    "insecure-links", "open-graph", "twitter-card", "structured-data-validation",
+    "lang-attribute", "viewport", "charset", "hreflang", "indexability",
+    "meta-refresh", "structured-data",
+}
+
+_MAX_EVIDENCE_ITEMS = 5
+
+
+_STATUS_PRIORITY = {"fail": 0, "error": 1, "warn": 2, "skip": 3, "pass": 4}
+
+
+def _group_checks(checks: list[SeoCheckResult]) -> list[tuple[SeoCheckResult, int]]:
+    """Group per-page checks by id; return (representative, affected_count) pairs.
+
+    Site-wide checks (not in _PER_PAGE_CHECK_IDS) pass through as-is with count=1.
+    Per-page checks are deduplicated: the worst-status instance is kept as the
+    representative, and affected_count = total number of instances with that id.
+    """
+    seen: dict[str, tuple[SeoCheckResult, int]] = {}
+    order: list[str] = []
+    site_wide: list[tuple[SeoCheckResult, int]] = []
+    for item in checks:
+        if item.id in _PER_PAGE_CHECK_IDS:
+            if item.id in seen:
+                rep, cnt = seen[item.id]
+                if _STATUS_PRIORITY.get(item.status, 4) < _STATUS_PRIORITY.get(rep.status, 4):
+                    rep = item
+                seen[item.id] = (rep, cnt + 1)
+            else:
+                seen[item.id] = (item, 1)
+                order.append(item.id)
+        else:
+            site_wide.append((item, 1))
+    per_page = [(*seen[cid],) for cid in order]
+    return site_wide + [(rep, cnt) for rep, cnt in per_page]
+
+
+def _aggregated_evidence_html(check: SeoCheckResult, count: int, labels: dict[str, str]) -> str:
+    """Render evidence for a grouped per-page check, limited to _MAX_EVIDENCE_ITEMS."""
+    if count <= 1:
+        return _additional_details_html(check, labels)
+    status = getattr(check, "status", "")
+    if status not in {"fail", "warn", "error"}:
+        return ""
+    evidence = getattr(check, "evidence", [])
+    if not evidence:
+        return ""
+    items: list[str] = []
+    for item in evidence[:_MAX_EVIDENCE_ITEMS]:
+        fields = [
+            (labels["evidence"], getattr(item, "action", "")),
+            ("URL", getattr(item, "url", "")),
+            ("HTTP", getattr(item, "status_code", "")),
+            ("Finding", getattr(item, "finding", "")),
+        ]
+        content = "".join(
+            f"<p><strong>{html.escape(str(label))}:</strong> {html.escape(str(value))}</p>"
+            for label, value in fields
+            if value not in ("", None)
+        )
+        if content:
+            items.append(f"<li>{content}</li>")
+    if not items:
+        return ""
+    more = f"<p>…и ещё {count - len(items)} страниц(а) с той же проблемой</p>" if count > len(items) else ""
+    return (
+        f"<details class='additional-details'><summary>{html.escape(labels['additional'])} ({count} стр.)</summary>"
+        f"<ul>{''.join(items)}</ul>{more}</details>"
+    )
+
+
 def render_seo_html(report: SeoReport, lang: str | None = None) -> str:
     active = normalize_language(lang or report.language)
     labels = _labels(active)
     generated = datetime.now().astimezone().isoformat(timespec="seconds")
     rows = ""
-    for item in report.checks:
+    for item, affected in _group_checks(report.checks):
         title, category, hint = _localized_check(item.id, item.title, item.category, active)
+        count_note = f" <small>({affected} стр.)</small>" if affected > 1 else ""
         rows += (
             f"<tr>{render_status_cell(item.status, labels.get(item.status, item.status))}"
             f"<td>{html.escape(category)}</td>{render_check_cell(title, item.id, hint)}"
-            f"<td>{html.escape(seo_detail(item.details, active))}{_affected_pages_html(item, labels)}"
-            f"{_additional_details_html(item, labels)}</td></tr>"
+            f"<td>{html.escape(seo_detail(item.details, active))}{count_note}{_affected_pages_html(item, labels)}"
+            f"{_aggregated_evidence_html(item, affected, labels)}</td></tr>"
         )
     recommendations = "".join(
         f"<li><strong>{html.escape(_localized_check(item.check_id, item.title, '', active)[0])}</strong>: {html.escape(seo_summary(item.check_id, item.action, active))}</li>"
@@ -422,9 +558,11 @@ def render_seo_html(report: SeoReport, lang: str | None = None) -> str:
         category, hint = _localized_category(item.category, active)
         score = "-" if item.score is None else f"{item.score}%"
         category_cards.append(render_category_card(category, hint, f"{score} · {item.passed}/{item.applicable}", item.score))
+    remediation_seen: set[str] = set()
     remediation_items = []
     for item in report.checks:
-        if item.remediation:
+        if item.remediation and item.id not in remediation_seen:
+            remediation_seen.add(item.id)
             refs = " ".join(f"<a href='{html.escape(ref)}'>{html.escape(ref)}</a>" for ref in item.remediation.references)
             remediation_items.append(
                 f"<h3>{html.escape(_localized_check(item.id, item.title, item.category, active)[0])}</h3><p>{html.escape(seo_summary(item.id, item.remediation.summary, active))}</p>"

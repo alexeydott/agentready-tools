@@ -231,9 +231,11 @@ def _render_html_body(report: ScanReport, lang: str, generated: str, *, instance
             f"<br>{html.escape(str(loc['action']))}<br><small>{html.escape(str(loc['reason']))}</small></li>"
         )
     remediation: list[str] = []
+    remediation_seen: set[str] = set()
     for r in report.checks:
-        if r.status not in {"fail", "warn", "error"} or not r.remediation:
+        if r.status not in {"fail", "warn", "error"} or not r.remediation or r.id in remediation_seen:
             continue
+        remediation_seen.add(r.id)
         rem = localized_checks[r.id]["remediation"]
         refs = " ".join(f"<a href='{html.escape(u)}'>{html.escape(u)}</a>" for u in rem["references"])
         prompt = f"<pre>{html.escape(rem.get('agent_prompt') or '')}</pre>" if rem.get("agent_prompt") else ""

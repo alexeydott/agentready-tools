@@ -132,7 +132,13 @@ def render_mobile_markdown(report: MobileReport, lang: str | None = None) -> str
     else:
         lines.append(labels["no_items"])
     lines.extend(["", f"## {labels['remediation']}", ""])
-    actionable = [check for page in report.pages for check in page.checks if check.remediation]
+    remediation_seen: set[str] = set()
+    actionable = []
+    for page in report.pages:
+        for check in page.checks:
+            if check.remediation and check.id not in remediation_seen:
+                remediation_seen.add(check.id)
+                actionable.append(check)
     if not actionable:
         lines.append(labels["no_items"])
     for check in actionable:
@@ -183,10 +189,12 @@ def render_mobile_html(report: MobileReport, lang: str | None = None) -> str:
         category, hint = _localized_category(item.category, active)
         score = "-" if item.score is None else f"{item.score}%"
         category_cards.append(render_category_card(category, hint, f"{score} · {item.passed}/{item.applicable}", item.score))
+    remediation_seen: set[str] = set()
     remediation_items = []
     for page in report.pages:
         for check in page.checks:
-            if check.remediation:
+            if check.remediation and check.id not in remediation_seen:
+                remediation_seen.add(check.id)
                 refs = " ".join(f"<a href='{html.escape(ref)}'>{html.escape(ref)}</a>" for ref in check.remediation.references)
                 remediation_items.append(
                     f"<h3>{html.escape(_localized_check(check.id, check.title, check.category, active)[0])}</h3><p>{html.escape(mobile_summary(check.id, check.remediation.summary, active))}</p>"
