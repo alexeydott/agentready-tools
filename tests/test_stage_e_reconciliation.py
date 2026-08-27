@@ -33,7 +33,10 @@ def test_every_planned_reference_has_an_explicit_disposition():
             ReconciliationClassification.MATCH,
             ReconciliationClassification.SEMANTIC_MISMATCH,
             ReconciliationClassification.MISSING_FROM_CATALOG,
+            ReconciliationClassification.RETIRED,
             ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE,
+            ReconciliationClassification.UNBLOCKED,
+            ReconciliationClassification.INTENTIONALLY_UNBOUND,
         }
         assert reference.disposition
         assert reference.planned_semantics
@@ -43,8 +46,10 @@ def test_matrix_marks_missing_planned_ids_without_synthesizing_catalog_entries()
     matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
     rows = matrix["rows"]
     missing = [row for row in rows if row["classification"] == "MISSING_FROM_CATALOG"]
-    assert missing
-    assert all(row["catalog"] is None for row in missing)
+    assert not missing
+    unbound = [row for row in rows if row["classification"] == "INTENTIONALLY_UNBOUND"]
+    assert unbound
+    assert all(row["catalog"] is None for row in unbound)
 
 
 def test_matrix_preserves_catalog_identity_and_metadata_for_existing_ids():
@@ -94,7 +99,6 @@ def test_binding_gate_is_target_scoped_but_rejects_unresolved_target():
     assert stage_e_binding_is_blocked(
         matrix, issue=23, rule_id="CORE-ROBOTS-001"
     )
-    assert stage_e_binding_is_blocked(matrix, issue=34)
 
 
 def test_existing_catalog_rows_preserve_authored_planned_semantics():
@@ -123,17 +127,35 @@ def test_binding_gate_rejects_semantic_and_version_mismatches():
 def test_issue_34_has_an_explicit_issue_level_disposition():
     matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
     assert matrix["issues"] == list(range(22, 35))
-    assert matrix["issue_dispositions"] == [{
-        "issue": 34,
-        "classification": ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE,
-        "disposition": (
-            "downstream golden-cutover work is not implementable until each "
-            "dependent issue has an exact catalog-authoritative contract"
-        ),
-    }]
+    dispositions = matrix["issue_dispositions"]
+    assert len(dispositions) == 5
+    by_issue = {d["issue"]: d for d in dispositions}
+    assert by_issue[23]["classification"] == ReconciliationClassification.RETIRED
+    assert by_issue[25]["classification"] == ReconciliationClassification.RETIRED
+    assert by_issue[29]["classification"] == ReconciliationClassification.RETIRED
+    assert by_issue[30]["classification"] == ReconciliationClassification.INTENTIONALLY_UNBOUND
+    assert by_issue[34]["classification"] == ReconciliationClassification.UNBLOCKED
+    assert "unblocked" in by_issue[34]["disposition"]
+
+
+def test_retired_and_unbound_rows_have_terminal_resolution_status():
+    matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
+    rows_by_id = {row["planned_rule_id"]: row for row in matrix["rows"]}
+    assert rows_by_id["CORE-ROBOTS-001"]["resolution_status"] == "retired"
+    assert rows_by_id["CORE-ROBOTS-002"]["resolution_status"] == "retired"
+    assert rows_by_id["CORE-HTTP-002"]["resolution_status"] == "intentionally_unbound"
+    assert rows_by_id["GOOGLE-IDX-001"]["resolution_status"] == "intentionally_unbound"
+
+
+def test_binding_gate_blocks_retired_and_unbound_rows():
+    matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
+    assert stage_e_binding_is_blocked(matrix)
+    matrix["binding_allowed"] = True
+    assert stage_e_binding_is_blocked(matrix, issue=23, rule_id="CORE-ROBOTS-001")
+    assert stage_e_binding_is_blocked(matrix, issue=30, rule_id="GOOGLE-IDX-001")
 
 
 def test_checked_in_matrix_matches_the_loaded_catalog_snapshot():
     expected = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
-    checked_in = yaml.safe_load((ROOT / "docs" / "stage-e-f-reconciliation.yaml").read_text())
+    checked_in = yaml.safe_load((ROOT / "docs" / "stage-e-f-reconciliation.yaml").read_text(encoding="utf-8"))
     assert checked_in == expected
