@@ -226,3 +226,21 @@ repository as audit inventory (schema v7); `ProjectService` does not open SQL
 connections directly. Before upgrading a durable database, make a backup copy.
 There are no down-migrations. Deleting project metadata removes memberships but
 retains immutable runs unless a future explicit retention operation is added.
+
+## Process Exceptions
+
+### v0.14.0-rc1 PR-only bypass
+
+PR #72 was merged via direct push bypassing the PR merge gate (squash-merge
+required). Content is safe: tree SHA identical between approved HEAD
+`6721704dfbe0f8a1e56dc638a7068f20ac6d6d39` and release commit
+`c0ca84e`. Tag `v0.14.0-rc1` not rewritten.
+
+PR #72 closed with comment explaining supersession. Assets attached
+to GitHub Release with verified SHA-256 hashes.
+
+**Before v0.14.0 stable:** enable GitHub branch protection rulesets:
+- Require pull request before merging to `master`
+- Require at least 1 approval
+- Block merge when review threads are unresolved
+- Deny direct push to `master`
