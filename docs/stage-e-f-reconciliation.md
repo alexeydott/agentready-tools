@@ -27,8 +27,8 @@ become executable by evaluator code.
 - catalog version, title, scope, fact requirements, rule kind, score role,
   failure policy, mechanism, and automation mode when present;
 - an explicit classification:
-  `MATCH`, `SEMANTIC_MISMATCH`, `MISSING_FROM_CATALOG`, or
-  `PLAN_NO_LONGER_APPLICABLE`;
+  `MATCH`, `SEMANTIC_MISMATCH`, `MISSING_FROM_CATALOG`, `RETIRED`,
+  `INTENTIONALLY_UNBOUND`, `UNBLOCKED`, or `PLAN_NO_LONGER_APPLICABLE`;
 - a disposition that must be applied before the dependent issue starts.
 
 The matrix is generated from the immutable loaded snapshot, so it carries the
@@ -39,13 +39,14 @@ actual catalog digest rather than a copied expectation.
 | Family | Current disposition |
 | --- | --- |
 | Coverage canary (#22) | Existing ID is present but semantics mismatch; amend #22 before binding. |
-| Robots/sitemap (#23, #29) | Planned `CORE-ROBOTS-*`/`CORE-SITEMAP-*` IDs are absent; keep blocked and select explicit catalog IDs in a follow-up plan. |
+| Robots/sitemap (#23, #29) | RETIRED: all planned IDs retired from v0.14.0 scope; no catalog binding. |
 | Canonical (#24, #26) | IDs exist, but issue semantics and catalog roles/facts differ; amend plans first. |
-| Duplicate content (#25) | Planned IDs are absent; no duplicate evaluator may be bound. |
+| Duplicate content (#25) | RETIRED: all planned IDs retired from v0.14.0 scope; no evaluator created. |
 | Links (#27) | IDs exist, but score/failure/fact semantics differ; amend the plan. |
 | Hreflang (#28) | IDs exist, but planned numbering/meaning differs from catalog titles and facts; amend the plan. |
-| Intent (#30) | No inferred `intent.indexability` fact is created; missing IDs remain blocked. |
+| Intent (#30) | INTENTIONALLY_UNBOUND: intent.indexability out of scope for v0.14.0; rules kept unbound by governance decision. |
 | Description/title (#31–#33) | Existing IDs require catalog-defined roles/facts; `GOOGLE-TITLE-001` uses the catalog's `page@1` requirement without an undeclared `content.main` prerequisite. |
+| Final cutover (#34) | UNBLOCKED: all dependent issues have reviewed dispositions (resolved, retired, or intentionally unbound). |
 
 ## Binding gate
 

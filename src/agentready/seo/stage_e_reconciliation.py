@@ -25,7 +25,10 @@ class ReconciliationClassification:
     MATCH = "MATCH"
     SEMANTIC_MISMATCH = "SEMANTIC_MISMATCH"
     MISSING_FROM_CATALOG = "MISSING_FROM_CATALOG"
+    RETIRED = "RETIRED"
     PLAN_NO_LONGER_APPLICABLE = "PLAN_NO_LONGER_APPLICABLE"
+    UNBLOCKED = "UNBLOCKED"
+    INTENTIONALLY_UNBOUND = "INTENTIONALLY_UNBOUND"
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,8 +69,8 @@ STAGE_E_PLAN_REFERENCES: tuple[StageEPlanReference, ...] = (
             "CORE-SITEMAP-005",
             "CORE-SITEMAP-008",
         ),
-        ReconciliationClassification.MISSING_FROM_CATALOG,
-        "retain as blocked plan IDs; replace with explicitly selected robots-sitemap catalog IDs in a follow-up plan",
+        ReconciliationClassification.RETIRED,
+        "retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-* rules covering same fact families but no semantic/evaluator binding; adding governed rules requires new catalog revision beyond final cutover",
         "atomic robots/sitemap state and URL validity rules",
     ),
     *_refs(
@@ -80,8 +83,8 @@ STAGE_E_PLAN_REFERENCES: tuple[StageEPlanReference, ...] = (
     *_refs(
         25,
         ("CORE-DUP-001", "CORE-DUP-002"),
-        ReconciliationClassification.MISSING_FROM_CATALOG,
-        "retain duplicate work as blocked until catalog IDs are intentionally added by a reviewed catalog change",
+        ReconciliationClassification.RETIRED,
+        "retired from v0.14.0 scope — duplicate detection remains legacy/current functionality; no frozen evaluator identity created",
         "exact and near duplicate cluster semantics",
     ),
     *_refs(
@@ -115,8 +118,8 @@ STAGE_E_PLAN_REFERENCES: tuple[StageEPlanReference, ...] = (
             "CORE-SITEMAP-008",
             "CORE-ROBOTS-003",
         ),
-        ReconciliationClassification.MISSING_FROM_CATALOG,
-        "keep dependent robots/sitemap work blocked until each ID has an explicit catalog disposition",
+        ReconciliationClassification.RETIRED,
+        "retired from v0.14.0 scope — follows #23 governance disposition; no catalog binding",
         "cross-family robots/sitemap consistency rules",
     ),
     StageEPlanReference(
@@ -136,8 +139,8 @@ STAGE_E_PLAN_REFERENCES: tuple[StageEPlanReference, ...] = (
             "YANDEX-IDX-001",
             "YANDEX-IDX-002",
         ),
-        ReconciliationClassification.MISSING_FROM_CATALOG,
-        "keep intent-dependent rules unbound; create no inferred intent fact",
+        ReconciliationClassification.INTENTIONALLY_UNBOUND,
+        "intentionally unbound: intent.indexability is out of scope for v0.14.0; rules kept unbound by reviewed governance decision",
         "intent.indexability-dependent technical and provider rules",
     ),
     *_refs(
@@ -221,7 +224,11 @@ def build_stage_e_reconciliation_matrix(
                 reference.planned_semantics,
             )
         )
-        if entry is not None:
+        if reference.classification == ReconciliationClassification.RETIRED:
+            resolution_status = "retired"
+        elif reference.classification == ReconciliationClassification.INTENTIONALLY_UNBOUND:
+            resolution_status = "intentionally_unbound"
+        elif entry is not None:
             resolution_status = "resolved_catalog_authoritative"
         else:
             resolution_status = "blocked_missing_catalog"
@@ -248,13 +255,45 @@ def build_stage_e_reconciliation_matrix(
         "issues": list(range(22, 35)),
         "issue_dispositions": [
             {
-                "issue": 34,
-                "classification": ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE,
+                "issue": 23,
+                "classification": ReconciliationClassification.RETIRED,
                 "disposition": (
-                    "downstream golden-cutover work is not implementable until each "
-                    "dependent issue has an exact catalog-authoritative contract"
+                    "governance-only: all planned IDs retired from v0.14.0 scope "
+                    "(see docs/governance-disposition-23-25-29.md)"
                 ),
-            }
+            },
+            {
+                "issue": 25,
+                "classification": ReconciliationClassification.RETIRED,
+                "disposition": (
+                    "governance-only: all planned IDs retired from v0.14.0 scope "
+                    "(see docs/governance-disposition-23-25-29.md)"
+                ),
+            },
+            {
+                "issue": 29,
+                "classification": ReconciliationClassification.RETIRED,
+                "disposition": (
+                    "governance-only: all planned IDs retired from v0.14.0 scope "
+                    "(see docs/governance-disposition-23-25-29.md)"
+                ),
+            },
+            {
+                "issue": 30,
+                "classification": ReconciliationClassification.INTENTIONALLY_UNBOUND,
+                "disposition": (
+                    "intent.indexability is out of scope for v0.14.0; all "
+                    "dependent rules intentionally unbound by reviewed governance decision"
+                ),
+            },
+            {
+                "issue": 34,
+                "classification": ReconciliationClassification.UNBLOCKED,
+                "disposition": (
+                    "final cutover/re-freeze for v0.14.0 is now unblocked — all "
+                    "dependent issues have reviewed dispositions (resolved, retired, or intentionally unbound)"
+                ),
+            },
         ],
         "rows": rows,
     }
@@ -292,15 +331,19 @@ def stage_e_binding_is_blocked(
         rows = [row for row in rows if row.get("planned_rule_id") == rule_id]
     if not rows:
         return True
-    if any(
-        not isinstance(row, Mapping)
-        or row.get("resolution_status") != "resolved_catalog_authoritative"
-        or not isinstance(row.get("effective_contract"), Mapping)
-        or not row["effective_contract"].get("version")
-        or not row["effective_contract"].get("applicability_condition")
-        for row in rows
-    ):
-        return True
+    _bindable_statuses = {"resolved_catalog_authoritative"}
+    _terminal_statuses = _bindable_statuses | {"retired", "intentionally_unbound"}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            return True
+        status = row.get("resolution_status")
+        if status not in _terminal_statuses:
+            return True
+        if status not in _bindable_statuses:
+            return True
+        contract = row.get("effective_contract")
+        if not isinstance(contract, Mapping) or not contract.get("version") or not contract.get("applicability_condition"):
+            return True
     if not isinstance(dispositions, list) or any(
         not isinstance(item, Mapping)
         or item.get("classification") == ReconciliationClassification.PLAN_NO_LONGER_APPLICABLE

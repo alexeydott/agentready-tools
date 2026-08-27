@@ -20,10 +20,23 @@ issues:
 - 33
 - 34
 issue_dispositions:
+- issue: 23
+  classification: RETIRED
+  disposition: 'governance-only: all planned IDs retired from v0.14.0 scope (see docs/governance-disposition-23-25-29.md)'
+- issue: 25
+  classification: RETIRED
+  disposition: 'governance-only: all planned IDs retired from v0.14.0 scope (see docs/governance-disposition-23-25-29.md)'
+- issue: 29
+  classification: RETIRED
+  disposition: 'governance-only: all planned IDs retired from v0.14.0 scope (see docs/governance-disposition-23-25-29.md)'
+- issue: 30
+  classification: INTENTIONALLY_UNBOUND
+  disposition: intent.indexability is out of scope for v0.14.0; all dependent rules
+    intentionally unbound by reviewed governance decision
 - issue: 34
-  classification: PLAN_NO_LONGER_APPLICABLE
-  disposition: downstream golden-cutover work is not implementable until each dependent
-    issue has an exact catalog-authoritative contract
+  classification: UNBLOCKED
+  disposition: final cutover/re-freeze for v0.14.0 is now unblocked — all dependent
+    issues have reviewed dispositions (resolved, retired, or intentionally unbound)
 rows:
 - issue: 22
   planned_rule_id: CORE-COVERAGE-001
@@ -68,94 +81,104 @@ rows:
   resolution_status: resolved_catalog_authoritative
 - issue: 23
   planned_rule_id: CORE-ROBOTS-001
-  classification: MISSING_FROM_CATALOG
-  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
-    catalog IDs in a follow-up plan
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-*
+    rules covering same fact families but no semantic/evaluator binding; adding governed
+    rules requires new catalog revision beyond final cutover
   planned_semantics: robots.txt fetch state is known
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 23
   planned_rule_id: CORE-ROBOTS-002
-  classification: MISSING_FROM_CATALOG
-  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
-    catalog IDs in a follow-up plan
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-*
+    rules covering same fact families but no semantic/evaluator binding; adding governed
+    rules requires new catalog revision beyond final cutover
   planned_semantics: robots.txt is parsed under an explicit versioned REP profile
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 23
   planned_rule_id: CORE-SITEMAP-001
-  classification: MISSING_FROM_CATALOG
-  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
-    catalog IDs in a follow-up plan
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-*
+    rules covering same fact families but no semantic/evaluator binding; adding governed
+    rules requires new catalog revision beyond final cutover
   planned_semantics: sitemap discovery state is known
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 23
   planned_rule_id: CORE-SITEMAP-002
-  classification: MISSING_FROM_CATALOG
-  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
-    catalog IDs in a follow-up plan
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-*
+    rules covering same fact families but no semantic/evaluator binding; adding governed
+    rules requires new catalog revision beyond final cutover
   planned_semantics: sitemap fetch state is known
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 23
   planned_rule_id: CORE-SITEMAP-003
-  classification: MISSING_FROM_CATALOG
-  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
-    catalog IDs in a follow-up plan
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-*
+    rules covering same fact families but no semantic/evaluator binding; adding governed
+    rules requires new catalog revision beyond final cutover
   planned_semantics: sitemap parse state is known
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 23
   planned_rule_id: CORE-SITEMAP-004
-  classification: MISSING_FROM_CATALOG
-  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
-    catalog IDs in a follow-up plan
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-*
+    rules covering same fact families but no semantic/evaluator binding; adding governed
+    rules requires new catalog revision beyond final cutover
   planned_semantics: sitemap URLs are absolute and valid
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 23
   planned_rule_id: CORE-ROBOTS-003
-  classification: MISSING_FROM_CATALOG
-  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
-    catalog IDs in a follow-up plan
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-*
+    rules covering same fact families but no semantic/evaluator binding; adding governed
+    rules requires new catalog revision beyond final cutover
   planned_semantics: robots policy is consistent with explicit intent.indexability
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 23
   planned_rule_id: CORE-ROBOTS-004
-  classification: MISSING_FROM_CATALOG
-  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
-    catalog IDs in a follow-up plan
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-*
+    rules covering same fact families but no semantic/evaluator binding; adding governed
+    rules requires new catalog revision beyond final cutover
   planned_semantics: robots blocking does not hide a noindex directive
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 23
   planned_rule_id: CORE-SITEMAP-005
-  classification: MISSING_FROM_CATALOG
-  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
-    catalog IDs in a follow-up plan
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-*
+    rules covering same fact families but no semantic/evaluator binding; adding governed
+    rules requires new catalog revision beyond final cutover
   planned_semantics: sitemap contains preferred/canonical URLs
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 23
   planned_rule_id: CORE-SITEMAP-008
-  classification: MISSING_FROM_CATALOG
-  disposition: retain as blocked plan IDs; replace with explicitly selected robots-sitemap
-    catalog IDs in a follow-up plan
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-*
+    rules covering same fact families but no semantic/evaluator binding; adding governed
+    rules requires new catalog revision beyond final cutover
   planned_semantics: sitemap preferred URLs are not marked noindex
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 24
   planned_rule_id: CORE-CANON-001
   classification: SEMANTIC_MISMATCH
@@ -486,23 +509,23 @@ rows:
   resolution_status: resolved_catalog_authoritative
 - issue: 25
   planned_rule_id: CORE-DUP-001
-  classification: MISSING_FROM_CATALOG
-  disposition: retain duplicate work as blocked until catalog IDs are intentionally
-    added by a reviewed catalog change
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — duplicate detection remains legacy/current
+    functionality; no frozen evaluator identity created
   planned_semantics: exact duplicate clusters use content.hash and canonical facts
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 25
   planned_rule_id: CORE-DUP-002
-  classification: MISSING_FROM_CATALOG
-  disposition: retain duplicate work as blocked until catalog IDs are intentionally
-    added by a reviewed catalog change
+  classification: RETIRED
+  disposition: retired from v0.14.0 scope — duplicate detection remains legacy/current
+    functionality; no frozen evaluator identity created
   planned_semantics: near-duplicate clusters use content.signatures as observation-only
     data
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 26
   planned_rule_id: CORE-CANON-001
   classification: SEMANTIC_MISMATCH
@@ -980,58 +1003,58 @@ rows:
   resolution_status: resolved_catalog_authoritative
 - issue: 29
   planned_rule_id: CORE-ROBOTS-004
-  classification: MISSING_FROM_CATALOG
-  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
-    catalog disposition
+  classification: RETIRED
+  disposition: 'retired from v0.14.0 scope — follows #23 governance disposition; no
+    catalog binding'
   planned_semantics: robots blocking does not hide a noindex directive
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 29
   planned_rule_id: CORE-SITEMAP-005
-  classification: MISSING_FROM_CATALOG
-  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
-    catalog disposition
+  classification: RETIRED
+  disposition: 'retired from v0.14.0 scope — follows #23 governance disposition; no
+    catalog binding'
   planned_semantics: sitemap contains preferred/canonical URLs
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 29
   planned_rule_id: CORE-SITEMAP-006
-  classification: MISSING_FROM_CATALOG
-  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
-    catalog disposition
+  classification: RETIRED
+  disposition: 'retired from v0.14.0 scope — follows #23 governance disposition; no
+    catalog binding'
   planned_semantics: sitemap URLs are not redirect URLs
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 29
   planned_rule_id: CORE-SITEMAP-007
-  classification: MISSING_FROM_CATALOG
-  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
-    catalog disposition
+  classification: RETIRED
+  disposition: 'retired from v0.14.0 scope — follows #23 governance disposition; no
+    catalog binding'
   planned_semantics: sitemap URLs do not return 4xx/5xx
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 29
   planned_rule_id: CORE-SITEMAP-008
-  classification: MISSING_FROM_CATALOG
-  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
-    catalog disposition
+  classification: RETIRED
+  disposition: 'retired from v0.14.0 scope — follows #23 governance disposition; no
+    catalog binding'
   planned_semantics: sitemap preferred URLs are not marked noindex
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 29
   planned_rule_id: CORE-ROBOTS-003
-  classification: MISSING_FROM_CATALOG
-  disposition: keep dependent robots/sitemap work blocked until each ID has an explicit
-    catalog disposition
+  classification: RETIRED
+  disposition: 'retired from v0.14.0 scope — follows #23 governance disposition; no
+    catalog binding'
   planned_semantics: robots policy is consistent with explicit intent.indexability
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: retired
 - issue: 30
   planned_rule_id: CORE-LINK-002
   classification: SEMANTIC_MISMATCH
@@ -1075,53 +1098,59 @@ rows:
   resolution_status: resolved_catalog_authoritative
 - issue: 30
   planned_rule_id: CORE-HTTP-002
-  classification: MISSING_FROM_CATALOG
-  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  classification: INTENTIONALLY_UNBOUND
+  disposition: 'intentionally unbound: intent.indexability is out of scope for v0.14.0;
+    rules kept unbound by reviewed governance decision'
   planned_semantics: HTTP/indexability consistency is evaluated only with explicit
     intent.indexability
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: intentionally_unbound
 - issue: 30
   planned_rule_id: CORE-ROBOTS-003
-  classification: MISSING_FROM_CATALOG
-  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  classification: INTENTIONALLY_UNBOUND
+  disposition: 'intentionally unbound: intent.indexability is out of scope for v0.14.0;
+    rules kept unbound by reviewed governance decision'
   planned_semantics: robots policy is consistent with explicit intent.indexability
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: intentionally_unbound
 - issue: 30
   planned_rule_id: GOOGLE-IDX-001
-  classification: MISSING_FROM_CATALOG
-  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  classification: INTENTIONALLY_UNBOUND
+  disposition: 'intentionally unbound: intent.indexability is out of scope for v0.14.0;
+    rules kept unbound by reviewed governance decision'
   planned_semantics: 'Google indexability intent-dependent rule from issue #30'
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: intentionally_unbound
 - issue: 30
   planned_rule_id: GOOGLE-IDX-002
-  classification: MISSING_FROM_CATALOG
-  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  classification: INTENTIONALLY_UNBOUND
+  disposition: 'intentionally unbound: intent.indexability is out of scope for v0.14.0;
+    rules kept unbound by reviewed governance decision'
   planned_semantics: Google indexability outcome rule requiring explicit intent provenance
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: intentionally_unbound
 - issue: 30
   planned_rule_id: YANDEX-IDX-001
-  classification: MISSING_FROM_CATALOG
-  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  classification: INTENTIONALLY_UNBOUND
+  disposition: 'intentionally unbound: intent.indexability is out of scope for v0.14.0;
+    rules kept unbound by reviewed governance decision'
   planned_semantics: 'Yandex indexability intent-dependent rule from issue #30'
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: intentionally_unbound
 - issue: 30
   planned_rule_id: YANDEX-IDX-002
-  classification: MISSING_FROM_CATALOG
-  disposition: keep intent-dependent rules unbound; create no inferred intent fact
+  classification: INTENTIONALLY_UNBOUND
+  disposition: 'intentionally unbound: intent.indexability is out of scope for v0.14.0;
+    rules kept unbound by reviewed governance decision'
   planned_semantics: Yandex indexability outcome rule requiring explicit intent provenance
   catalog: null
   effective_contract: null
-  resolution_status: blocked_missing_catalog
+  resolution_status: intentionally_unbound
 - issue: 31
   planned_rule_id: GOOGLE-DESC-001
   classification: SEMANTIC_MISMATCH
