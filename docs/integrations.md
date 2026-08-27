@@ -177,7 +177,7 @@ scope, normalized URL identity, bounded frontier, explicit item states, and
 coverage accounting. Protocol profiles audit passive documents and expose
 evidence through the same report and agent/MCP projection boundaries.
 
-Release `0.13.7` carries the v2 transport parity milestone plus the bounded AI
+Release `0.14.0rc1` carries the v2 transport parity milestone plus the bounded AI
 context and provider-aware dashboard handoff. The compatibility manifest lists
 only v2 schemas and surfaces; legacy report identifiers and routes are rejected
 rather than silently adapted.

@@ -2,7 +2,7 @@
 
 # Development
 
-The current release is **0.13.7**. The package version, compatibility manifest,
+The current release is **0.14.0rc1**. The package version, compatibility manifest,
 report defaults, and Win64 file metadata are synchronized from the same release
 change.
 
@@ -141,7 +141,7 @@ Build the standalone executable with:
 
 The output is `dist\portable\agentready.exe`. The PyInstaller spec embeds
 version information and `packaging\agentready.ico` as the application icon.
-Release builds must report the same `0.13.7` version in package metadata,
+Release builds must report the same `0.14.0rc1` version in package metadata,
 `src/agentready/compatibility.py`, and the executable file properties.
 
 ## Source archive
