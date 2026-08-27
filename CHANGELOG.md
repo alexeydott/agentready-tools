@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.13.8
+
+### Stage F freeze: final #34 re-freeze governance
+
+- Finalized Stage F governance freeze for issue #34, completing the entire
+  Stage E/F reconciliation cycle.
+- Added `frozen_retired` set to baseline: 20 rule IDs retired from v0.14.0
+  scope (issues #23, #25, #29: CORE-ROBOTS-*, CORE-SITEMAP-*, CORE-DUP-*).
+- Added `frozen_intentionally_unbound` set to baseline: 6 rule IDs kept
+  unbound by governance decision (issue #30: CORE-HTTP-002, CORE-ROBOTS-003,
+  GOOGLE-IDX-*, YANDEX-IDX-*).
+- Added 9 drift gate tests verifying frozen sets, bindability, and
+  non-overlap between bound and retired/unbound rule IDs.
+- Verified RETIRED/INTENTIONALLY_UNBOUND rows remain blocked for binding
+  even when binding_allowed=True.
+- All 1096 tests pass (30 skipped, 3 xfailed).
+- Frozen contract: catalog 2.1.0-draft.2, semantics 1.0.4, score model
+  readiness-transparent-v2.
+
 ## 0.13.7
 
 ### Full discovered crawl and report completeness
