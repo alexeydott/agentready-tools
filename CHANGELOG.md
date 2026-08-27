@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.13.8
+## 0.14.0-rc1
 
 ### Stage F freeze: final #34 re-freeze governance
 
@@ -20,6 +20,7 @@
 - All 1096 tests pass (30 skipped, 3 xfailed).
 - Frozen contract: catalog 2.1.0-draft.2, semantics 1.0.4, score model
   readiness-transparent-v2.
+- Version bumped to 0.14.0rc1 (PEP 440) for release candidate.
 
 ## 0.13.7
 
