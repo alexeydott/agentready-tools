@@ -1,5 +1,5 @@
 {
-  "commit": "7fa0b9c25a030a729c83f6367ac34afe0a97e789",
+  "commit": "4c13023cad872a87c415fa5854bc51a12307bb75",
   "deferred_declared_not_produced": [
     {
       "rule_id": "GOOGLE-HREF-002",
@@ -10,6 +10,58 @@
       "reason": "Canonical/indexability of hreflang target URLs requires facts about the target pages; {page, links} for the current subject cannot establish those properties."
     }
   ],
+  "frozen_retired": {
+    "issue_23": {
+      "classification": "RETIRED",
+      "disposition": "retired from v0.14.0 scope — catalog has ungoverned ROBOTS-SITEMAP-* rules covering same fact families but no semantic/evaluator binding",
+      "rule_ids": [
+        "CORE-ROBOTS-001",
+        "CORE-ROBOTS-002",
+        "CORE-SITEMAP-001",
+        "CORE-SITEMAP-002",
+        "CORE-SITEMAP-003",
+        "CORE-SITEMAP-004",
+        "CORE-ROBOTS-003",
+        "CORE-ROBOTS-004",
+        "CORE-SITEMAP-005",
+        "CORE-SITEMAP-008"
+      ]
+    },
+    "issue_25": {
+      "classification": "RETIRED",
+      "disposition": "retired from v0.14.0 scope — duplicate detection remains legacy/current functionality; no frozen evaluator identity created",
+      "rule_ids": [
+        "CORE-DUP-001",
+        "CORE-DUP-002"
+      ]
+    },
+    "issue_29": {
+      "classification": "RETIRED",
+      "disposition": "retired from v0.14.0 scope — follows #23 governance disposition; no catalog binding",
+      "rule_ids": [
+        "CORE-ROBOTS-004",
+        "CORE-SITEMAP-005",
+        "CORE-SITEMAP-006",
+        "CORE-SITEMAP-007",
+        "CORE-SITEMAP-008",
+        "CORE-ROBOTS-003"
+      ]
+    }
+  },
+  "frozen_intentionally_unbound": {
+    "issue_30": {
+      "classification": "INTENTIONALLY_UNBOUND",
+      "disposition": "intent.indexability is out of scope for v0.14.0; rules kept unbound by reviewed governance decision",
+      "rule_ids": [
+        "CORE-HTTP-002",
+        "CORE-ROBOTS-003",
+        "GOOGLE-IDX-001",
+        "GOOGLE-IDX-002",
+        "YANDEX-IDX-001",
+        "YANDEX-IDX-002"
+      ]
+    }
+  },
   "frozen_bindings": {
     "CORE-CANON-002": {
       "failure_policy": "block_on_missing_facts",
@@ -132,7 +184,7 @@
       "version": "1.0.0"
     }
   },
-  "generated_at": "2026-08-26T21:51:47Z",
+  "generated_at": "2026-08-27T02:38:08Z",
   "package_version": "0.13.7",
   "registered_evaluators": {
     "CANARY": {
