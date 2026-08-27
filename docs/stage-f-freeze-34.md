@@ -39,6 +39,10 @@ intentionally-unbound rule sets into the frozen baseline.
 | #25 | CORE-DUP-001, 002 | Retired — duplicate detection is legacy functionality |
 | #29 | CORE-ROBOTS-003, 004; CORE-SITEMAP-005..008 | Retired — follows #23 governance |
 
+**Counting semantics:** 18 issue-scoped retirement entries, 14 unique retired rule IDs
+(4 IDs shared between #23 and #29: CORE-ROBOTS-003, CORE-ROBOTS-004,
+CORE-SITEMAP-005, CORE-SITEMAP-008).
+
 ### Intentionally unbound (issue #30)
 
 | Issue | Rules | Disposition |

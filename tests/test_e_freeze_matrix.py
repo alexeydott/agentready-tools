@@ -107,31 +107,33 @@ def test_deferred_declared_not_produced_set_is_frozen():
 
 
 def test_frozen_retired_set_is_frozen():
-    """Retired set matches baseline: issues #23, #25, #29."""
+    """Retired set matches baseline: issues #23, #25, #29 — exact per-issue mappings."""
     matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
     retired_rows = [
         row for row in matrix["rows"]
         if row["classification"] == ReconciliationClassification.RETIRED
     ]
-    retired_ids = {row["planned_rule_id"] for row in retired_rows}
-    baseline_retired = set()
-    for issue_key in ["issue_23", "issue_25", "issue_29"]:
-        baseline_retired.update(BASELINE["frozen_retired"][issue_key]["rule_ids"])
-    assert retired_ids == baseline_retired
+    retired_pairs = {(row["issue"], row["planned_rule_id"]) for row in retired_rows}
+    baseline_pairs = set()
+    for issue_key, issue_num in [("issue_23", 23), ("issue_25", 25), ("issue_29", 29)]:
+        for rid in BASELINE["frozen_retired"][issue_key]["rule_ids"]:
+            baseline_pairs.add((issue_num, rid))
+    assert retired_pairs == baseline_pairs
 
 
 def test_frozen_intentionally_unbound_set_is_frozen():
-    """Intentionally unbound set matches baseline: issue #30."""
+    """Intentionally unbound set matches baseline: issue #30 — exact per-issue mappings."""
     matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
     unbound_rows = [
         row for row in matrix["rows"]
         if row["classification"] == ReconciliationClassification.INTENTIONALLY_UNBOUND
     ]
-    unbound_ids = {row["planned_rule_id"] for row in unbound_rows}
-    baseline_unbound = set()
-    for issue_key in ["issue_30"]:
-        baseline_unbound.update(BASELINE["frozen_intentionally_unbound"][issue_key]["rule_ids"])
-    assert unbound_ids == baseline_unbound
+    unbound_pairs = {(row["issue"], row["planned_rule_id"]) for row in unbound_rows}
+    baseline_pairs = set()
+    for issue_key, issue_num in [("issue_30", 30)]:
+        for rid in BASELINE["frozen_intentionally_unbound"][issue_key]["rule_ids"]:
+            baseline_pairs.add((issue_num, rid))
+    assert unbound_pairs == baseline_pairs
 
 
 def test_retired_rows_have_terminal_resolution_status():
@@ -203,6 +205,47 @@ def test_no_duplicate_rule_ids_across_all_sets():
     assert not bound_vs_others, (
         f"Bound rules found in retired/unbound/deferred: {bound_vs_others}"
     )
+
+
+def test_retired_issue_rule_entry_count():
+    """18 issue-scoped retirement entries across #23 (10), #25 (2), #29 (6)."""
+    matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
+    retired_rows = [
+        row for row in matrix["rows"]
+        if row["classification"] == ReconciliationClassification.RETIRED
+    ]
+    by_issue = {}
+    for row in retired_rows:
+        by_issue.setdefault(row["issue"], []).append(row["planned_rule_id"])
+    assert len(by_issue[23]) == 10
+    assert len(by_issue[25]) == 2
+    assert len(by_issue[29]) == 6
+    total_entries = sum(len(v) for v in by_issue.values())
+    assert total_entries == 18
+
+
+def test_retired_unique_ids_count():
+    """14 unique retired rule IDs (4 shared between #23 and #29)."""
+    matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
+    retired_rows = [
+        row for row in matrix["rows"]
+        if row["classification"] == ReconciliationClassification.RETIRED
+    ]
+    unique_ids = {row["planned_rule_id"] for row in retired_rows}
+    assert len(unique_ids) == 14
+
+
+def test_retired_shared_ids_between_23_and_29():
+    """CORE-ROBOTS-003/004, CORE-SITEMAP-005/008 are shared between #23 and #29."""
+    matrix = build_stage_e_reconciliation_matrix(load_rule_catalog_snapshot())
+    retired_rows = [
+        row for row in matrix["rows"]
+        if row["classification"] == ReconciliationClassification.RETIRED
+    ]
+    ids_23 = {row["planned_rule_id"] for row in retired_rows if row["issue"] == 23}
+    ids_29 = {row["planned_rule_id"] for row in retired_rows if row["issue"] == 29}
+    shared = ids_23 & ids_29
+    assert shared == {"CORE-ROBOTS-003", "CORE-ROBOTS-004", "CORE-SITEMAP-005", "CORE-SITEMAP-008"}
 
 
 def test_all_plan_references_have_disposition():

@@ -6,13 +6,15 @@
 
 - Finalized Stage F governance freeze for issue #34, completing the entire
   Stage E/F reconciliation cycle.
-- Added `frozen_retired` set to baseline: 20 rule IDs retired from v0.14.0
-  scope (issues #23, #25, #29: CORE-ROBOTS-*, CORE-SITEMAP-*, CORE-DUP-*).
+- Added `frozen_retired` set to baseline: 18 issue-scoped retirement entries
+  covering 14 unique rule IDs (issues #23, #25, #29: CORE-ROBOTS-*,
+  CORE-SITEMAP-*, CORE-DUP-*; 4 IDs shared between #23 and #29).
 - Added `frozen_intentionally_unbound` set to baseline: 6 rule IDs kept
   unbound by governance decision (issue #30: CORE-HTTP-002, CORE-ROBOTS-003,
   GOOGLE-IDX-*, YANDEX-IDX-*).
-- Added 9 drift gate tests verifying frozen sets, bindability, and
-  non-overlap between bound and retired/unbound rule IDs.
+- Added 17 drift gate tests verifying frozen sets, bindability, per-issue
+  identity, shared ID counts, and non-overlap between bound and
+  retired/unbound rule IDs.
 - Verified RETIRED/INTENTIONALLY_UNBOUND rows remain blocked for binding
   even when binding_allowed=True.
 - All 1096 tests pass (30 skipped, 3 xfailed).

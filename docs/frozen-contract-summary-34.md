@@ -14,13 +14,16 @@
 
 ## Rule ID inventory
 
-| Category | Count | IDs |
-|----------|-------|-----|
-| Bound (evaluator) | 20 | CORE-CANON-001..008, CORE-COVERAGE-001, CORE-LINK-001..006, GOOGLE-DESC-001, GOOGLE-HREF-001,003,004, GOOGLE-TITLE-001 |
-| Deferred | 2 | GOOGLE-HREF-002, GOOGLE-HREF-005 |
-| Retired | 20 | CORE-ROBOTS-001..004, CORE-SITEMAP-001..008, CORE-DUP-001..002 |
-| Intentionally unbound | 6 | CORE-HTTP-002, CORE-ROBOTS-003, GOOGLE-IDX-001..002, YANDEX-IDX-001..002 |
-| **Total governed** | **48** | |
+| Category | Issue-scoped entries | Unique IDs | IDs |
+|----------|---------------------|------------|-----|
+| Bound (evaluator) | 20 | 20 | CORE-CANON-001..008, CORE-COVERAGE-001, CORE-LINK-001..006, GOOGLE-DESC-001, GOOGLE-HREF-001,003,004, GOOGLE-TITLE-001 |
+| Deferred | 2 | 2 | GOOGLE-HREF-002, GOOGLE-HREF-005 |
+| Retired | 18 | 14 | CORE-ROBOTS-001..004, CORE-SITEMAP-001..008, CORE-DUP-001..002 |
+| Intentionally unbound | 6 | 6 | CORE-HTTP-002, CORE-ROBOTS-003, GOOGLE-IDX-001..002, YANDEX-IDX-001..002 |
+
+**Note:** 4 retired IDs are shared between issues #23 and #29 (CORE-ROBOTS-003,
+CORE-ROBOTS-004, CORE-SITEMAP-005, CORE-SITEMAP-008), so unique retired count
+is 14, not 18.
 
 ## Classification matrix
 

@@ -13,7 +13,7 @@ pytest -q -ra
 ### Freeze matrix tests (test_e_freeze_matrix.py)
 
 ```
-14 passed in 2.42s
+17 passed in 3.26s
 ```
 
 - test_frozen_catalog_is_unchanged PASSED
@@ -28,6 +28,9 @@ pytest -q -ra
 - test_retired_rows_are_never_bindable PASSED
 - test_intentionally_unbound_rows_are_never_bindable PASSED
 - test_no_duplicate_rule_ids_across_all_sets PASSED
+- test_retired_issue_rule_entry_count PASSED
+- test_retired_unique_ids_count PASSED
+- test_retired_shared_ids_between_23_and_29 PASSED
 - test_all_plan_references_have_disposition PASSED
 - test_all_plan_references_have_terminal_classification PASSED
 
@@ -49,7 +52,8 @@ dirty=false
 | Semantics digest matches baseline | ✅ 4c678b79… |
 | Score model matches baseline | ✅ readiness-transparent-v2 |
 | Evaluator targets match baseline | ✅ All 6 registries |
-| Retired set matches reconciliation | ✅ 20 IDs |
-| Unbound set matches reconciliation | ✅ 6 IDs |
+| Retired set matches reconciliation (per-issue pairs) | ✅ 18 entries, 14 unique IDs |
+| Unbound set matches reconciliation (per-issue pairs) | ✅ 6 entries |
 | No bound/retired overlap | ✅ Clean |
 | No bound/unbound overlap | ✅ Clean |
+| Retired shared IDs (#23∩#29) | ✅ CORE-ROBOTS-003/004, CORE-SITEMAP-005/008 |
