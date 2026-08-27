@@ -66,12 +66,12 @@ The following are frozen and any drift requires explicit re-freeze:
 - Evaluator registry targets per evaluator
 - Score model ID (`readiness-transparent-v2`)
 - Deferred set (GOOGLE-HREF-002, GOOGLE-HREF-005)
-- Retired set (20 rule IDs across issues #23, #25, #29)
+- Retired set (18 issue-scoped entries / 14 unique rule IDs across issues #23, #25, #29)
 - Intentionally-unbound set (6 rule IDs from issue #30)
 
 ## Acceptance
 
-- [x] All 14 drift gate tests pass
+- [x] All 17 drift gate tests pass
 - [x] RETIRED rows have resolution_status=retired
 - [x] INTENTIONALLY_UNBOUND rows have resolution_status=intentionally_unbound
 - [x] Retired rows remain blocked when binding_allowed=True

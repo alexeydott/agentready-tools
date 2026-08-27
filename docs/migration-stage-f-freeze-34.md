@@ -20,7 +20,7 @@ identical to the pre-freeze state.
 
 ### Frozen baseline
 The baseline artifact now includes:
-- `frozen_retired`: 20 rule IDs retired from v0.14.0 scope
+- `frozen_retired`: 18 issue-scoped retirement entries covering 14 unique rule IDs retired from v0.14.0 scope (4 IDs shared between #23 and #29)
 - `frozen_intentionally_unbound`: 6 rule IDs kept unbound by governance decision
 
 ### Retired rules (no action required)
