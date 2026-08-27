@@ -30,6 +30,13 @@ datas = [
     *collect_data_files("certifi"),
 ]
 
+# Explicitly add agentready package data files
+catalog_dir = src_root / "agentready" / "seo" / "rules" / "catalog"
+for f in catalog_dir.glob("*.yaml"):
+    datas.append((str(f), f"agentready/seo/rules/catalog"))
+for f in catalog_dir.glob("*.json"):
+    datas.append((str(f), f"agentready/seo/rules/catalog"))
+
 a = Analysis(
     [str(project_root / "packaging" / "portable_entrypoint.py")],
     pathex=[str(src_root)],
